@@ -1,14 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-// 1. 引入组件
-import RuleConfig from '../views/RuleConfig.vue'
+// 1. 引入布局组件 (作为父级容器)
+import MainLayout from '../layout/MainLayout.vue'
+
+// 2. 引入业务页面 (直接在 views 目录下，不搞 modules 子文件夹)
 import DictLayout from '../views/DictLayout.vue'
 import BasicClass from '../views/BasicClass.vue'
 import PmcCode from '../views/PmcCode.vue'
+
+// 3. 引入通用组件
 import DictTable from '../components/DictTable.vue'
 
-// 暂时复用 BasicClass，后面你建好文件了再改
-import SpecConfig from '../views/BasicClass.vue' 
+// 暂时复用 BasicClass
+import SpecConfig from '../views/BasicClass.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,16 +21,16 @@ const router = createRouter({
 
     {
       path: '/config',
-      component: RuleConfig, // 顶部 Menu 在这里
+      component: MainLayout, // 这一层是顶部导航骨架
       children: [
         // 1. 字典模块
         {
           path: 'dict',
-          component: DictLayout, // 白色背景容器
+          component: DictLayout, // 这一层是白色内容容器
           redirect: '/config/dict/grade',
           children: [
-            // :id 对应 grade, material 等
-            { path: ':id', component: DictTable } 
+            // 这一层是具体表格
+            { path: ':id', component: DictTable }
           ]
         },
         
