@@ -1,58 +1,82 @@
 <script setup>
-import { ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 const route = useRoute()
-const router = useRouter()
-
-const activeTopTab = ref('dict')
-
-// 1. 路由同步 Tab：根据当前 URL，高亮对应的 Tab
-// 例如：访问 /config/spec，Tab 自动变成 spec
-watch(() => route.path, (newPath) => {
-  const path = newPath.split('/')
-  // 假设路径是 /config/dict/grade，取第2个部分 'dict'
-  if (path[2]) {
-    activeTopTab.value = path[2]
-  }
-}, { immediate: true })
-
-// 2. Tab 切换逻辑：点击 Tab 跳转到对应模块的默认页
-const handleTabClick = (tab) => {
-  const name = tab.paneName
-  
-  if (name === 'dict') {
-    router.push('/config/dict/grade') // 字典默认跳到管材等级
-  } else {
-    // 其他页面直接跳 /config/xxx
-    router.push(`/config/${name}`)
-  }
-}
 </script>
 
 <template>
-  <div class="main-layout">
-    <div class="top-tabs">
-      <el-tabs v-model="activeTopTab" type="card" @tab-click="handleTabClick">
-        <el-tab-pane label="字典定义" name="dict"></el-tab-pane>
-        <el-tab-pane label="基础类" name="basic"></el-tab-pane>
-        <el-tab-pane label="Spec配置" name="spec"></el-tab-pane>
-        <el-tab-pane label="PMC编码" name="pmc"></el-tab-pane>
-        <el-tab-pane label="船型船号基础数据" name="ship"></el-tab-pane>
-        <el-tab-pane label="管材规格书配置" name="pipe"></el-tab-pane>
-      </el-tabs>
-    </div>
+  <el-container class="layout-container">
+    <el-header class="header-wrap">
+      <div class="logo">
+        <span style="font-size: 24px; margin-right: 8px;">⚙️</span>
+        <span style="font-weight: bold; font-size: 18px; color: #303133;">规则配置器</span>
+      </div>
 
-    <div class="content-body">
+      <el-menu
+        :default-active="route.path"
+        mode="horizontal"
+        router
+        :ellipsis="false"
+        class="header-menu"
+      >
+        <el-sub-menu index="/config/dict">
+          <template #title>字典定义</template>
+          <el-menu-item-group title="业务属性">
+            <el-menu-item index="/config/dict/grade">A-管材等级</el-menu-item>
+            <el-menu-item index="/config/dict/material">B1-主材料</el-menu-item>
+            <el-menu-item index="/config/dict/interface">接口表</el-menu-item>
+          </el-menu-item-group>
+          <el-menu-item-group title="标准系列">
+            <el-menu-item index="/config/dict/std-gb">国标系列</el-menu-item>
+          </el-menu-item-group>
+        </el-sub-menu>
+
+        <el-menu-item index="/config/basic">基础类配置</el-menu-item>
+        <el-menu-item index="/config/spec">Spec配置</el-menu-item>
+        <el-menu-item index="/config/pmc">PMC编码</el-menu-item>
+        <el-menu-item index="/config/ship">船型船号</el-menu-item>
+        <el-menu-item index="/config/pipe">管材规格书</el-menu-item>
+      </el-menu>
+    </el-header>
+
+    <el-main class="main-content">
       <RouterView />
-    </div>
-  </div>
+    </el-main>
+  </el-container>
 </template>
 
 <style scoped>
-.main-layout { height: 100vh; display: flex; flex-direction: column; background: #fff; }
-.top-tabs { padding: 10px 20px 0 20px; border-bottom: 1px solid #dcdfe6; }
-:deep(.el-tabs__content) { display: none; } /* 隐藏 Tab 自带的内容区 */
-:deep(.el-tabs__header) { margin-bottom: 0; }
-.content-body { flex: 1; overflow: hidden; }
+.layout-container {
+  height: 100vh;
+  background-color: #ffffff;
+}
+
+.header-wrap {
+  display: flex;
+  align-items: center;
+  /* 加上底边框，与 el-menu 的默认样式呼应 */
+  border-bottom: solid 1px var(--el-menu-border-color); 
+  padding: 0 20px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  margin-right: 40px;
+  /* 防止 logo 被压缩 */
+  flex-shrink: 0; 
+}
+
+.header-menu {
+  flex: 1;
+  /* 去掉 el-menu 默认的底边框，因为外层 header 已经加了，避免双重边框 */
+  border-bottom: none !important; 
+}
+
+.main-content {
+  /* 给内容区一个浅灰背景，突显卡片感 */
+  background-color: #f5f7fa; 
+  padding: 20px;
+  overflow: hidden; /* 防止双重滚动条 */
+}
 </style>
