@@ -20,9 +20,14 @@ const route = useRoute()
       >
         <el-sub-menu index="/config/dict">
            <template #title>字典定义</template>
-           <el-menu-item-group title="业务属性">
-             <el-menu-item index="/config/dict/grade">A-管材等级</el-menu-item>
-             <el-menu-item index="/config/dict/material">B1-主材料</el-menu-item>
+           <el-menu-item-group title="业务属性字典定义">
+             <el-menu-item index="/config/dict/grade">标准系列</el-menu-item>
+             <el-menu-item index="/config/dict/material">A-管材标准</el-menu-item>
+             <el-menu-item index="/config/dict/interface">B1-主材料</el-menu-item>
+             <el-menu-item index="/config/dict/interface1">B-牌号</el-menu-item>
+             <el-menu-item index="/config/dict/interface2">C1-法兰标准</el-menu-item>
+             <el-menu-item index="/config/dict/interfacee">C2-法兰压力等级</el-menu-item>
+             <el-menu-item index="/config/dict/interfacer4">D-壁厚等级</el-menu-item>
              <el-menu-item index="/config/dict/interface">接口表</el-menu-item>
            </el-menu-item-group>
            <el-menu-item-group title="标准系列">
