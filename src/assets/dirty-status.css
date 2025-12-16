@@ -1,0 +1,37 @@
+/* --- 全局脏数据高亮样式 --- */
+
+/* 1. 单元格容器：用于定位右上角的小红点 */
+.dirty-cell-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* 2. 修改过的输入框：背景变微黄，边框变橙色 */
+/* 使用 !important 覆盖 Element 默认样式 */
+.is-modified .el-input__wrapper,
+.is-modified .el-textarea__inner {
+  background-color: #fdf6ec !important; /* 浅橙色背景 */
+  box-shadow: 0 0 0 1px #e6a23c inset !important; /* 橙色边框 */
+}
+
+/* 3. 脏标记：右上角的小红三角 (类似 Excel) */
+.dirty-marker {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 0;
+  height: 0;
+  border-top: 6px solid #f56c6c;
+  border-left: 6px solid transparent;
+  z-index: 20;
+  pointer-events: none; /* 防止遮挡点击 */
+}
+
+/* 4. 新增行高亮：整行浅绿 */
+.el-table .new-row-highlight {
+  background-color: #f0f9eb !important;
+}
+/* 处理 Hover 时的颜色覆盖问题 */
+.el-table .new-row-highlight:hover > td.el-table__cell {
+  background-color: #f0f9eb !important;
+}
