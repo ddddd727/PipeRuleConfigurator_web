@@ -1,4 +1,4 @@
-# 📘 PipeRuleConfigurator Web (管材规则配置器前端) - 新手入职指南
+# 📘 PipeRuleConfigurator Web (管材规则配置器前端) 
 
 欢迎加入项目组！这份文档旨在帮助你快速配置环境、理解开发流程，并掌握核心协作规范。我们推荐使用 **VS Code** 进行全流程开发。
 
