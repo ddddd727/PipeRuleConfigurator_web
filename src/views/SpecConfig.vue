@@ -1,17 +1,17 @@
-import { createRouter, createWebHistory } from 'vue-router'
+<template>
+  <div class="page-container">
+    <div class="header">
+      <h2>🛠️ Spec 规格书配置</h2>
+      <el-button type="primary">新建 Spec</el-button>
+    </div>
+    
+    <el-card shadow="never">
+      <el-empty description="Spec 配置功能模块开发中..." />
+    </el-card>
+  </div>
+</template>
 
-// 1. 引入所有页面组件
-import RuleConfig from '../views/RuleConfig.vue'
-import DictLayout from '../views/DictLayout.vue'
-import BasicClass from '../views/BasicClass.vue'
-import PmcCode from '../views/PmcCode.vue'
-import DictTable from '../components/DictTable.vue'
-
-
-import SpecConfig from '../views/BasicClass.vue' // <--- 补充这一行
-
-const router = createRouter({
-  // ... 你的其他代码 ...
-})
-
-exportXZ default router
+<style scoped>
+.page-container { padding: 24px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+</style>

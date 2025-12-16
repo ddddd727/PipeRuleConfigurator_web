@@ -1,15 +1,16 @@
 import { createApp } from 'vue'
 import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css' // 引入样式
-import * as ElementPlusIconsVue from '@element-plus/icons-vue' // 引入图标
+import 'element-plus/dist/index.css'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
-
 import './mock/index.js'
+
+// 【新增】引入全局脏数据样式
+import './assets/dirty-status.css' 
 
 const app = createApp(App)
 
-// 注册所有图标 (方便菜单使用)
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }

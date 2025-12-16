@@ -20,16 +20,25 @@ const route = useRoute()
       >
         <el-sub-menu index="/config/dict">
            <template #title>字典定义</template>
+           
            <el-menu-item-group title="业务属性字典定义">
-             <el-menu-item index="/config/dict/grade">标准系列</el-menu-item>
-             <el-menu-item index="/config/dict/material">A-管材标准</el-menu-item>
-             <el-menu-item index="/config/dict/interface">B1-主材料</el-menu-item>
-             <el-menu-item index="/config/dict/interface1">B-牌号</el-menu-item>
-             <el-menu-item index="/config/dict/interface2">C1-法兰标准</el-menu-item>
-             <el-menu-item index="/config/dict/interfacee">C2-法兰压力等级</el-menu-item>
-             <el-menu-item index="/config/dict/interfacer4">D-壁厚等级</el-menu-item>
-             <el-menu-item index="/config/dict/interface">接口表</el-menu-item>
+             <el-menu-item index="/config/dict/grade">管材等级</el-menu-item>
+             
+             <el-menu-item index="/config/dict/pipe-std">A-管材标准</el-menu-item>
+             
+             <el-menu-item index="/config/dict/main-material">B1-主材料</el-menu-item>
+             
+             <el-menu-item index="/config/dict/material-grade">B-牌号</el-menu-item>
+             
+             <el-menu-item index="/config/dict/flange-std">C1-法兰标准</el-menu-item>
+             
+             <el-menu-item index="/config/dict/flange-pressure">C2-法兰压力等级</el-menu-item>
+             
+             <el-menu-item index="/config/dict/wall-thickness">D-壁厚等级</el-menu-item>
+             
+             <el-menu-item index="/config/dict/interface-table">接口表</el-menu-item>
            </el-menu-item-group>
+
            <el-menu-item-group title="标准系列">
              <el-menu-item index="/config/dict/std-gb">国标系列</el-menu-item>
            </el-menu-item-group>
@@ -50,7 +59,6 @@ const route = useRoute()
 </template>
 
 <style scoped>
-/* ... 样式保持不变 ... */
 .layout-container { height: 100vh; background-color: #ffffff; }
 .header-wrap { display: flex; align-items: center; border-bottom: solid 1px var(--el-menu-border-color); padding: 0 20px; }
 .logo { display: flex; align-items: center; margin-right: 40px; flex-shrink: 0; }
