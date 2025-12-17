@@ -164,6 +164,50 @@ const db = {
       'name': '@ctitle(5, 12)',
       'status|1': ['现行', '废止', '即将实施']
     }]
+  },
+
+   // 10. 弯管数据 (bend-pipe)
+  'bend-pipe': {
+    title: '弯管数据',
+    columns: [
+      { prop: 'id', label: '序号', width: 60 },
+      { prop: 'dn', label: '通径DN', filterable: true },
+      { prop: 'unit', label: '通径单位' },
+      { prop: 'material', label: '主材料', filterable: true },
+      { prop: 'l1', label: '前夹长L1', filterable: true },
+      { prop: 'l2', label: '后加长L2', filterable: true }
+    ],
+    'data|22': [{
+      'id|+1': 1,
+      'dn': '@integer(10, 50)',
+      'unit': 'mm',
+      'material|1': [' carbon steel', ' stainless steel', ' iron', ' copper', ' aluminum'],
+      'l1': '@integer(1, 10)',
+      'l2': '@integer(1, 10)'
+    }]
+  },
+
+  // 11. 壁厚系列 (wall-thickness-series)
+  'wall-thickness-series': {
+    title: '壁厚系列',
+    columns: [
+      { prop: 'id', label: '序号', width: 60 },
+      { prop: 'dn', label: '通径DN', filterable: true },
+      { prop: 'unit', label: '通径单位' },
+      { prop: 'thickness', label: '壁厚系列', filterable: true },
+      { prop: 'outer diameter', label: '外径', filterable: true },
+      { prop: 'value', label: '壁厚值', filterable: true },
+      { prop: 'material', label: '主材料', filterable: true }
+    ],
+    'data|156': [{
+      'id|+1': 1,
+      'dn': '@integer(10, 50)',
+      'unit': 'mm',
+      'thickness|1': ['Sch10', 'Sch20', 'Sch30', 'STD', 'Sch40', 'Sch60', 'XS', 'Sch80', 'Sch120', 'Sch160'],
+      'outer diameter': '@float(1, 10, 1, 2)',
+      'value': '@float(1, 10, 1, 2)',
+      'material|1': [' carbon steel', ' stainless steel', ' iron', ' copper', ' aluminum']
+    }]
   }
 }
 

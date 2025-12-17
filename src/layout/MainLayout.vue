@@ -44,7 +44,12 @@ const route = useRoute()
            </el-menu-item-group>
         </el-sub-menu>
 
-        <el-menu-item index="/config/basic">基础类配置</el-menu-item>
+        <el-sub-menu index="/config/basic">
+          <template #title>基础类配置</template>
+          <el-menu-item index="/config/dict/bend-pipe">弯管数据</el-menu-item>
+          <el-menu-item index="/config/dict/wall-thickness-series">壁厚系列</el-menu-item>
+        </el-sub-menu>
+        
         <el-menu-item index="/config/spec">Spec配置</el-menu-item>
         <el-menu-item index="/config/pmc">PMC编码</el-menu-item>
         <el-menu-item index="/config/ship">船型船号</el-menu-item>
