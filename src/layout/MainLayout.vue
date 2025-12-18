@@ -1,7 +1,25 @@
 <script setup>
 import { useRoute } from 'vue-router'
+import { ref, computed } from 'vue'
 const route = useRoute()
 </script>
+
+// 控制基础类配置是否展开
+const basicConfigActive = ref(false)
+
+// 当前激活的基础配置项
+const activeBasicConfig = ref('wall-thickness-series')
+
+// 点击基础类菜单的处理函数
+const handleBasicConfigClick = () => {
+  basicConfigActive.value = !basicConfigActive.value
+}
+
+// 计算当前是否在基础配置相关路由
+const isBasicConfigRoute = computed(() => {
+  return route.path.includes('/config/dict/bend-pipe') || 
+         route.path.includes('/config/dict/wall-thickness-series')
+})
 
 <template>
   <el-container class="layout-container">
@@ -44,12 +62,21 @@ const route = useRoute()
            </el-menu-item-group>
         </el-sub-menu>
 
-        <el-sub-menu index="/config/basic">
+        <!-- <el-sub-menu index="/config/basic">
           <template #title>基础类配置</template>
           <el-menu-item index="/config/dict/bend-pipe">弯管数据</el-menu-item>
           <el-menu-item index="/config/dict/wall-thickness-series">壁厚系列</el-menu-item>
-        </el-sub-menu>
-        
+        </el-sub-menu> -->
+
+        <!-- <el-menu-item 
+          index="/config/basic"
+          @click="handleBasicConfigClick"
+          :class="{ 'is-active': basicConfigActive || isBasicConfigRoute }"
+        >
+          基础类
+        </el-menu-item> -->
+
+        <el-menu-item index="/config/basic">基础类</el-menu-item>
         <el-menu-item index="/config/spec">Spec配置</el-menu-item>
         <el-menu-item index="/config/pmc">PMC编码</el-menu-item>
         <el-menu-item index="/config/ship">船型船号</el-menu-item>
