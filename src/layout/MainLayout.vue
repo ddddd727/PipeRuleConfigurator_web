@@ -34,27 +34,63 @@ const breadcrumbs = computed(() => {
         unique-opened
         :collapse-transition="false"
       >
-        <el-sub-menu index="/dict">
+        <el-sub-menu index="/dict" :popper-offset="16">
           <template #title>
             <el-icon><Reading /></el-icon>
             <span>字典定义</span>
           </template>
           
-          <el-sub-menu index="dict-business">
+          <el-sub-menu index="dict-business" :popper-offset="16" class="nest-menu">
             <template #title>业务属性</template>
-            <el-menu-item index="/dict/grade">管材等级</el-menu-item>
-            <el-menu-item index="/dict/pipe-std">A-管材标准</el-menu-item>
-            <el-menu-item index="/dict/main-material">B1-主材料</el-menu-item>
-            <el-menu-item index="/dict/material-grade">B-牌号</el-menu-item>
-            <el-menu-item index="/dict/flange-std">C1-法兰标准</el-menu-item>
-            <el-menu-item index="/dict/flange-pressure">C2-法兰压力等级</el-menu-item>
-            <el-menu-item index="/dict/wall-thickness">D-壁厚等级</el-menu-item>
-            <el-menu-item index="/dict/interface-table">接口表</el-menu-item>
+            
+            <el-menu-item index="/dict/grade">
+              <el-icon><Medal /></el-icon>
+              <span>管材等级</span>
+            </el-menu-item>
+
+            <el-menu-item index="/dict/pipe-std">
+              <el-icon><Collection /></el-icon>
+              <span>A-管材标准</span>
+            </el-menu-item>
+
+            <el-menu-item index="/dict/main-material">
+              <el-icon><Box /></el-icon>
+              <span>B1-主材料</span>
+            </el-menu-item>
+
+            <el-menu-item index="/dict/material-grade">
+              <el-icon><Ticket /></el-icon>
+              <span>B-牌号</span>
+            </el-menu-item>
+
+            <el-menu-item index="/dict/flange-std">
+              <el-icon><CircleCheck /></el-icon>
+              <span>C1-法兰标准</span>
+            </el-menu-item>
+
+            <el-menu-item index="/dict/flange-pressure">
+              <el-icon><Odometer /></el-icon>
+              <span>C2-法兰压力</span>
+            </el-menu-item>
+
+            <el-menu-item index="/dict/wall-thickness">
+              <el-icon><CopyDocument /></el-icon>
+              <span>D-壁厚等级</span>
+            </el-menu-item>
+
+            <el-menu-item index="/dict/interface-table">
+              <el-icon><Link /></el-icon>
+              <span>接口表</span>
+            </el-menu-item>
           </el-sub-menu>
 
-          <el-sub-menu index="dict-std">
+          <el-sub-menu index="dict-std" :popper-offset="16" class="nest-menu">
              <template #title>标准系列</template>
-             <el-menu-item index="/dict/std-gb">国标系列</el-menu-item>
+             
+             <el-menu-item index="/dict/std-gb">
+               <el-icon><Flag /></el-icon>
+               <span>国标系列</span>
+             </el-menu-item>
           </el-sub-menu>
         </el-sub-menu>
 
@@ -113,7 +149,7 @@ const breadcrumbs = computed(() => {
 </template>
 
 <style scoped>
-/* 样式保持不变 */
+/* --- 布局基础 --- */
 .layout-container { height: 100vh; display: flex; }
 .aside-menu { background-color: #304156; transition: width 0.28s; overflow-x: hidden; display: flex; flex-direction: column; }
 .logo-area { height: 50px; line-height: 50px; text-align: center; background-color: #2b2f3a; color: #fff; flex-shrink: 0; overflow: hidden; }
@@ -121,6 +157,54 @@ const breadcrumbs = computed(() => {
 .logo-text { font-size: 16px; font-weight: bold; margin-left: 10px; vertical-align: middle; }
 .el-menu-vertical { border-right: none; width: 100%; }
 
+/* ================================================= */
+/* 核心修改：背景色 & 字体大小 阶梯           */
+/* ================================================= */
+
+/* --- Level 1: 一级菜单 --- */
+/* 目标：选中第一层级的菜单项和子菜单标题 */
+:deep(.el-menu-vertical > .el-menu-item),
+:deep(.el-menu-vertical > .el-sub-menu > .el-sub-menu__title) {
+  font-size: 16px !important;  /* 【大号字体】 */
+  font-weight: bold !important; /* 【加粗】 */
+  /* 背景色由 Element 默认控制 (#304156) */
+}
+
+/* --- Level 2: 二级菜单标题 --- */
+/* 目标：选中 class="nest-menu" 的子菜单标题 (如：业务属性) */
+:deep(.nest-menu > .el-sub-menu__title) {
+  background-color: #1f2d3d !important; /* 背景变暗 */
+  font-size: 14px !important;  /* 【中号字体】 */
+  font-weight: normal !important; /* 不加粗 */
+}
+
+/* --- Level 3: 三级菜单项 --- */
+/* 目标：选中 class="nest-menu" 下的具体页面 (如：管材等级) */
+:deep(.nest-menu .el-menu-item) {
+  background-color: #001528 !important; /* 背景最暗 */
+  font-size: 12px !important;  /* 【小号字体】 */
+  height: 45px !important; /* 稍微调小一点行高，显得更紧凑 */
+  line-height: 45px !important;
+}
+
+/* ================================================= */
+/* 交互状态 (Hover/Active)            */
+/* ================================================= */
+
+/* Hover 统一效果 */
+:deep(.el-sub-menu__title:hover),
+:deep(.el-menu-item:hover) {
+  background-color: #263445 !important;
+}
+
+/* Active 选中高亮 */
+:deep(.el-menu-item.is-active) {
+  color: #409EFF !important;
+  background-color: #001528 !important; /* 保持深色背景 */
+  font-weight: bold !important; /* 选中时加粗 */
+}
+
+/* --- 顶部 Header --- */
 .header-wrap { background-color: #fff; border-bottom: 1px solid #e6e6e6; display: flex; align-items: center; height: 50px; padding: 0 15px; }
 .collapse-btn { margin-right: 20px; cursor: pointer; display: flex; align-items: center; }
 .collapse-btn:hover { color: #409EFF; }
@@ -129,22 +213,9 @@ const breadcrumbs = computed(() => {
 .breadcrumb-inner a { font-weight: normal; cursor: pointer; }
 .breadcrumb-inner a:hover { color: #409EFF; }
 
+/* --- Main 内容 --- */
 .main-content { background-color: #f0f2f5; padding: 20px; overflow-y: auto; }
 .fade-transform-enter-active, .fade-transform-leave-active { transition: all 0.3s; }
 .fade-transform-enter-from { opacity: 0; transform: translateX(-10px); }
 .fade-transform-leave-to { opacity: 0; transform: translateX(10px); }
-
-/* 额外优化：让嵌套菜单的背景色稍微深一点，增强层次感 
-  注意：Element Plus 的暗色模式菜单处理起来比较自动，
-  如果觉得层次感不够，可以取消注释下面的样式
-*/
-/*
-:deep(.el-sub-menu .el-menu-item),
-:deep(.el-sub-menu .el-sub-menu__title) {
-  background-color: #1f2d3d !important;
-}
-:deep(.el-menu-item:hover) {
-  background-color: #001528 !important;
-}
-*/
 </style>
