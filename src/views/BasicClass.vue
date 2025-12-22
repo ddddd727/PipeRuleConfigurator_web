@@ -39,6 +39,14 @@
           <div class="action-buttons">
             <el-button 
               size="small" 
+              :type="editMode ? 'danger' : 'warning'"
+              @click="toggleEditMode"
+            >
+              <el-icon><Edit /></el-icon>
+              {{ editMode ? '取消编辑' : '编辑' }}
+            </el-button>
+            <el-button 
+              size="small" 
               type="primary" 
               @click="openAddRowDialog"
             >
@@ -57,7 +65,7 @@
               size="small" 
               type="danger" 
               @click="handleDeleteSelectedRows"
-              :disabled="selectedRows.length === 0"
+              :disabled="!editMode || selectedRows.length === 0"
             >
               <el-icon><Delete /></el-icon>
               删除 ({{ selectedRows.length }})
@@ -66,6 +74,7 @@
               size="small" 
               type="success" 
               @click="handleSave"
+              :disabled="!editMode"
             >
               <el-icon><Check /></el-icon>
               保存
@@ -148,14 +157,30 @@
                 prop="id"
                 label="序号"
                 width="80"
-              />
-              <template v-for="col in bendPipeColumns" :key="col.prop">
+              >
+                <template #default="{ row }">
+                  {{ row.id }}
+                </template>
+              </el-table-column>
+              <template v-for="col in bendPipeColumns.filter(col => col.prop !== 'id')" :key="col.prop">
                 <el-table-column
-                  v-if="col.prop !== 'id'"
                   :prop="col.prop"
                   :label="col.label"
                   :width="col.width || 'auto'"
-                />
+                >
+                  <template #default="{ row, $index }">
+                    <template v-if="editMode">
+                      <el-input
+                        v-model="row[col.prop]"
+                        size="small"
+                        @change="handleCellChange(row, col.prop, $index)"
+                      />
+                    </template>
+                    <template v-else>
+                      {{ row[col.prop] }}
+                    </template>
+                  </template>
+                </el-table-column>
               </template>
             </el-table>
             
@@ -187,14 +212,30 @@
                 prop="id"
                 label="序号"
                 width="80"
-              />
-              <template v-for="col in wallThicknessColumns" :key="col.prop">
+              >
+                <template #default="{ row }">
+                  {{ row.id }}
+                </template>
+              </el-table-column>
+              <template v-for="col in wallThicknessColumns.filter(col => col.prop !== 'id')" :key="col.prop">
                 <el-table-column
-                  v-if="col.prop !== 'id'"
                   :prop="col.prop"
                   :label="col.label"
                   :width="col.width || 'auto'"
-                />
+                >
+                  <template #default="{ row, $index }">
+                    <template v-if="editMode">
+                      <el-input
+                        v-model="row[col.prop]"
+                        size="small"
+                        @change="handleCellChange(row, col.prop, $index)"
+                      />
+                    </template>
+                    <template v-else>
+                      {{ row[col.prop] }}
+                    </template>
+                  </template>
+                </el-table-column>
               </template>
             </el-table>
             
@@ -221,7 +262,8 @@ import {
   Document,
   Plus,
   Delete,
-  Check
+  Check,
+  Edit
 } from '@element-plus/icons-vue'
 
 // 树形数据
@@ -258,6 +300,7 @@ const rowFormRef = ref()
 const addColumnDialogVisible = ref(false)
 const addRowDialogVisible = ref(false)
 const selectedRows = ref([])
+const editMode = ref(false)
 
 // 弯管数据表列定义
 const bendPipeColumns = ref([
@@ -377,7 +420,21 @@ const handleNodeClick = (node) => {
   if (node.id !== 'basic') {
     currentNode.value = node
     selectedRows.value = [] // 切换节点时清空选中
+    editMode.value = false // 切换节点时退出编辑模式
   }
+}
+
+// 切换编辑模式
+const toggleEditMode = () => {
+  editMode.value = !editMode.value
+  if (!editMode.value) {
+    selectedRows.value = [] // 退出编辑模式时清空选中
+  }
+}
+
+// 处理单元格变更
+const handleCellChange = (row, prop, index) => {
+  console.log(`行${index + 1}的${prop}字段修改为:`, row[prop])
 }
 
 // 打开添加行对话框
@@ -390,11 +447,6 @@ const openAddRowDialog = () => {
   // 为所有列设置初始空值
   currentColumns.value.forEach(col => {
     newRowForm[col.prop] = ''
-    
-    // 设置默认值
-    if (col.prop === 'unit') {
-      newRowForm[col.prop] = 'mm'
-    }
   })
   
   addRowDialogVisible.value = true
@@ -580,6 +632,8 @@ const handleSave = () => {
     // 模拟API调用
     setTimeout(() => {
       ElMessage.success('保存成功')
+      editMode.value = false // 保存后退出编辑模式
+      selectedRows.value = [] // 清空选中
     }, 500)
   }).catch(() => {
     // 用户取消
