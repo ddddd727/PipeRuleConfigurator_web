@@ -37,32 +37,47 @@
             <span class="subtitle">{{ currentNode.id === 'bend-pipe' ? '弯管参数配置' : '管材壁厚系列配置' }}</span>
           </div>
           <div class="action-buttons">
-            <el-button size="small" type="primary" @click="handleAddRow">
-              <el-icon><Plus /></el-icon>
-              增加行
-            </el-button>
-            <el-button size="small" type="primary" @click="handleAddColumn">
-              <el-icon><Plus /></el-icon>
-              增加列
-            </el-button>
             <el-button 
               size="small" 
               :type="editMode ? 'danger' : 'warning'"
               @click="toggleEditMode"
             >
               <el-icon><Edit /></el-icon>
-              {{ editMode ? '取消编辑' : '编辑' }} 
+              {{ editMode ? '取消' : '编辑' }} 
+            </el-button>
+            <el-button 
+              size="small" 
+              type="primary" 
+              @click="handleAddRow"
+              :disabled="!editMode"
+            >
+              <el-icon><Plus /></el-icon>
+              增加行
+            </el-button>
+            <el-button 
+              size="small" 
+              type="primary" 
+              @click="handleAddColumn"
+              :disabled="!editMode"
+            >
+              <el-icon><Plus /></el-icon>
+              增加列
             </el-button>
             <el-button 
               size="small" 
               type="danger" 
               @click="handleDeleteSelectedRows"
-              :disabled="selectedRows.length === 0"
+              :disabled="!editMode || selectedRows.length === 0"
             >
               <el-icon><Delete /></el-icon>
               删除 ({{ selectedRows.length }})
             </el-button>
-            <el-button size="small" type="success" @click="handleSave">
+            <el-button 
+              size="small" 
+              type="success" 
+              @click="handleSave"
+              :disabled="!editMode"
+            >
               <el-icon><Check /></el-icon>
               保存
             </el-button>
@@ -73,6 +88,7 @@
         <el-dialog
           v-model="addColumnDialogVisible"
           :title="`为${currentNode.label}添加新列`"
+          
           width="500px"
           @close="handleAddColumnDialogClose"
         >
@@ -83,12 +99,9 @@
             <el-form-item label="字段名" prop="prop">
               <el-input v-model="newColumnForm.prop" placeholder="请输入英文字段名" />
             </el-form-item>
-            <!-- <el-form-item label="内容">
-              <el-input v-model="newColumnForm.width" placeholder="" />
-            </el-form-item> -->
-            <el-form-item label="是否可编辑">
+            <!-- <el-form-item label="是否可编辑">
               <el-switch v-model="newColumnForm.editable" />
-            </el-form-item>
+            </el-form-item> -->
           </el-form>
           <template #footer>
             <span class="dialog-footer">
@@ -199,13 +212,6 @@
                   批量编辑选中行
                 </el-button>
               </div>
-              <el-pagination
-                v-model:current-page="currentPage"
-                :page-size="pageSize"
-                layout="total, prev, pager, next"
-                :total="bendPipeData.length"
-                small
-              />
             </div>
           </div>
 
@@ -282,13 +288,6 @@
                   批量编辑选中行
                 </el-button>
               </div>
-              <el-pagination
-                v-model:current-page="currentPage"
-                :page-size="pageSize"
-                layout="total, prev, pager, next"
-                :total="wallThicknessData.length"
-                small
-              />
             </div>
           </div>
         </div>
@@ -725,7 +724,7 @@ onMounted(() => {
 .basic-config-sidebar {
   width: 240px;
   background: white;
-  border-radius: 4px;
+  border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
@@ -769,7 +768,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   background: white;
-  border-radius: 4px;
+  border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }
@@ -864,7 +863,7 @@ onMounted(() => {
 /* 树节点选中样式 */
 :deep(.el-tree-node.is-current > .el-tree-node__content) {
   background-color: #ecf5ff;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 :deep(.el-tree-node__content:hover) {
@@ -895,8 +894,9 @@ onMounted(() => {
   gap: 8px;
 }
 
-/* 删除按钮禁用样式 */
+/* 按钮禁用样式 */
 :deep(.el-button.is-disabled) {
   opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>
