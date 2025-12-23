@@ -7,9 +7,9 @@ import MainLayout from '../layout/MainLayout.vue'
 import DictLayout from '../views/DictLayout.vue'
 import BasicClass from '../views/BasicClass.vue'
 import PmcCode from '../views/PmcCode.vue'
-import SpecConfig from '../views/SpecConfig.vue' // 已修复的 Spec 页面
-import ShipData from '../views/ShipData.vue'     // 新增
-import PipeSpec from '../views/PipeSpec.vue'     // 新增
+import SpecConfig from '../views/SpecConfig.vue'
+import ShipData from '../views/ShipData.vue'
+import PipeSpec from '../views/PipeSpec.vue'
 
 // 3. 组件
 import DictTable from '../components/DictTable.vue'
@@ -17,35 +17,61 @@ import DictTable from '../components/DictTable.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', redirect: '/config/dict/grade' },
+    // 默认重qy定向到第一个业务页面
+    { path: '/', redirect: '/dict/grade' },
 
     {
-      path: '/config',
+      path: '/',
       component: MainLayout,
+      // 这里的 children 就是你的一级标题内容
       children: [
-        // --- 1. 字典模块 (动态路由) ---
+        // --- 1. 字典模块 (一级标题：字典定义) ---
         {
           path: 'dict',
           component: DictLayout,
-          redirect: '/config/dict/grade',
+          meta: { title: '字典定义' },
+          redirect: '/dict/grade', // 默认去管材等级
           children: [
-            // :id 匹配 /config/dict/xxx，例如 grade, material, interface
-            { path: ':id', component: DictTable }
+            // 这里的 :id 对应具体的 tab 页（如 grade, pipe-std）
+            { 
+              path: ':id', 
+              component: DictTable,
+              meta: { title: '字典详情' } 
+            }
           ]
         },
         
-        // --- 2. 独立业务模块 ---
-        { path: 'basic', component: BasicClass }, // 基础类
-        { path: 'spec', component: SpecConfig },  // Spec配置
-        { path: 'pmc', component: PmcCode },      // PMC编码
-        { path: 'ship', component: ShipData },    // 船型船号 (新)
-        { path: 'pipe', component: PipeSpec }     // 管材规格书 (新)
+        // --- 2. 独立业务模块 (一级标题：基础类、Spec、PMC等) ---
+        { 
+          path: 'basic', 
+          component: BasicClass, 
+          meta: { title: '基础类配置' } 
+        },
+        { 
+          path: 'spec', 
+          component: SpecConfig, 
+          meta: { title: 'Spec规格书' } 
+        },
+        { 
+          path: 'pmc', 
+          component: PmcCode, 
+          meta: { title: 'PMC编码规则' } 
+        },
+        { 
+          path: 'ship', 
+          component: ShipData, 
+          meta: { title: '船型船号' } 
+        },
+        { 
+          path: 'pipe', 
+          component: PipeSpec, 
+          meta: { title: '管材规格书' } 
+        }
       ]
     },
 
-    // --- 404 捕获 ---
-    // 匹配所有未定义的路径，重定向回首页或显示404组件
-    { path: '/:pathMatch(.*)*', redirect: '/config/dict/grade' }
+    // 404
+    { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
 
