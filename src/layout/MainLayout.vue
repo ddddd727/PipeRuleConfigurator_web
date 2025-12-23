@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import SidebarItem from '@/layout/components/SidebarItem.vue'
+import SidebarItem from './components/SidebarItem.vue'
+import TagsView from './components/TagsView.vue' // 1. 引入新组件
 import { constantRoutes } from '@/router/index'
 
 const route = useRoute()
@@ -66,6 +67,8 @@ const breadcrumbs = computed(() => {
         </el-breadcrumb>
       </el-header>
 
+      <tags-view />
+
       <el-main class="main-content">
         <router-view />
       </el-main>
@@ -74,13 +77,48 @@ const breadcrumbs = computed(() => {
 </template>
 
 <style scoped>
-/* 保持你的原生样式不变 */
-.layout-container { height: 100vh; }
-.aside-wrap { background-color: #304156; transition: width 0.3s; }
-.el-menu-vertical-demo:not(.el-menu--collapse) { width: 200px; }
-.el-menu-vertical-demo { border-right: none; height: 100%; }
-.logo-item { background-color: #2b2f3a !important; color: #fff !important; pointer-events: none; }
-.header-wrap { height: 50px; border-bottom: 1px solid #e6e6e6; display: flex; align-items: center; padding: 0 15px; }
-.collapse-btn { margin-right: 20px; cursor: pointer; }
-.main-content { background-color: #f0f2f5; padding: 20px; }
+.layout-container {
+  height: 100vh;
+}
+
+.aside-wrap {
+  background-color: #304156;
+  transition: width 0.3s;
+}
+
+.el-menu-vertical-demo:not(.el-menu--collapse) {
+  width: 200px;
+}
+
+.el-menu-vertical-demo {
+  border-right: none;
+  height: 100%;
+}
+
+.logo-item {
+  background-color: #2b2f3a !important;
+  color: #fff !important;
+  pointer-events: none;
+}
+
+.header-wrap {
+  height: 50px;
+  border-bottom: 1px solid #e6e6e6;
+  display: flex;
+  align-items: center;
+  padding: 0 15px;
+}
+
+.collapse-btn {
+  margin-right: 20px;
+  cursor: pointer;
+}
+
+.main-content {
+  background-color: #f0f2f5;
+  padding: 20px;
+  /* 3. 调整高度计算：头部50 + 标签栏41 (34高+6padding+1border) ≈ 92px */
+  height: calc(100vh - 92px);
+  overflow-y: auto;
+}
 </style>
