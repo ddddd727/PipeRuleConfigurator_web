@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import SidebarItem from '@/components/SidebarItem.vue'
+import SidebarItem from '@/layout/components/SidebarItem.vue'
 import { constantRoutes } from '@/router/index'
 
 const route = useRoute()
