@@ -49,6 +49,7 @@ const route = useRoute()
         <el-menu-item index="/config/pmc">PMC编码</el-menu-item>
         <el-menu-item index="/config/ship">船型船号</el-menu-item>
         <el-menu-item index="/config/pipe">管材规格书</el-menu-item>
+        <el-menu-item index="/config/property">属性管理</el-menu-item>
       </el-menu>
     </el-header>
 

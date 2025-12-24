@@ -10,6 +10,7 @@ import PmcCode from '../views/PmcCode.vue'
 import SpecConfig from '../views/SpecConfig.vue' // 已修复的 Spec 页面
 import ShipData from '../views/ShipData.vue'     // 新增
 import PipeSpec from '../views/PipeSpec.vue'     // 新增
+import PropertyManagement from '../views/PropertyManagement.vue' // 属性管理
 
 // 3. 组件
 import DictTable from '../components/DictTable.vue'
@@ -39,7 +40,8 @@ const router = createRouter({
         { path: 'spec', component: SpecConfig },  // Spec配置
         { path: 'pmc', component: PmcCode },      // PMC编码
         { path: 'ship', component: ShipData },    // 船型船号 (新)
-        { path: 'pipe', component: PipeSpec }     // 管材规格书 (新)
+        { path: 'pipe', component: PipeSpec } ,   // 管材规格书 (新)
+        { path: 'property', component: PropertyManagement } // 属性管理 (新)
       ]
     },
 
