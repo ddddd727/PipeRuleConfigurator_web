@@ -13,10 +13,10 @@
       label-width="120px"
       label-position="right"
     >
-      <!-- 标准文件选择 - 使用虚拟滚动节省空间 -->
-      <el-form-item label="标准文件：" prop="standardFiles">
+      <!-- 标准文件选择 -->
+      <el-form-item label="标准文件：">
         <el-select
-          v-model="form.standardFiles"
+          v-model="form.standardFileIds"
           multiple
           filterable
           collapse-tags
@@ -24,6 +24,7 @@
           placeholder="请选择标准文件"
           style="width: 100%"
           :teleported="false"
+          @change="handleStandardFileChange"
         >
           <el-option
             v-for="file in standardFilesList"
@@ -32,71 +33,47 @@
             :value="file.id"
           />
         </el-select>
-        <div class="tip-text">可多选，已选择 {{ form.standardFiles.length }} 个文件</div>
+        <div class="tip-text">可多选，已选择 {{ form.standardFileIds.length }} 个文件</div>
       </el-form-item>
 
-      <!-- 作用范围选择 -->
-      <el-form-item label="作用范围：" prop="pathRangeIds">
-        <div class="path-range-selector">
-          <!-- 范围选择表格 -->
-          <el-table
-            :data="filteredPathRanges"
-            height="200"
-            style="width: 100%"
-            @selection-change="handleSelectionChange"
-          >
-            <el-table-column type="selection" width="55" />
-            <el-table-column prop="name" label="通径名称" width="150" />
-            <el-table-column prop="minSize" label="最小通径" width="100">
-              <template #default="{ row }">
-                {{ row.minSize }} mm
-              </template>
-            </el-table-column>
-            <el-table-column prop="maxSize" label="最大通径" width="100">
-              <template #default="{ row }">
-                {{ row.maxSize }} mm
-              </template>
-            </el-table-column>
-          </el-table>
-          
-          <!-- 已选摘要 -->
-          <div v-if="selectedPaths.length > 0" class="selection-summary">
-            <el-tag
-              v-for="path in selectedPaths"
-              :key="path.id"
-              size="small"
-              type="info"
-              closable
-              @close="removePath(path.id)"
-            >
-              {{ path.minSize }} - {{ path.maxSize }} mm
-            </el-tag>
-          </div>
-          <div v-else class="selection-summary empty">
-            未选择任何通径范围
+      <!-- 标准文件与NPD范围对应关系配置 -->
+      <el-form-item label="NPD范围配置：" v-if="form.standardFileConfigurations.length > 0">
+        <div class="configuration-container">
+          <div v-for="config in form.standardFileConfigurations" :key="config.standardFile" class="config-item">
+            <div class="config-file-info">
+              <el-tag size="small" type="info">{{ getStandardFileName(config.standardFile) }}</el-tag>
+              <span class="config-separator">→</span>
+            </div>
+            <div class="npd-range-selectors">
+              <el-select
+                v-model="config.minNpdValue"
+                placeholder="选择最小NPD"
+                style="width: 120px; margin-right: 10px"
+              >
+                <el-option
+                  v-for="value in npdValues"
+                  :key="value"
+                  :label="`${value} mm`"
+                  :value="value"
+                />
+              </el-select>
+              <span class="range-separator">-</span>
+              <el-select
+                v-model="config.maxNpdValue"
+                placeholder="选择最大NPD"
+                style="width: 120px; margin-left: 10px"
+              >
+                <el-option
+                  v-for="value in npdValues"
+                  :key="value"
+                  :label="`${value} mm`"
+                  :value="value"
+                />
+              </el-select>
+            </div>
           </div>
         </div>
-      </el-form-item>
-
-      <!-- 额外配置 -->
-      <el-form-item label="生效日期：" prop="effectiveDate">
-        <el-date-picker
-          v-model="form.effectiveDate"
-          type="date"
-          placeholder="选择生效日期"
-          style="width: 100%"
-        />
-      </el-form-item>
-
-      <el-form-item label="备注信息：" prop="remarks">
-        <el-input
-          v-model="form.remarks"
-          type="textarea"
-          :rows="3"
-          placeholder="请输入备注信息"
-          maxlength="200"
-          show-word-limit
-        />
+        <div class="tip-text">请为每个选择的标准文件配置对应的NPD范围</div>
       </el-form-item>
     </el-form>
 
@@ -134,24 +111,21 @@ const dialogVisible = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
-// 表单数据
+// 表单数据 - 支持标准文件与NPD范围的一一对应
 const form = ref({
-  standardFiles: [],
-  pathRangeIds: [],
+  standardFileIds: [], // 选择的标准文件ID数组
+  standardFileConfigurations: [], // 每个元素包含standardFile、minNpdValue和maxNpdValue
   effectiveDate: '',
   remarks: ''
 })
 
 // 表单验证规则
 const rules = {
-  standardFiles: [
-    { required: true, message: '请至少选择一个标准文件', trigger: 'change' }
-  ],
-  pathRangeIds: [
-    { required: true, message: '请至少选择一个作用范围', trigger: 'change' }
-  ],
   effectiveDate: [
     { required: true, message: '请选择生效日期', trigger: 'change' }
+  ],
+  standardFileIds: [
+    { required: true, message: '请选择标准文件', trigger: 'change' }
   ]
 }
 
@@ -168,30 +142,68 @@ const standardFilesList = ref([
   { id: 9, name: 'NB/T 47002-2019 压力容器用爆炸焊接复合板' }
 ])
 
-// 表格选择相关
-const tableSelection = ref([])
-const selectedPaths = computed(() => tableSelection.value)
-
-// 过滤后的通径范围（可根据需要添加搜索功能）
+// 过滤后的通径范围（显示所有可用的NPD范围）
 const filteredPathRanges = computed(() => props.pathRanges)
 
-// 处理表格选择变化
-const handleSelectionChange = (selection) => {
-  tableSelection.value = selection
-  form.value.pathRangeIds = selection.map(item => item.id)
+// 获取所有可用的NPD值（从filteredPathRanges中提取并去重）
+const npdValues = computed(() => {
+  const values = []
+  filteredPathRanges.value.forEach(range => {
+    // 提取所有NPD值
+    if (!values.includes(range.minSize)) {
+      values.push(range.minSize)
+    }
+    if (range.maxSize !== range.minSize && !values.includes(range.maxSize)) {
+      values.push(range.maxSize)
+    }
+  })
+  // 按升序排序
+  return values.sort((a, b) => a - b)
+})
+
+// 获取最小和最大NPD值
+const minNpdValue = computed(() => {
+  const values = npdValues.value
+  return values.length > 0 ? values[0] : null
+})
+
+const maxNpdValue = computed(() => {
+  const values = npdValues.value
+  return values.length > 0 ? values[values.length - 1] : null
+})
+
+// 处理标准文件选择变化
+const handleStandardFileChange = (value) => {
+  // 更新选择的文件ID数组
+  form.value.standardFileIds = value
+  
+  // 初始化标准文件配置
+  const newConfigurations = []
+  
+  // 保留已存在的配置
+  value.forEach(fileId => {
+    const existingConfig = form.value.standardFileConfigurations.find(config => config.standardFile === fileId)
+    if (existingConfig) {
+      newConfigurations.push(existingConfig)
+    } else {
+      newConfigurations.push({
+        standardFile: fileId,
+        minNpdValue: minNpdValue.value, // 默认选择最小值
+        maxNpdValue: maxNpdValue.value  // 默认选择最大值
+      })
+    }
+  })
+  
+  form.value.standardFileConfigurations = newConfigurations
 }
 
-// 保持removePath函数，用于已选摘要的关闭按钮
-const removePath = (id) => {
-  const index = form.value.pathRangeIds.indexOf(id)
-  if (index > -1) {
-    form.value.pathRangeIds.splice(index, 1)
-    const pathIndex = tableSelection.value.findIndex(item => item.id === id)
-    if (pathIndex > -1) {
-      tableSelection.value.splice(pathIndex, 1)
-    }
-  }
+// 获取标准文件名称
+const getStandardFileName = (fileId) => {
+  const file = standardFilesList.value.find(f => f.id === fileId)
+  return file ? file.name : ''
 }
+
+
 
 // 提交状态
 const submitting = ref(false)
@@ -202,19 +214,36 @@ const handleSubmit = async () => {
   if (!formRef.value) return
   
   try {
+    // 表单基本验证
     await formRef.value.validate()
+    
+    // 验证每个标准文件是否都选择了有效的NPD范围
+    const invalidConfigs = form.value.standardFileConfigurations.filter(
+      config => config.minNpdValue === null || config.maxNpdValue === null || config.minNpdValue > config.maxNpdValue
+    )
+    
+    if (invalidConfigs.length > 0) {
+      ElMessage.error('请为所有选择的标准文件配置有效的NPD范围（最小值不能大于最大值）')
+      return
+    }
+    
     submitting.value = true
+    
+    // 准备提交数据 - 简化参数传递
+    const submitData = {
+      ...form.value,
+      // 转换为更友好的格式，传递数组即可
+      configurations: form.value.standardFileConfigurations.map(config => ({
+        standardFileId: config.standardFile,
+        standardFileName: getStandardFileName(config.standardFile),
+        npdRange: [config.minNpdValue, config.maxNpdValue] // 简化为传递数组
+      }))
+    }
     
     // 模拟API调用
     await new Promise(resolve => setTimeout(resolve, 1000))
     
-    emit('confirm', {
-      ...form.value,
-      selectedFiles: standardFilesList.value.filter(file => 
-        form.value.standardFiles.includes(file.id)
-      ),
-      selectedPaths: tableSelection.value
-    })
+    emit('confirm', submitData)
     
     dialogVisible.value = false
     ElMessage.success('配置已保存！')
@@ -227,8 +256,13 @@ const handleSubmit = async () => {
 
 // 关闭对话框
 const handleClose = () => {
-  formRef.value?.resetFields()
-  tableSelection.value = []
+  // 重置表单
+  if (formRef.value) {
+    formRef.value.resetFields()
+  }
+  // 清空选择的文件和配置
+  form.value.standardFileIds = []
+  form.value.standardFileConfigurations = []
   dialogVisible.value = false
 }
 
@@ -237,8 +271,11 @@ watch(dialogVisible, (val) => {
   if (val) {
     // 对话框打开时重置表单
     nextTick(() => {
-      formRef.value?.resetFields()
-      tableSelection.value = []
+      if (formRef.value) {
+        formRef.value.resetFields()
+      }
+      // 确保配置数组为空
+      form.value.standardFileConfigurations = []
     })
   }
 })
@@ -251,40 +288,73 @@ watch(dialogVisible, (val) => {
   margin-top: 4px;
 }
 
-.path-range-selector {
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  padding: 10px;
-  background-color: #fafafa;
-}
 
-.quick-actions {
+
+/* 配置容器样式 */
+.configuration-container {
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 15px;
+  background-color: #fafafa;
   margin-bottom: 10px;
 }
 
-.quick-actions .el-button {
-  margin-right: 8px;
-  margin-bottom: 5px;
-}
-
-.selection-summary {
-  margin-top: 10px;
-  padding: 8px;
-  border-top: 1px dashed #dcdfe6;
-  min-height: 40px;
+/* 配置项样式 */
+.config-item {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
   align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 8px;
+  background-color: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #ebeef5;
 }
 
-.selection-summary.empty {
+.config-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 配置文件信息样式 */
+.config-file-info {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+  margin-bottom: 5px;
+  flex: 1;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* 为el-tag添加溢出处理 */
+:deep(.el-tag) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 配置分隔符样式 */
+.config-separator {
+  margin: 0 10px;
   color: #c0c4cc;
-  font-style: italic;
+  font-weight: bold;
 }
 
-.selection-summary .el-tag {
-  margin: 2px;
+/* NPD范围选择器容器 */
+.npd-range-selectors {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 260px;
+  margin-top: 5px;
+}
+
+/* 范围分隔符 */
+.range-separator {
+  margin: 0 5px;
+  color: #606266;
+  font-weight: bold;
 }
 
 :deep(.el-select__tags) {

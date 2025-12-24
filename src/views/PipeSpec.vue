@@ -90,24 +90,34 @@ const showDialog = ref(false)
 // 当前选中的按钮Label
 const currentButtonLabel = ref('')
 
-// 计算属性：根据NPD表格选中的范围生成过滤后的通径范围数据
+// 计算属性：根据NPD表格选中的范围生成所有可能的单个范围选项
 const filteredNpdRanges = computed(() => {
   if (selectedMin.value === null || selectedMax.value === null) {
     return []
   }
   
-  // 生成唯一的ID
-  const id = Date.now()
+  // 从dimensionData中获取NPD行的数据
+  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
+  if (!npdRow) {
+    return []
+  }
   
-  // 返回包含最小和最大通径的范围数据
-  return [
-    {
-      id: id,
-      minSize: selectedMin.value,
-      maxSize: selectedMax.value,
-      name: `通径范围: ${selectedMin.value} - ${selectedMax.value}`
+  // 提取所有NPD值并过滤出选中范围内的值
+  const npdValues = []
+  for (let i = 1; i <= 15; i++) {
+    const value = parseInt(npdRow[`col${i}`])
+    if (!isNaN(value) && value >= selectedMin.value && value <= selectedMax.value) {
+      npdValues.push(value)
     }
-  ]
+  }
+  
+  // 为每个NPD值生成一个单独的范围选项
+  return npdValues.map((value, index) => ({
+    id: `${value}-${Date.now()}`,
+    minSize: value,
+    maxSize: value,
+    name: `通径 ${value} mm`
+  }))
 })
 
 // 处理配置确认
