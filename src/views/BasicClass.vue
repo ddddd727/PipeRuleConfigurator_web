@@ -43,7 +43,7 @@
               @click="toggleEditMode"
             >
               <el-icon><Edit /></el-icon>
-              {{ editMode ? '取消编辑' : '编辑' }}
+              {{ editMode ? '取消' : '编辑' }}
             </el-button>
             <el-button 
               size="small" 
