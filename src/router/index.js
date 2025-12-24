@@ -1,54 +1,33 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-// 1. 布局
-import MainLayout from '../layout/MainLayout.vue'
+// 1. 引入所有独立的路由模块
+import dictRouter from './modules/dict'
+import basicRouter from './modules/basic'
+import specRouter from './modules/spec'
+import pmcRouter from './modules/pmc'
+import shipRouter from './modules/ship'
+import pipeRouter from './modules/pipe'
 
-// 2. 业务页面
-import DictLayout from '../views/DictLayout.vue'
-import BasicClass from '../views/BasicClass.vue'
-import PmcCode from '../views/PmcCode.vue'
-import SpecConfig from '../views/SpecConfig.vue' // 已修复的 Spec 页面
-import ShipData from '../views/ShipData.vue'     // 新增
-import PipeSpec from '../views/PipeSpec.vue'     // 新增
-import PropertyManagement from '../views/PropertyManagement.vue' // 属性管理
+// 2. 组装路由表
+// 这里的顺序决定了左侧菜单栏的显示顺序
+export const constantRoutes = [
+  // 根路径默认重定向
+  { path: '/', redirect: '/dict/business/grade' },
 
-// 3. 组件
-import DictTable from '../components/DictTable.vue'
+  dictRouter,   // 字典模块
+  basicRouter,  // 基础类模块
+  specRouter,   // Spec模块
+  pmcRouter,    // PMC模块
+  shipRouter,   // 船型模块
+  pipeRouter,   // 管材模块
+
+  // 404 页面
+  { path: '/:pathMatch(.*)*', redirect: '/' }
+]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
-    { path: '/', redirect: '/config/dict/grade' },
-
-    {
-      path: '/config',
-      component: MainLayout,
-      children: [
-        // --- 1. 字典模块 (动态路由) ---
-        {
-          path: 'dict',
-          component: DictLayout,
-          redirect: '/config/dict/grade',
-          children: [
-            // :id 匹配 /config/dict/xxx，例如 grade, material, interface
-            { path: ':id', component: DictTable }
-          ]
-        },
-        
-        // --- 2. 独立业务模块 ---
-        { path: 'basic', component: BasicClass }, // 基础类
-        { path: 'spec', component: SpecConfig },  // Spec配置
-        { path: 'pmc', component: PmcCode },      // PMC编码
-        { path: 'ship', component: ShipData },    // 船型船号 (新)
-        { path: 'pipe', component: PipeSpec } ,   // 管材规格书 (新)
-        { path: 'property', component: PropertyManagement } // 属性管理 (新)
-      ]
-    },
-
-    // --- 404 捕获 ---
-    // 匹配所有未定义的路径，重定向回首页或显示404组件
-    { path: '/:pathMatch(.*)*', redirect: '/config/dict/grade' }
-  ]
+  routes: constantRoutes
 })
 
 export default router
