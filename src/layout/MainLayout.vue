@@ -42,26 +42,12 @@ const breadcrumbs = computed(() => {
           </template>
         </el-menu-item>
 
-<<<<<<< HEAD
-           <el-menu-item-group title="标准系列">
-             <el-menu-item index="/config/dict/std-gb">国标系列</el-menu-item>
-           </el-menu-item-group>
-        </el-sub-menu>
-
-        <el-menu-item index="/config/basic">基础类配置</el-menu-item>
-        <el-menu-item index="/config/spec">Spec配置</el-menu-item>
-        <el-menu-item index="/config/pmc">PMC编码</el-menu-item>
-        <el-menu-item index="/config/ship">船型船号</el-menu-item>
-        <el-menu-item index="/config/pipe">管材规格书</el-menu-item>
-        <el-menu-item index="/config/property">属性管理</el-menu-item>
-=======
-        <sidebar-item 
-          v-for="route in menuList" 
-          :key="route.path" 
-          :item="route" 
-          :basePath="''"  
+        <sidebar-item
+          v-for="route in menuList"
+          :key="route.path"
+          :item="route"
+          :basePath="''"
         />
->>>>>>> origin/feature
       </el-menu>
     </el-aside>
 
