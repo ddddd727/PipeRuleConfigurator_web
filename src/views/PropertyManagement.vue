@@ -1,8 +1,5 @@
 <template>
   <div class="property-page">
-    <!-- 页面标题 -->
-    <h2>🏷️ 属性管理（Smart3D 设计）</h2>
-    
     <!-- 说明提示 -->
     <el-alert 
       title="在此页面可以对 Smart3D 设计的属性进行增删改操作" 
@@ -223,11 +220,7 @@ const loadData = () => {
 
 <style scoped>
 .property-page {
-  padding: 24px;
-}
-
-h2 {
-  margin-bottom: 16px;
-  color: #303133;
+  padding: 0;
+  background-color: #f0f2f5;
 }
 </style>
