@@ -10,7 +10,7 @@ export default {
       path: 'index',
       name: 'BasicLibrary',
       // 如果没有这个页面，先用个临时组件占位，或者指向 BasicClass
-      component: () => import('@/views/BasicClass.vue'), 
+      component: () => import('@/views/BasicLibrary.vue'), 
       meta: { title: '基础库列表' }
     }
   ]

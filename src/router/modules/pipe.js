@@ -10,7 +10,7 @@ export default {
       path: 'index',
       name: 'PipeSpec',
       component: () => import('@/views/PipeSpec.vue'),
-      meta: { title: '规格书列表' }
+      meta: { title: '管材规格书配置' }
     }
   ]
 }

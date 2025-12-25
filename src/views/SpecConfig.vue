@@ -1,17 +1,13 @@
 <template>
-  <div class="page-container">
-    <div class="header">
-      <h2>🛠️ Spec 规格书配置</h2>
-      <el-button type="primary">新建 Spec</el-button>
-    </div>
-    
+  <div class="app-container" style="padding: 20px;">
     <el-card shadow="never">
-      <el-empty description="Spec 配置功能模块开发中..." />
+      <template #header>
+        <span style="font-weight: bold;">ShortCode 规则</span>
+      </template>
+      <div style="height: 500px; display: flex; justify-content: center; align-items: center;">
+        <el-empty description="ShortCode 模块 - 待开发" />
+      </div>
     </el-card>
   </div>
 </template>
-
-<style scoped>
-.page-container { padding: 24px; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-</style>
+<script setup></script>
