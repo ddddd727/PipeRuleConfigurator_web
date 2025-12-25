@@ -42,34 +42,49 @@
           <div v-for="config in form.standardFileConfigurations" :key="config.standardFile" class="config-item">
             <div class="config-file-info">
               <el-tag size="small" type="info">{{ getStandardFileName(config.standardFile) }}</el-tag>
-              <span class="config-separator">→</span>
             </div>
-            <div class="npd-range-selectors">
-              <el-select
-                v-model="config.minNpdValue"
-                placeholder="选择最小NPD"
-                style="width: 120px; margin-right: 10px"
-              >
-                <el-option
-                  v-for="value in npdValues"
-                  :key="value"
-                  :label="`${value} mm`"
-                  :value="value"
-                />
-              </el-select>
-              <span class="range-separator">-</span>
-              <el-select
-                v-model="config.maxNpdValue"
-                placeholder="选择最大NPD"
-                style="width: 120px; margin-left: 10px"
-              >
-                <el-option
-                  v-for="value in npdValues"
-                  :key="value"
-                  :label="`${value} mm`"
-                  :value="value"
-                />
-              </el-select>
+            <div class="config-controls">
+              <div class="material-selector">
+                <el-select
+                  v-model="config.material"
+                  placeholder="选择材料"
+                  style="width: 150px; margin-right: 10px"
+                >
+                  <el-option
+                    v-for="material in props.materials"
+                    :key="material.id"
+                    :label="material.name"
+                    :value="material.id"
+                  />
+                </el-select>
+              </div>
+              <div class="npd-range-selectors">
+                <el-select
+                  v-model="config.minNpdValue"
+                  placeholder="选择最小NPD"
+                  style="width: 120px; margin-right: 10px"
+                >
+                  <el-option
+                    v-for="value in npdValues"
+                    :key="value"
+                    :label="`${value} mm`"
+                    :value="value"
+                  />
+                </el-select>
+                <span class="range-separator">-</span>
+                <el-select
+                  v-model="config.maxNpdValue"
+                  placeholder="选择最大NPD"
+                  style="width: 120px; margin-left: 10px"
+                >
+                  <el-option
+                    v-for="value in npdValues"
+                    :key="value"
+                    :label="`${value} mm`"
+                    :value="value"
+                  />
+                </el-select>
+              </div>
             </div>
           </div>
         </div>
@@ -101,6 +116,10 @@ const props = defineProps({
   buttonLabel: {
     type: String,
     default: ''
+  },
+  materials: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -188,6 +207,7 @@ const handleStandardFileChange = (value) => {
     } else {
       newConfigurations.push({
         standardFile: fileId,
+        material: props.materials.length > 0 ? props.materials[0].id : null, // 默认选择第一个材料
         minNpdValue: minNpdValue.value, // 默认选择最小值
         maxNpdValue: maxNpdValue.value  // 默认选择最大值
       })
@@ -233,11 +253,16 @@ const handleSubmit = async () => {
     const submitData = {
       ...form.value,
       // 转换为更友好的格式，传递数组即可
-      configurations: form.value.standardFileConfigurations.map(config => ({
-        standardFileId: config.standardFile,
-        standardFileName: getStandardFileName(config.standardFile),
-        npdRange: [config.minNpdValue, config.maxNpdValue] // 简化为传递数组
-      }))
+      configurations: form.value.standardFileConfigurations.map(config => {
+        const material = props.materials.find(m => m.id === config.material)
+        return {
+          standardFileId: config.standardFile,
+          standardFileName: getStandardFileName(config.standardFile),
+          materialId: config.material,
+          materialName: material ? material.name : '',
+          npdRange: [config.minNpdValue, config.maxNpdValue] // 简化为传递数组
+        }
+      })
     }
     
     // 模拟API调用
@@ -302,8 +327,7 @@ watch(dialogVisible, (val) => {
 /* 配置项样式 */
 .config-item {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
   margin-bottom: 10px;
   padding: 8px;
   background-color: #ffffff;
@@ -319,11 +343,24 @@ watch(dialogVisible, (val) => {
 .config-file-info {
   display: flex;
   align-items: center;
-  margin-right: 10px;
-  margin-bottom: 5px;
-  flex: 1;
-  max-width: 100%;
+  margin-bottom: 8px;
+  width: 100%;
   overflow: hidden;
+}
+
+/* 配置控制区域样式 */
+.config-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+/* 材料选择器样式 */
+.material-selector {
+  display: flex;
+  align-items: center;
+  margin-right: 15px;
 }
 
 /* 为el-tag添加溢出处理 */
@@ -345,9 +382,7 @@ watch(dialogVisible, (val) => {
 .npd-range-selectors {
   display: flex;
   align-items: center;
-  flex: 1;
   min-width: 260px;
-  margin-top: 5px;
 }
 
 /* 范围分隔符 */
