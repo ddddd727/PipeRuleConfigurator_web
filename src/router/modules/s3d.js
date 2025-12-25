@@ -10,7 +10,7 @@ export default {
       path: 'index',
       name: 'S3DManager',
       // 如果没有这个页面，先用个临时组件占位
-      component: () => import('@'), 
+      component: () => import('@/views/S3DManager.vue'), 
       meta: { title: '属性列表' }
     }
   ]
