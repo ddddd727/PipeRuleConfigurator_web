@@ -20,6 +20,7 @@
         <div style="display: flex; gap: 10px; margin: 20px 20px 15px 20px; align-items: center; flex-shrink: 0;">
           <el-button type="primary" @click="handleAdd">➕ 新增属性</el-button>
           <el-button @click="loadData">🔄 刷新</el-button>
+          <el-button @click="handleExport">📥 导出Excel</el-button>
           <el-input 
             v-model="searchText" 
             placeholder="搜索属性..."
@@ -285,6 +286,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import * as XLSX from 'xlsx'
 
 // 属性列表
 const propertyList = ref([])
@@ -622,6 +624,60 @@ function handleSave() {
 
     dialogVisible.value = false
   })
+}
+
+/**
+ * 导出为Excel
+ */
+function handleExport() {
+  try {
+    // 准备导出数据
+    const exportData = propertyList.value.map(item => ({
+      'Interface Name': item.interfaceName,
+      'Category Name': item.categoryName,
+      'Attribute Name': item.attributeName,
+      'Attribute UserName': item.attributeUserName,
+      'Type': item.type,
+      'Units Type': item.unitsType,
+      'Primary Units': item.primaryUnits,
+      'Codelist': item.codelist,
+      'CodeList Namespace': item.codelistNamespace,
+      'OnPropertyPage': item.onPropertyPage ? '是' : '否',
+      'ReadOnly': item.readOnly ? '是' : '否',
+      'SymbolParameter': item.symbolParameter ? '是' : '否'
+    }))
+
+    // 创建工作簿
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, '属性列表')
+
+    // 设置列宽
+    const columnWidths = [
+      { wch: 15 },  // Interface Name
+      { wch: 15 },  // Category Name
+      { wch: 15 },  // Attribute Name
+      { wch: 15 },  // Attribute UserName
+      { wch: 12 },  // Type
+      { wch: 12 },  // Units Type
+      { wch: 12 },  // Primary Units
+      { wch: 12 },  // Codelist
+      { wch: 20 },  // CodeList Namespace
+      { wch: 12 },  // OnPropertyPage
+      { wch: 10 },  // ReadOnly
+      { wch: 15 }   // SymbolParameter
+    ]
+    worksheet['!cols'] = columnWidths
+
+    // 导出文件
+    const fileName = `属性列表_${new Date().getTime()}.xlsx`
+    XLSX.writeFile(workbook, fileName)
+    
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败，请重试')
+  }
 }
 
 // 页面加载时获取数据
