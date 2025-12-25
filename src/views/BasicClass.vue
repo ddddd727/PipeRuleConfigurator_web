@@ -31,12 +31,14 @@
 
       <!-- 右侧内容区域 -->
       <div class="basic-config-main">
-        <!-- 弯管数据配置 -->
-        <div v-if="currentNode.id === 'bend-pipe'" class="config-section">
+        <!-- 动态渲染配置区域 -->
+        <div class="config-section" v-if="currentConfig">
+          <!-- 标题区域 -->
           <div class="main-header">
             <div class="title-section">
-              <h3>{{ "名称:PlainPipingGenericData" }}</h3>
+              <h3>{{ currentConfig.title }}</h3>
               <span 
+                v-if="currentConfig.id === 'bend-pipe'" 
                 class="subtitle clickable-standard" 
                 @click="openStandardImageDialog"
               >
@@ -44,47 +46,53 @@
                 <el-icon class="view-icon"><View /></el-icon>
               </span>
             </div>
+            
+            <!-- 操作按钮组 -->
             <div class="action-buttons">
               <el-button 
                 size="small" 
-                :type="bendPipeEditMode ? 'danger' : 'warning'"
-                @click="toggleBendPipeEditMode"
+                :type="currentConfig.editMode ? 'danger' : 'warning'"
+                @click="toggleEditMode(currentConfig.id)"
               >
                 <el-icon><Edit /></el-icon>
-                {{ bendPipeEditMode ? '取消' : '编辑' }} 
+                {{ currentConfig.editMode ? '取消' : '编辑' }} 
               </el-button>
+              
               <el-button 
                 size="small" 
                 type="primary" 
-                @click="handleAddBendPipeRow"
-                :disabled="!bendPipeEditMode"
+                @click="handleAddRow(currentConfig.id)"
+                :disabled="!currentConfig.editMode"
               >
                 <el-icon><Plus /></el-icon>
                 增加行
               </el-button>
+              
               <el-button 
                 size="small" 
                 type="primary" 
-                @click="handleAddBendPipeColumn"
-                :disabled="!bendPipeEditMode"
+                @click="showAddColumnDialog(currentConfig.id)"
+                :disabled="!currentConfig.editMode"
               >
                 <el-icon><Plus /></el-icon>
                 增加列
               </el-button>
+              
               <el-button 
                 size="small" 
                 type="danger" 
-                @click="handleDeleteBendPipeRows"
-                :disabled="!bendPipeEditMode || bendPipeSelectedRows.length === 0"
+                @click="handleDeleteRows(currentConfig.id)"
+                :disabled="!currentConfig.editMode || currentConfig.selectedRows.length === 0"
               >
                 <el-icon><Delete /></el-icon>
-                删除 ({{ bendPipeSelectedRows.length }})
+                删除 ({{ currentConfig.selectedRows.length }})
               </el-button>
+              
               <el-button 
                 size="small" 
                 type="success" 
-                @click="handleSaveBendPipe"
-                :disabled="!bendPipeEditMode"
+                @click="handleSave(currentConfig.id)"
+                :disabled="!currentConfig.editMode"
               >
                 <el-icon><Check /></el-icon>
                 保存
@@ -92,41 +100,31 @@
             </div>
           </div>
 
-          <!-- 弯管数据表格 -->
+          <!-- 数据表格 -->
           <div class="table-container">
             <el-table
-              ref="bendPipeTableRef"
-              :data="bendPipeData"
+              :ref="`${currentConfig.id}TableRef`"
+              :data="currentConfig.data"
               stripe
               style="width: 100%"
               height="100%"
-              @selection-change="handleBendPipeSelectionChange"
+              @selection-change="(val) => handleSelectionChange(currentConfig.id, val)"
             >
-              <el-table-column
-                type="selection"
-                width="55"
-              />
-              <el-table-column
-                prop="id"
-                label="序号"
-                width="80"
-              >
-                <template #default="{ row }">
-                  {{ row.id }}
-                </template>
-              </el-table-column>
-              <template v-for="col in bendPipeColumns" :key="col.prop">
+              <el-table-column type="selection" width="55" />
+              <el-table-column prop="id" label="序号" width="80" />
+              
+              <template v-for="col in currentConfig.columns" :key="col.prop">
                 <el-table-column
                   :prop="col.prop"
                   :label="col.label"
                   :width="col.width || 'auto'"
                 >
                   <template #default="{ row, $index }">
-                    <template v-if="bendPipeEditMode && col.editable">
+                    <template v-if="currentConfig.editMode && col.editable">
                       <el-input
                         v-model="row[col.prop]"
                         size="small"
-                        @change="handleBendPipeCellChange(row, col.prop, $index)"
+                        @change="handleCellChange(currentConfig.id, row, col.prop, $index)"
                       />
                     </template>
                     <template v-else>
@@ -137,274 +135,67 @@
               </template>
             </el-table>
             
+            <!-- 表格底部信息 -->
             <div class="table-footer">
               <div class="pagination-info">
-                共 {{ bendPipeData.length }} 条记录
-                <span v-if="bendPipeSelectedRows.length > 0" class="selected-info">
-                  | 已选 {{ bendPipeSelectedRows.length }} 条
+                共 {{ currentConfig.data.length }} 条记录
+                <span v-if="currentConfig.selectedRows.length > 0" class="selected-info">
+                  | 已选 {{ currentConfig.selectedRows.length }} 条
                 </span>
-                <el-button 
-                  v-if="bendPipeSelectedRows.length > 0 && bendPipeEditMode" 
-                  type="text" 
-                  size="small"
-                  @click="openBendPipeBatchEditDialog"
-                  class="batch-edit-btn"
-                >
-                  <el-icon><Edit /></el-icon>
-                  批量编辑选中行
-                </el-button>
               </div>
             </div>
           </div>
-
-          <!-- 标准规范图片对话框 -->
-          <el-dialog
-            v-model="standardImageDialogVisible"
-            width="70%"
-            top="10vh"
-            class="standard-image-dialog"
-          >
-            <div class="image-container">
-              <div class="image-wrapper">
-                <img 
-                  :src="standardImagePath" 
-                  alt="管子设计惯例6M241000TB"
-                  class="standard-image"
-                  @load="handleImageLoad"
-                  @error="handleImageError"
-                />
-              </div>
-            </div>
-          </el-dialog>
-
-          <!-- 弯管数据添加列对话框 -->
-          <el-dialog
-            v-model="bendPipeAddColumnDialogVisible"
-            title="为弯管数据添加新列"
-            width="500px"
-            @close="handleBendPipeAddColumnDialogClose"
-          >
-            <el-form :model="bendPipeNewColumnForm" :rules="columnFormRules" ref="bendPipeColumnFormRef">
-              <el-form-item label="列名" prop="label">
-                <el-input v-model="bendPipeNewColumnForm.label" placeholder="请输入列名" />
-              </el-form-item>
-              <el-form-item label="字段名" prop="prop">
-                <el-input v-model="bendPipeNewColumnForm.prop" placeholder="请输入英文字段名" />
-              </el-form-item>
-            </el-form>
-            <template #footer>
-              <span class="dialog-footer">
-                <el-button @click="bendPipeAddColumnDialogVisible = false">取消</el-button>
-                <el-button type="primary" @click="confirmAddBendPipeColumn">确定</el-button>
-              </span>
-            </template>
-          </el-dialog>
-
-          <!-- 弯管数据批量编辑对话框 -->
-          <el-dialog
-            v-model="bendPipeBatchEditDialogVisible"
-            :title="`批量编辑选中的${bendPipeSelectedRows.length}行`"
-            width="500px"
-          >
-            <el-form :model="bendPipeBatchEditForm" ref="bendPipeBatchEditFormRef">
-              <el-form-item 
-                v-for="col in bendPipeColumns" 
-                :key="col.prop"
-                :label="col.label"
-              >
-                <el-input 
-                  v-model="bendPipeBatchEditForm[col.prop]"
-                  :placeholder="`批量设置${col.label}`"
-                  @keyup.enter="confirmBendPipeBatchEdit"
-                />
-              </el-form-item>
-            </el-form>
-            <template #footer>
-              <span class="dialog-footer">
-                <el-button @click="bendPipeBatchEditDialogVisible = false">取消</el-button>
-                <el-button type="primary" @click="confirmBendPipeBatchEdit">确定</el-button>
-              </span>
-            </template>
-          </el-dialog>
-        </div>
-
-        <!-- 壁厚系列配置 -->
-        <div v-else-if="currentNode.id === 'wall-thickness-series'" class="config-section">
-          <div class="main-header">
-            <div class="title-section">
-              <h3>{{ "名称:PlainPipingGenericData" }}</h3>
-              <!-- <span class="subtitle">管材壁厚系列配置</span> -->
-            </div>
-            <div class="action-buttons">
-              <el-button 
-                size="small" 
-                :type="wallThicknessEditMode ? 'danger' : 'warning'"
-                @click="toggleWallThicknessEditMode"
-              >
-                <el-icon><Edit /></el-icon>
-                {{ wallThicknessEditMode ? '取消' : '编辑' }} 
-              </el-button>
-              <el-button 
-                size="small" 
-                type="primary" 
-                @click="handleAddWallThicknessRow"
-                :disabled="!wallThicknessEditMode"
-              >
-                <el-icon><Plus /></el-icon>
-                增加行
-              </el-button>
-              <el-button 
-                size="small" 
-                type="primary" 
-                @click="handleAddWallThicknessColumn"
-                :disabled="!wallThicknessEditMode"
-              >
-                <el-icon><Plus /></el-icon>
-                增加列
-              </el-button>
-              <el-button 
-                size="small" 
-                type="danger" 
-                @click="handleDeleteWallThicknessRows"
-                :disabled="!wallThicknessEditMode || wallThicknessSelectedRows.length === 0"
-              >
-                <el-icon><Delete /></el-icon>
-                删除 ({{ wallThicknessSelectedRows.length }})
-              </el-button>
-              <el-button 
-                size="small" 
-                type="success" 
-                @click="handleSaveWallThickness"
-                :disabled="!wallThicknessEditMode"
-              >
-                <el-icon><Check /></el-icon>
-                保存
-              </el-button>
-            </div>
-          </div>
-
-          <!-- 壁厚系列表格 -->
-          <div class="table-container">
-            <el-table
-              ref="wallThicknessTableRef"
-              :data="wallThicknessData"
-              stripe
-              style="width: 100%"
-              height="100%"
-              @selection-change="handleWallThicknessSelectionChange"
-            >
-              <el-table-column
-                type="selection"
-                width="55"
-              />
-              <el-table-column
-                prop="id"
-                label="序号"
-                width="80"
-              >
-                <template #default="{ row }">
-                  {{ row.id }}
-                </template>
-              </el-table-column>
-              <template v-for="col in wallThicknessColumns" :key="col.prop">
-                <el-table-column
-                  :prop="col.prop"
-                  :label="col.label"
-                  :width="col.width || 'auto'"
-                >
-                  <template #default="{ row, $index }">
-                    <template v-if="wallThicknessEditMode && col.editable">
-                      <el-input
-                        v-model="row[col.prop]"
-                        size="small"
-                        @change="handleWallThicknessCellChange(row, col.prop, $index)"
-                      />
-                    </template>
-                    <template v-else>
-                      {{ row[col.prop] }}
-                    </template>
-                  </template>
-                </el-table-column>
-              </template>
-            </el-table>
-            
-            <div class="table-footer">
-              <div class="pagination-info">
-                共 {{ wallThicknessData.length }} 条记录
-                <span v-if="wallThicknessSelectedRows.length > 0" class="selected-info">
-                  | 已选 {{ wallThicknessSelectedRows.length }} 条
-                </span>
-                <el-button 
-                  v-if="wallThicknessSelectedRows.length > 0 && wallThicknessEditMode" 
-                  type="text" 
-                  size="small"
-                  @click="openWallThicknessBatchEditDialog"
-                  class="batch-edit-btn"
-                >
-                  <el-icon><Edit /></el-icon>
-                  批量编辑选中行
-                </el-button>
-              </div>
-            </div>
-          </div>
-
-          <!-- 壁厚系列添加列对话框 -->
-          <el-dialog
-            v-model="wallThicknessAddColumnDialogVisible"
-            title="为壁厚系列添加新列"
-            width="500px"
-            @close="handleWallThicknessAddColumnDialogClose"
-          >
-            <el-form :model="wallThicknessNewColumnForm" :rules="columnFormRules" ref="wallThicknessColumnFormRef">
-              <el-form-item label="列名" prop="label">
-                <el-input v-model="wallThicknessNewColumnForm.label" placeholder="请输入列名" />
-              </el-form-item>
-              <el-form-item label="字段名" prop="prop">
-                <el-input v-model="wallThicknessNewColumnForm.prop" placeholder="请输入英文字段名" />
-              </el-form-item>
-            </el-form>
-            <template #footer>
-              <span class="dialog-footer">
-                <el-button @click="wallThicknessAddColumnDialogVisible = false">取消</el-button>
-                <el-button type="primary" @click="confirmAddWallThicknessColumn">确定</el-button>
-              </span>
-            </template>
-          </el-dialog>
-
-          <!-- 壁厚系列批量编辑对话框 -->
-          <el-dialog
-            v-model="wallThicknessBatchEditDialogVisible"
-            :title="`批量编辑选中的${wallThicknessSelectedRows.length}行`"
-            width="500px"
-          >
-            <el-form :model="wallThicknessBatchEditForm" ref="wallThicknessBatchEditFormRef">
-              <el-form-item 
-                v-for="col in wallThicknessColumns" 
-                :key="col.prop"
-                :label="col.label"
-              >
-                <el-input 
-                  v-model="wallThicknessBatchEditForm[col.prop]"
-                  :placeholder="`批量设置${col.label}`"
-                  @keyup.enter="confirmWallThicknessBatchEdit"
-                />
-              </el-form-item>
-            </el-form>
-            <template #footer>
-              <span class="dialog-footer">
-                <el-button @click="wallThicknessBatchEditDialogVisible = false">取消</el-button>
-                <el-button type="primary" @click="confirmWallThicknessBatchEdit">确定</el-button>
-              </span>
-            </template>
-          </el-dialog>
         </div>
       </div>
     </div>
+
+    <!-- 标准规范图片对话框 -->
+    <el-dialog
+      v-model="standardImageDialogVisible"
+      width="70%"
+      top="10vh"
+      class="standard-image-dialog"
+    >
+      <div class="image-container">
+        <div class="image-wrapper">
+          <img 
+            :src="standardImagePath" 
+            alt="管子设计惯例6M241000TB"
+            class="standard-image"
+            @load="handleImageLoad"
+            @error="handleImageError"
+          />
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 添加列对话框 -->
+    <el-dialog
+      v-model="addColumnDialogVisible"
+      :title="`为${currentAddColumnConfig?.title || ''}添加新列`"
+      width="500px"
+      @close="handleAddColumnDialogClose"
+    >
+      <el-form :model="newColumnForm" :rules="columnFormRules" ref="columnFormRef">
+        <el-form-item label="列名" prop="label">
+          <el-input v-model="newColumnForm.label" placeholder="请输入列名" />
+        </el-form-item>
+        <el-form-item label="字段名" prop="prop">
+          <el-input v-model="newColumnForm.prop" placeholder="请输入英文字段名" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="addColumnDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmAddColumn">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Folder,
@@ -413,10 +204,7 @@ import {
   Edit,
   Delete,
   Check,
-  View,
-  Download,
-  Loading,
-  Picture
+  View
 } from '@element-plus/icons-vue'
 
 // 树形数据
@@ -426,16 +214,9 @@ const treeData = ref([
     label: '设计规则类',
     icon: Folder,
     children: [
-      {
-        id: 'bend-pipe',
-        label: '弯管数据',
-        icon: Document
-      },
-      {
-        id: 'wall-thickness-series',
-        label: '壁厚系列',
-        icon: Document
-      },
+      { id: 'bend-pipe', label: '弯管数据', icon: Document },
+      { id: 'wall-thickness-series', label: '壁厚系列', icon: Document },
+      { id: 'shortcode', label: 'ShortCode', icon: Document }
     ]
   }
 ])
@@ -443,163 +224,235 @@ const treeData = ref([
 // 当前选中的节点
 const currentNode = ref(treeData.value[0].children[0])
 
-// 表格引用
-const bendPipeTableRef = ref()
-const wallThicknessTableRef = ref()
-const bendPipeColumnFormRef = ref()
-const wallThicknessColumnFormRef = ref()
-const bendPipeBatchEditFormRef = ref()
-const wallThicknessBatchEditFormRef = ref()
+// 获取当前配置
+const configs = reactive({
+  'bend-pipe': {
+    id: 'bend-pipe',
+    title: 'PlainPipingGenericData',
+    editMode: false,
+    selectedRows: [],
+    columns: [
+      { prop: 'diameter', label: '通径DN', editable: true },
+      { prop: 'unit', label: '通径单位', editable: true },
+      { prop: 'material', label: '主材料', editable: true },
+      { prop: 'l1', label: '前夹长L1', editable: true },
+      { prop: 'l2', label: '后夹长L2', editable: true }
+    ],
+    data: [
+      { id: 1, diameter: 'DN15', unit: 'mm', material: '304不锈钢' },
+      { id: 2, diameter: 'DN20', unit: 'mm', material: '304不锈钢' },
+      { id: 3, diameter: 'DN25', unit: 'mm', material: '碳钢' }
+    ]
+  },
+  'wall-thickness-series': {
+    id: 'wall-thickness-series',
+    title: 'PlainPipingGenericData',
+    editMode: false,
+    selectedRows: [],
+    columns: [
+      { prop: 'diameter', label: '通径DN', editable: true },
+      { prop: 'unit', label: '通径单位', editable: true },
+      { prop: 'standard', label: '管材标准EndStandard', editable: true },
+      { prop: 'series', label: '壁厚系列', editable: true },
+      { prop: 'outer', label: '外径', editable: true },
+      { prop: 'value', label: '壁厚值', editable: true }
+    ],
+    data: [
+      { id: 1, diameter: 'DN15', unit: 'mm' },
+      { id: 2, diameter: 'DN20', unit: 'mm' },
+      { id: 3, diameter: 'DN25', unit: 'mm' }
+    ]
+  },
+  'shortcode': {
+    id: 'shortcode',
+    title: 'ShortCodeHierarchyRule',
+    editMode: false,
+    selectedRows: [],
+    columns: [
+      { prop: 'type', label: 'ShortCodeHierarchyType', editable: true },
+      { prop: 'shortcode', label: 'ShortCode', editable: true }
+    ],
+    data: [
+      { id: 1, type: 'PIPE', shortcode: '管道' },
+      { id: 2, type: 'VALVE', shortcode: '阀门' },
+      { id: 3, type: 'FLANGE', shortcode: '法兰' }
+    ]
+  }
+})
 
-// ========== 标准规范图片相关状态 ==========
+const currentConfig = computed(() => configs[currentNode.value?.id])
+
+// ========== 通用状态 ==========
+const columnFormRef = ref()
+const addColumnDialogVisible = ref(false)
+const currentAddColumnConfig = ref(null)
+const newColumnForm = reactive({
+  label: '',
+  prop: '',
+  editable: true
+})
+
+// ========== 标准图片相关状态 ==========
 const standardImageDialogVisible = ref(false)
-const standardImagePath = ref('/图片1.png') // 假设图片在public根目录下
+const standardImagePath = ref('/管子设计惯例6M241000TB.png')
 const imageLoading = ref(false)
 const imageLoaded = ref(false)
 const imageError = ref(false)
-const imageDimensions = ref({ width: 0, height: 0 })
 
-// ========== 弯管数据状态 ==========
-const bendPipeEditMode = ref(false)
-const bendPipeAddColumnDialogVisible = ref(false)
-const bendPipeBatchEditDialogVisible = ref(false)
-const bendPipeSelectedRows = ref([])
-
-// 弯管数据表列定义
-const bendPipeColumns = ref([
-  { prop: 'Diameter', label: '通径DN', width: 'auto', editable: true },
-  { prop: 'unit', label: '通径单位', width: 'auto', editable: true },
-  { prop: 'series', label: '壁厚系列', width: 'auto', editable: true },
-  { prop: 'outerDiameter', label: '外径mm', width: 'auto', editable: true },
-  { prop: 'thickness', label: '壁厚值', width: 'auto', editable: true },
-  { prop: 'material', label: '主材料', width: 'auto', editable: true },
-])
-
-// 表格数据示例（弯管数据）
-const bendPipeData = ref([
-  { 
-    id: 1, 
-    Diameter: 'DN15', 
-    unit: 'mm',
-    series: 'Sch10',
-    outerDiameter: '21.3',
-    thickness: '2.11',
-    material: '304不锈钢'
-  },
-  { 
-    id: 2, 
-    Diameter: 'DN20', 
-    unit: 'mm',
-    series: 'Sch20',
-    outerDiameter: '26.9',
-    thickness: '2.65',
-    material: '304不锈钢'
-  },
-  { 
-    id: 3, 
-    Diameter: 'DN25', 
-    unit: 'mm',
-    series: 'Sch40',
-    outerDiameter: '33.7',
-    thickness: '3.38',
-    material: '碳钢'
-  },
-])
-
-// 添加列表单（弯管数据）
-const bendPipeNewColumnForm = reactive({
-  label: '',
-  prop: '',
-  width: '',
-  editable: true
-})
-
-// 批量编辑表单（弯管数据）
-const bendPipeBatchEditForm = reactive({})
-
-// ========== 壁厚系列状态 ==========
-const wallThicknessEditMode = ref(false)
-const wallThicknessAddColumnDialogVisible = ref(false)
-const wallThicknessBatchEditDialogVisible = ref(false)
-const wallThicknessSelectedRows = ref([])
-
-// 壁厚系列表列定义
-const wallThicknessColumns = ref([
-  { prop: 'Diameter', label: '通径DN', width: 'auto', editable: true },
-  { prop: 'unit', label: '通径单位', width: 'auto', editable: true },
-  { prop: 'material', label: '主材料', width: 'auto', editable: true },
-  { prop: 'l1', label: '前夹L1', width: 'auto', editable: true },
-  { prop: 'l2', label: '前夹L2', width: 'auto', editable: true },
-])
-
-// 表格数据示例（壁厚系列）
-const wallThicknessData = ref([
-  { 
-    id: 1, 
-    Diameter: 'DN15', 
-    unit: 'mm', 
-    material: '304不锈钢',
-    l1: '50mm',
-    l2: '60mm'
-  },
-  { 
-    id: 2, 
-    Diameter: 'DN20', 
-    unit: 'mm', 
-    material: '304不锈钢',
-    l1: '55mm',
-    l2: '65mm'
-  },
-  { 
-    id: 3, 
-    Diameter: 'DN25', 
-    unit: 'mm', 
-    material: '碳钢',
-    l1: '60mm',
-    l2: '70mm'
-  },
-])
-
-// 添加列表单（壁厚系列）
-const wallThicknessNewColumnForm = reactive({
-  label: '',
-  prop: '',
-  width: '',
-  editable: true
-})
-
-// 批量编辑表单（壁厚系列）
-const wallThicknessBatchEditForm = reactive({})
-
-// 表单验证规则
+// ========== 表单验证规则 ==========
 const columnFormRules = {
-  label: [
-    { required: true, message: '请输入列名', trigger: 'blur' }
-  ],
+  label: [{ required: true, message: '请输入列名', trigger: 'blur' }],
   prop: [
     { required: true, message: '请输入字段名', trigger: 'blur' },
     { pattern: /^[a-zA-Z][a-zA-Z0-9_]*$/, message: '字段名只能包含字母、数字和下划线，且以字母开头', trigger: 'blur' }
   ]
 }
 
-// ========== 标准规范图片相关方法 ==========
+// ========== 通用方法 ==========
+const handleNodeClick = (node) => {
+  if (node.id !== 'basic') {
+    currentNode.value = node
+    // 清空所有配置的选中行
+    Object.values(configs).forEach(config => {
+      config.selectedRows = []
+    })
+  }
+}
+
+const toggleEditMode = (configId) => {
+  const config = configs[configId]
+  config.editMode = !config.editMode
+  if (!config.editMode) {
+    config.selectedRows = []
+  }
+}
+
+const handleCellChange = (configId, row, prop, index) => {
+  console.log(`${configId} 行${index + 1}的${prop}字段修改为:`, row[prop])
+}
+
+const handleSelectionChange = (configId, selection) => {
+  configs[configId].selectedRows = selection
+}
+
+const handleDeleteRows = (configId) => {
+  const config = configs[configId]
+  if (config.selectedRows.length === 0) {
+    ElMessage.warning('请先选择要删除的行')
+    return
+  }
+  
+  ElMessageBox.confirm(
+    `确定要删除选中的 ${config.selectedRows.length} 行数据吗？`,
+    '删除确认',
+    { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+  ).then(() => {
+    const selectedIds = config.selectedRows.map(row => row.id)
+    config.data = config.data.filter(row => !selectedIds.includes(row.id))
+    
+    // 重新排序ID
+    config.data.forEach((row, index) => {
+      row.id = index + 1
+    })
+    
+    ElMessage.success(`成功删除 ${selectedIds.length} 行数据`)
+    config.selectedRows = []
+  })
+}
+
+const handleAddRow = (configId) => {
+  const config = configs[configId]
+  const newId = config.data.length > 0 
+    ? Math.max(...config.data.map(item => item.id)) + 1 
+    : 1
+  
+  const newRow = { id: newId }
+  
+  // 为每个列添加空值
+  config.columns.forEach(col => {
+    newRow[col.prop] = ''
+  })
+  
+  config.data.push(newRow)
+  ElMessage.success('新增一行成功')
+}
+
+const showAddColumnDialog = (configId) => {
+  currentAddColumnConfig.value = configs[configId]
+  Object.assign(newColumnForm, {
+    label: '',
+    prop: '',
+    editable: true
+  })
+  addColumnDialogVisible.value = true
+}
+
+const confirmAddColumn = () => {
+  if (!columnFormRef.value) return
+  
+  columnFormRef.value.validate((valid) => {
+    if (!valid) return
+    
+    const config = currentAddColumnConfig.value
+    const newColumn = {
+      prop: newColumnForm.prop,
+      label: newColumnForm.label,
+      width: 'auto',
+      editable: newColumnForm.editable
+    }
+    
+    // 检查列是否已存在
+    if (config.columns.some(col => col.prop === newColumn.prop)) {
+      ElMessage.error('字段名已存在，请使用其他字段名')
+      return
+    }
+    
+    config.columns.push(newColumn)
+    
+    // 为所有行添加新字段
+    config.data.forEach(row => {
+      row[newColumn.prop] = ''
+    })
+    
+    addColumnDialogVisible.value = false
+    ElMessage.success('添加列成功')
+  })
+}
+
+const handleAddColumnDialogClose = () => {
+  if (columnFormRef.value) {
+    columnFormRef.value.resetFields()
+  }
+  currentAddColumnConfig.value = null
+}
+
+const handleSave = (configId) => {
+  const config = configs[configId]
+  ElMessageBox.confirm(
+    `确定要保存${config.title}的所有更改吗？`,
+    '保存确认',
+    { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
+  ).then(() => {
+    setTimeout(() => {
+      ElMessage.success(`${config.title}保存成功`)
+      config.editMode = false
+      config.selectedRows = []
+    }, 500)
+  })
+}
+
+// ========== 标准图片相关方法 ==========
 const openStandardImageDialog = () => {
   standardImageDialogVisible.value = true
   imageLoading.value = true
   imageLoaded.value = false
   imageError.value = false
-  imageDimensions.value = { width: 0, height: 0 }
 }
 
-const handleImageLoad = (event) => {
+const handleImageLoad = () => {
   imageLoading.value = false
   imageLoaded.value = true
   imageError.value = false
-  imageDimensions.value = {
-    width: event.target.naturalWidth,
-    height: event.target.naturalHeight
-  }
-  console.log('图片加载成功，尺寸:', imageDimensions.value)
 }
 
 const handleImageError = () => {
@@ -607,374 +460,9 @@ const handleImageError = () => {
   imageLoaded.value = false
   imageError.value = true
   ElMessage.error('标准规范图片加载失败，请检查文件路径')
-  console.error('图片加载失败，路径:', standardImagePath.value)
 }
 
-const downloadImage = () => {
-  if (imageError.value) return
-  
-  try {
-    const link = document.createElement('a')
-    link.href = standardImagePath.value
-    link.download = '管子设计惯例6M241000TB.png'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    ElMessage.success('图片下载开始')
-  } catch (error) {
-    ElMessage.error('图片下载失败')
-    console.error('下载图片时出错:', error)
-  }
-}
-
-// 处理节点点击
-const handleNodeClick = (node) => {
-  if (node.id !== 'basic') {
-    currentNode.value = node
-    // 切换节点时清空选中行
-    bendPipeSelectedRows.value = []
-    wallThicknessSelectedRows.value = []
-  }
-}
-
-// ========== 弯管数据方法 ==========
-const toggleBendPipeEditMode = () => {
-  bendPipeEditMode.value = !bendPipeEditMode.value
-  if (!bendPipeEditMode.value) {
-    bendPipeSelectedRows.value = []
-  }
-}
-
-const handleBendPipeCellChange = (row, prop, index) => {
-  console.log(`弯管数据行${index + 1}的${prop}字段修改为:`, row[prop])
-}
-
-const handleDeleteBendPipeRows = () => {
-  if (bendPipeSelectedRows.value.length === 0) {
-    ElMessage.warning('请先选择要删除的行')
-    return
-  }
-  
-  ElMessageBox.confirm(
-    `确定要删除选中的 ${bendPipeSelectedRows.value.length} 行数据吗？`,
-    '删除确认',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    }
-  ).then(() => {
-    const selectedIds = bendPipeSelectedRows.value.map(row => row.id)
-    bendPipeData.value = bendPipeData.value.filter(row => !selectedIds.includes(row.id))
-    
-    // 重新排序ID
-    bendPipeData.value.forEach((row, index) => {
-      row.id = index + 1
-    })
-    
-    ElMessage.success(`成功删除 ${selectedIds.length} 行数据`)
-    bendPipeSelectedRows.value = []
-  }).catch(() => {
-    // 用户取消
-  })
-}
-
-const handleAddBendPipeRow = () => {
-  const newId = bendPipeData.value.length > 0 
-    ? Math.max(...bendPipeData.value.map(item => item.id)) + 1 
-    : 1
-  
-  const newRow = { id: newId }
-  
-  // 为每个列添加空值
-  bendPipeColumns.value.forEach(col => {
-    newRow[col.prop] = ''
-  })
-  
-  // 设置默认值
-  newRow.Diameter = ''
-  newRow.unit = 'mm'
-  newRow.series = ''
-  newRow.outerDiameter = ''
-  newRow.thickness = ''
-  newRow.material = ''
-  
-  bendPipeData.value.push(newRow)
-  
-  ElMessage.success('新增一行成功')
-  
-  nextTick(() => {
-    if (bendPipeTableRef.value) {
-      bendPipeTableRef.value.scrollTo({ top: bendPipeTableRef.value.$el.scrollHeight })
-    }
-  })
-}
-
-const handleAddBendPipeColumn = () => {
-  Object.assign(bendPipeNewColumnForm, {
-    label: '',
-    prop: '',
-    width: '',
-    editable: true
-  })
-  bendPipeAddColumnDialogVisible.value = true
-}
-
-const confirmAddBendPipeColumn = () => {
-  if (!bendPipeColumnFormRef.value) return
-  
-  bendPipeColumnFormRef.value.validate((valid) => {
-    if (valid) {
-      const newColumn = {
-        prop: bendPipeNewColumnForm.prop,
-        label: bendPipeNewColumnForm.label,
-        width: bendPipeNewColumnForm.width || 'auto',
-        editable: bendPipeNewColumnForm.editable
-      }
-      
-      // 检查列是否已存在
-      if (bendPipeColumns.value.some(col => col.prop === newColumn.prop)) {
-        ElMessage.error('字段名已存在，请使用其他字段名')
-        return
-      }
-      
-      bendPipeColumns.value.push(newColumn)
-      
-      // 为所有行添加新字段
-      bendPipeData.value.forEach(row => {
-        row[newColumn.prop] = ''
-      })
-      
-      bendPipeAddColumnDialogVisible.value = false
-      ElMessage.success('添加列成功')
-    }
-  })
-}
-
-const handleBendPipeAddColumnDialogClose = () => {
-  if (bendPipeColumnFormRef.value) {
-    bendPipeColumnFormRef.value.resetFields()
-  }
-}
-
-const openBendPipeBatchEditDialog = () => {
-  bendPipeColumns.value.forEach(col => {
-    bendPipeBatchEditForm[col.prop] = ''
-  })
-  bendPipeBatchEditDialogVisible.value = true
-}
-
-const confirmBendPipeBatchEdit = () => {
-  bendPipeSelectedRows.value.forEach(row => {
-    bendPipeColumns.value.forEach(col => {
-      if (bendPipeBatchEditForm[col.prop]) {
-        row[col.prop] = bendPipeBatchEditForm[col.prop]
-      }
-    })
-  })
-  
-  bendPipeBatchEditDialogVisible.value = false
-  ElMessage.success(`已批量更新 ${bendPipeSelectedRows.value.length} 行数据`)
-  
-  // 清空表单
-  bendPipeColumns.value.forEach(col => {
-    bendPipeBatchEditForm[col.prop] = ''
-  })
-}
-
-const handleSaveBendPipe = () => {
-  ElMessageBox.confirm(
-    '确定要保存弯管数据的所有更改吗？',
-    '保存确认',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info',
-    }
-  ).then(() => {
-    setTimeout(() => {
-      ElMessage.success('弯管数据保存成功')
-      bendPipeEditMode.value = false
-      bendPipeSelectedRows.value = []
-    }, 500)
-  }).catch(() => {
-    // 用户取消
-  })
-}
-
-const handleBendPipeSelectionChange = (selection) => {
-  bendPipeSelectedRows.value = selection
-}
-
-// ========== 壁厚系列方法 ==========
-const toggleWallThicknessEditMode = () => {
-  wallThicknessEditMode.value = !wallThicknessEditMode.value
-  if (!wallThicknessEditMode.value) {
-    wallThicknessSelectedRows.value = []
-  }
-}
-
-const handleWallThicknessCellChange = (row, prop, index) => {
-  console.log(`壁厚系列行${index + 1}的${prop}字段修改为:`, row[prop])
-}
-
-const handleDeleteWallThicknessRows = () => {
-  if (wallThicknessSelectedRows.value.length === 0) {
-    ElMessage.warning('请先选择要删除的行')
-    return
-  }
-  
-  ElMessageBox.confirm(
-    `确定要删除选中的 ${wallThicknessSelectedRows.value.length} 行数据吗？`,
-    '删除确认',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    }
-  ).then(() => {
-    const selectedIds = wallThicknessSelectedRows.value.map(row => row.id)
-    wallThicknessData.value = wallThicknessData.value.filter(row => !selectedIds.includes(row.id))
-    
-    // 重新排序ID
-    wallThicknessData.value.forEach((row, index) => {
-      row.id = index + 1
-    })
-    
-    ElMessage.success(`成功删除 ${selectedIds.length} 行数据`)
-    wallThicknessSelectedRows.value = []
-  }).catch(() => {
-    // 用户取消
-  })
-}
-
-const handleAddWallThicknessRow = () => {
-  const newId = wallThicknessData.value.length > 0 
-    ? Math.max(...wallThicknessData.value.map(item => item.id)) + 1 
-    : 1
-  
-  const newRow = { id: newId }
-  
-  // 为每个列添加空值
-  wallThicknessColumns.value.forEach(col => {
-    newRow[col.prop] = ''
-  })
-  
-  // 设置默认值
-  newRow.Diameter = ''
-  newRow.unit = 'mm'
-  newRow.material = ''
-  newRow.l1 = ''
-  newRow.l2 = ''
-  
-  wallThicknessData.value.push(newRow)
-  
-  ElMessage.success('新增一行成功')
-  
-  nextTick(() => {
-    if (wallThicknessTableRef.value) {
-      wallThicknessTableRef.value.scrollTo({ top: wallThicknessTableRef.value.$el.scrollHeight })
-    }
-  })
-}
-
-const handleAddWallThicknessColumn = () => {
-  Object.assign(wallThicknessNewColumnForm, {
-    label: '',
-    prop: '',
-    width: '',
-    editable: true
-  })
-  wallThicknessAddColumnDialogVisible.value = true
-}
-
-const confirmAddWallThicknessColumn = () => {
-  if (!wallThicknessColumnFormRef.value) return
-  
-  wallThicknessColumnFormRef.value.validate((valid) => {
-    if (valid) {
-      const newColumn = {
-        prop: wallThicknessNewColumnForm.prop,
-        label: wallThicknessNewColumnForm.label,
-        width: wallThicknessNewColumnForm.width || 'auto',
-        editable: wallThicknessNewColumnForm.editable
-      }
-      
-      // 检查列是否已存在
-      if (wallThicknessColumns.value.some(col => col.prop === newColumn.prop)) {
-        ElMessage.error('字段名已存在，请使用其他字段名')
-        return
-      }
-      
-      wallThicknessColumns.value.push(newColumn)
-      
-      // 为所有行添加新字段
-      wallThicknessData.value.forEach(row => {
-        row[newColumn.prop] = ''
-      })
-      
-      wallThicknessAddColumnDialogVisible.value = false
-      ElMessage.success('添加列成功')
-    }
-  })
-}
-
-const handleWallThicknessAddColumnDialogClose = () => {
-  if (wallThicknessColumnFormRef.value) {
-    wallThicknessColumnFormRef.value.resetFields()
-  }
-}
-
-const openWallThicknessBatchEditDialog = () => {
-  wallThicknessColumns.value.forEach(col => {
-    wallThicknessBatchEditForm[col.prop] = ''
-  })
-  wallThicknessBatchEditDialogVisible.value = true
-}
-
-const confirmWallThicknessBatchEdit = () => {
-  wallThicknessSelectedRows.value.forEach(row => {
-    wallThicknessColumns.value.forEach(col => {
-      if (wallThicknessBatchEditForm[col.prop]) {
-        row[col.prop] = wallThicknessBatchEditForm[col.prop]
-      }
-    })
-  })
-  
-  wallThicknessBatchEditDialogVisible.value = false
-  ElMessage.success(`已批量更新 ${wallThicknessSelectedRows.value.length} 行数据`)
-  
-  // 清空表单
-  wallThicknessColumns.value.forEach(col => {
-    wallThicknessBatchEditForm[col.prop] = ''
-  })
-}
-
-const handleSaveWallThickness = () => {
-  ElMessageBox.confirm(
-    '确定要保存壁厚系列的所有更改吗？',
-    '保存确认',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info',
-    }
-  ).then(() => {
-    setTimeout(() => {
-      ElMessage.success('壁厚系列保存成功')
-      wallThicknessEditMode.value = false
-      wallThicknessSelectedRows.value = []
-    }, 500)
-  }).catch(() => {
-    // 用户取消
-  })
-}
-
-const handleWallThicknessSelectionChange = (selection) => {
-  wallThicknessSelectedRows.value = selection
-}
-
-// 初始化选中第一个二级节点
+// 初始化
 onMounted(() => {
   currentNode.value = treeData.value[0].children[0]
 })
@@ -996,7 +484,6 @@ onMounted(() => {
   gap: 10px;
 }
 
-/* 左侧目录树样式 */
 .basic-config-sidebar {
   width: 240px;
   background: white;
@@ -1038,7 +525,6 @@ onMounted(() => {
   color: #606266;
 }
 
-/* 右侧内容区域样式 */
 .basic-config-main {
   flex: 1;
   display: flex;
@@ -1079,7 +565,6 @@ onMounted(() => {
   align-items: center;
 }
 
-/* 标准规范点击样式 */
 .clickable-standard {
   color: #409eff;
   cursor: pointer;
@@ -1105,7 +590,6 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-/* 表格容器 */
 .table-container {
   flex: 1;
   display: flex;
@@ -1136,21 +620,6 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.batch-edit-btn {
-  margin-left: 12px;
-  font-size: 12px;
-  color: #409eff;
-}
-
-.batch-edit-btn:hover {
-  color: #66b1ff;
-}
-
-.batch-edit-btn .el-icon {
-  margin-right: 4px;
-}
-
-/* 树节点选中样式 */
 :deep(.el-tree-node.is-current > .el-tree-node__content) {
   background-color: #ecf5ff;
   border-radius: 8px;
@@ -1164,7 +633,6 @@ onMounted(() => {
   color: #c0c4cc;
 }
 
-/* 编辑模式样式 */
 :deep(.el-table .cell) {
   padding: 4px 8px;
 }
@@ -1173,24 +641,12 @@ onMounted(() => {
   width: 100%;
 }
 
-:deep(.el-input-number--small) {
-  width: 100%;
-}
-
-/* 对话框样式 */
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 
-/* 按钮禁用样式 */
-:deep(.el-button.is-disabled) {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* 标准图片对话框样式 */
 :deep(.standard-image-dialog .el-dialog__body) {
   padding: 0;
 }
@@ -1198,7 +654,7 @@ onMounted(() => {
 .image-container {
   display: flex;
   flex-direction: column;
-  height: 70vh;
+  height: 65vh;
 }
 
 .image-wrapper {
@@ -1216,61 +672,5 @@ onMounted(() => {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.image-loading,
-.image-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #909399;
-  padding: 40px;
-}
-
-.loading-icon {
-  font-size: 36px;
-  margin-bottom: 16px;
-  animation: rotate 2s linear infinite;
-}
-
-@keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.error-icon {
-  font-size: 36px;
-  margin-bottom: 16px;
-  color: #f56c6c;
-}
-
-.error-hint {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #c0c4cc;
-  text-align: center;
-  max-width: 300px;
-}
-
-.image-footer {
-  padding: 16px 20px;
-  border-top: 1px solid #e4e7ed;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #fafafa;
-}
-
-.image-title {
-  font-weight: 500;
-  color: #303133;
-}
-
-.image-size {
-  font-size: 12px;
-  color: #909399;
 }
 </style>
