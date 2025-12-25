@@ -3,17 +3,14 @@ import MainLayout from '@/layout/MainLayout.vue'
 export default {
   path: '/pmc',
   component: MainLayout,
-  meta: { 
-    title: 'PMC编码规则', 
-    icon: 'Connection' 
-  },
-  redirect: '/pmc/rules',
+  meta: { title: 'PMC编码', icon: 'Cpu' }, // 对应截图名称
+  redirect: '/pmc/index',
   children: [
     {
-      path: 'rules',
+      path: 'index',
       name: 'PmcCode',
       component: () => import('@/views/PmcCode.vue'),
-      meta: { title: '编码规则' }
+      meta: { title: 'PMC规则' }
     }
   ]
 }
