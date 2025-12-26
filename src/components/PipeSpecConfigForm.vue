@@ -25,11 +25,12 @@
           style="width: 100%"
           :teleported="false"
           @change="handleStandardFileChange"
+          :loading="standardFilesLoading"
         >
           <el-option
             v-for="file in standardFilesList"
             :key="file.id"
-            :label="file.name"
+            :label="file.code"
             :value="file.id"
           />
         </el-select>
@@ -104,7 +105,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps({
@@ -148,18 +150,27 @@ const rules = {
   ]
 }
 
-// 模拟的标准文件列表
-const standardFilesList = ref([
-  { id: 1, name: 'GB/T 12459-2017 钢制对焊管件' },
-  { id: 2, name: 'GB/T 13401-2017 钢板制对焊管件' },
-  { id: 3, name: 'ASME B16.9-2018 工厂制造的锻钢对焊管件' },
-  { id: 4, name: 'HG/T 21635-1987 碳钢、低合金钢无缝对焊管件' },
-  { id: 5, name: 'SH/T 3408-2012 石油化工钢制对焊管件' },
-  { id: 6, name: 'DL/T 695-2014 电站钢制对焊管件' },
-  { id: 7, name: 'SY/T 0510-2010 钢制对焊管件规范' },
-  { id: 8, name: 'JB/T 4710-2005 钢制塔式容器' },
-  { id: 9, name: 'NB/T 47002-2019 压力容器用爆炸焊接复合板' }
-])
+// 标准文件列表
+const standardFilesList = ref([])
+const standardFilesLoading = ref(false)
+
+// 获取标准文件列表
+const fetchStandardFiles = async () => {
+  standardFilesLoading.value = true
+  try {
+    const res = await axios.get('/api/pipe-spec/standard-files')
+    if (res.data.code === 200) {
+      standardFilesList.value = res.data.data
+    } else {
+      ElMessage.error(res.data.msg || '获取标准文件列表失败')
+    }
+  } catch (error) {
+    console.error('获取标准文件列表错误:', error)
+    ElMessage.error('网络错误，获取标准文件列表失败')
+  } finally {
+    standardFilesLoading.value = false
+  }
+}
 
 // 过滤后的通径范围（显示所有可用的NPD范围）
 const filteredPathRanges = computed(() => props.pathRanges)
@@ -220,7 +231,7 @@ const handleStandardFileChange = (value) => {
 // 获取标准文件名称
 const getStandardFileName = (fileId) => {
   const file = standardFilesList.value.find(f => f.id === fileId)
-  return file ? file.name : ''
+  return file ? file.code : ''
 }
 
 
@@ -265,13 +276,20 @@ const handleSubmit = async () => {
       })
     }
     
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    emit('confirm', submitData)
-    
-    dialogVisible.value = false
-    ElMessage.success('配置已保存！')
+    // 真实API调用
+    try {
+      const res = await axios.post('/api/pipe-spec/configure', submitData)
+      if (res.data.code === 200) {
+        emit('confirm', submitData)
+        dialogVisible.value = false
+        ElMessage.success('配置已保存！')
+      } else {
+        ElMessage.error(res.data.msg || '配置保存失败')
+      }
+    } catch (error) {
+      console.error('配置保存错误:', error)
+      ElMessage.error('网络错误，配置保存失败')
+    }
   } catch (error) {
     console.error('表单验证失败:', error)
   } finally {
@@ -302,7 +320,14 @@ watch(dialogVisible, (val) => {
       // 确保配置数组为空
       form.value.standardFileConfigurations = []
     })
+    // 对话框打开时获取标准文件列表
+    fetchStandardFiles()
   }
+})
+
+// 组件挂载时获取标准文件列表
+onMounted(() => {
+  fetchStandardFiles()
 })
 </script>
 

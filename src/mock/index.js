@@ -1,4 +1,6 @@
 import Mock from 'mockjs'
+// 导入管道规格配置相关的Mock数据
+import './modules/PipeSpecConfigInfo/ReferenceInfo.js'
 
 Mock.setup({
   timeout: '200-600'
@@ -234,3 +236,4 @@ Mock.mock(/\/api\/dict\/[\w-]+/, 'get', (options) => {
     }
   }
 })
+
