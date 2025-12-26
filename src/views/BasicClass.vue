@@ -197,6 +197,8 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { db } from '@/mock/index.js'
+import Mock from 'mockjs'
 import {
   Folder,
   Document,
@@ -216,7 +218,8 @@ const treeData = ref([
     children: [
       { id: 'bend-pipe', label: '弯管数据', icon: Document },
       { id: 'wall-thickness-series', label: '壁厚系列', icon: Document },
-      { id: 'shortcode', label: 'ShortCode', icon: Document }
+      { id: 'shortcode', label: 'ShortCode', icon: Document },
+      { id: 'spec', label: 'Spec', icon: Document }
     ]
   }
 ])
@@ -224,63 +227,55 @@ const treeData = ref([
 // 当前选中的节点
 const currentNode = ref(treeData.value[0].children[0])
 
-// 获取当前配置
-const configs = reactive({
-  'bend-pipe': {
-    id: 'bend-pipe',
-    title: 'PlainPipingGenericData',
-    editMode: false,
-    selectedRows: [],
-    columns: [
-      { prop: 'diameter', label: '通径DN', editable: true },
-      { prop: 'unit', label: '通径单位', editable: true },
-      { prop: 'material', label: '主材料', editable: true },
-      { prop: 'l1', label: '前夹长L1', editable: true },
-      { prop: 'l2', label: '后夹长L2', editable: true }
-    ],
-    data: [
-      { id: 1, diameter: 'DN15', unit: 'mm', material: '304不锈钢' },
-      { id: 2, diameter: 'DN20', unit: 'mm', material: '304不锈钢' },
-      { id: 3, diameter: 'DN25', unit: 'mm', material: '碳钢' }
-    ]
-  },
-  'wall-thickness-series': {
-    id: 'wall-thickness-series',
-    title: 'PlainPipingGenericData',
-    editMode: false,
-    selectedRows: [],
-    columns: [
-      { prop: 'diameter', label: '通径DN', editable: true },
-      { prop: 'unit', label: '通径单位', editable: true },
-      { prop: 'standard', label: '管材标准EndStandard', editable: true },
-      { prop: 'series', label: '壁厚系列', editable: true },
-      { prop: 'outer', label: '外径', editable: true },
-      { prop: 'value', label: '壁厚值', editable: true }
-    ],
-    data: [
-      { id: 1, diameter: 'DN15', unit: 'mm' },
-      { id: 2, diameter: 'DN20', unit: 'mm' },
-      { id: 3, diameter: 'DN25', unit: 'mm' }
-    ]
-  },
-  'shortcode': {
-    id: 'shortcode',
-    title: 'ShortCodeHierarchyRule',
-    editMode: false,
-    selectedRows: [],
-    columns: [
-      { prop: 'type', label: 'ShortCodeHierarchyType', editable: true },
-      { prop: 'shortcode', label: 'ShortCode', editable: true }
-    ],
-    data: [
-      { id: 1, type: 'PIPE', shortcode: '管道' },
-      { id: 2, type: 'VALVE', shortcode: '阀门' },
-      { id: 3, type: 'FLANGE', shortcode: '法兰' }
-    ]
-  }
-})
+// 配置数据
+const configs = reactive({})
 
-const currentConfig = computed(() => configs[currentNode.value?.id])
+// 初始化所有配置
+const initializeConfigs = () => {
+  const configIds = ['bend-pipe', 'wall-thickness-series', 'shortcode','spec']
+  
+  configIds.forEach(configId => {
+    if (db[configId]) {
+      const mockData = Mock.mock(db[configId])
+      console.log(`加载配置 ${configId}:`, mockData) // 调试用
+      
+      configs[configId] = {
+        id: configId,
+        title: mockData.title || configId,
+        editMode: false,
+        selectedRows: [],
+        columns: mockData.columns ? mockData.columns.map(col => ({
+          ...col,
+          editable: col.editable !== undefined ? col.editable : true
+        })) : [],
+        data: mockData.data || []
+      }
+    } else {
+      // 如果db中没有找到配置，使用默认数据
+      console.warn(`配置 ${configId} 未在 db 中找到`)
+      configs[configId] = {
+        id: configId,
+        title: configId,
+        editMode: false,
+        selectedRows: [],
+        columns: [],
+        data: []
+      }
+    }
+  })
+  
+  // 设置默认选中节点
+  if (treeData.value[0].children.length > 0) {
+    currentNode.value = treeData.value[0].children[0]
+  }
+}
+
+const currentConfig = computed(() => {
+  if (!currentNode.value || !configs[currentNode.value.id]) {
+    return null
+  }
+  return configs[currentNode.value.id]
+})
 
 // ========== 通用状态 ==========
 const columnFormRef = ref()
@@ -311,19 +306,39 @@ const columnFormRules = {
 // ========== 通用方法 ==========
 const handleNodeClick = (node) => {
   if (node.id !== 'basic') {
+    // 如果该配置尚未加载，则加载
+    if (!configs[node.id] && db[node.id]) {
+      const mockData = Mock.mock(db[node.id])
+      configs[node.id] = {
+        id: node.id,
+        title: mockData.title || node.id,
+        editMode: false,
+        selectedRows: [],
+        columns: mockData.columns ? mockData.columns.map(col => ({
+          ...col,
+          editable: col.editable !== undefined ? col.editable : true
+        })) : [],
+        data: mockData.data || []
+      }
+    }
+    
     currentNode.value = node
     // 清空所有配置的选中行
     Object.values(configs).forEach(config => {
-      config.selectedRows = []
+      if (config) {
+        config.selectedRows = []
+      }
     })
   }
 }
 
 const toggleEditMode = (configId) => {
   const config = configs[configId]
-  config.editMode = !config.editMode
-  if (!config.editMode) {
-    config.selectedRows = []
+  if (config) {
+    config.editMode = !config.editMode
+    if (!config.editMode) {
+      config.selectedRows = []
+    }
   }
 }
 
@@ -332,11 +347,16 @@ const handleCellChange = (configId, row, prop, index) => {
 }
 
 const handleSelectionChange = (configId, selection) => {
-  configs[configId].selectedRows = selection
+  const config = configs[configId]
+  if (config) {
+    config.selectedRows = selection
+  }
 }
 
 const handleDeleteRows = (configId) => {
   const config = configs[configId]
+  if (!config) return
+  
   if (config.selectedRows.length === 0) {
     ElMessage.warning('请先选择要删除的行')
     return
@@ -362,6 +382,8 @@ const handleDeleteRows = (configId) => {
 
 const handleAddRow = (configId) => {
   const config = configs[configId]
+  if (!config) return
+  
   const newId = config.data.length > 0 
     ? Math.max(...config.data.map(item => item.id)) + 1 
     : 1
@@ -378,7 +400,10 @@ const handleAddRow = (configId) => {
 }
 
 const showAddColumnDialog = (configId) => {
-  currentAddColumnConfig.value = configs[configId]
+  const config = configs[configId]
+  if (!config) return
+  
+  currentAddColumnConfig.value = config
   Object.assign(newColumnForm, {
     label: '',
     prop: '',
@@ -426,18 +451,26 @@ const handleAddColumnDialogClose = () => {
   currentAddColumnConfig.value = null
 }
 
-const handleSave = (configId) => {
+const handleSave = async (configId) => {
   const config = configs[configId]
+  if (!config) return
+  
   ElMessageBox.confirm(
     `确定要保存${config.title}的所有更改吗？`,
     '保存确认',
     { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
-  ).then(() => {
-    setTimeout(() => {
+  ).then(async () => {
+    try {
+      // 这里可以添加保存到服务器的逻辑
+      console.log('保存数据:', config)
+      
       ElMessage.success(`${config.title}保存成功`)
       config.editMode = false
       config.selectedRows = []
-    }, 500)
+    } catch (error) {
+      console.error('保存失败:', error)
+      ElMessage.error('保存失败，请重试')
+    }
   })
 }
 
@@ -464,7 +497,7 @@ const handleImageError = () => {
 
 // 初始化
 onMounted(() => {
-  currentNode.value = treeData.value[0].children[0]
+  initializeConfigs()
 })
 </script>
 
