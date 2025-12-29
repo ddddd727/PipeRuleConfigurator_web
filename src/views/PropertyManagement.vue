@@ -1,44 +1,71 @@
 <template>
   <div class="property-page">
-    <div style="display: flex; gap: 0; height: 100vh;">
+    <div class="page-container">
       <!-- 左侧目录树 -->
-      <div style="width: 250px; background: #f5f7fa; border-right: 1px solid #dcdfe6; overflow-y: auto; padding: 15px;">
-        <div style="margin-bottom: 15px; font-weight: bold; font-size: 14px;">Interface 列表</div>
-        <el-tree
-          :data="treeData"
-          :props="{ children: 'children', label: 'label' }"
-          node-key="id"
-          :expand-on-click-node="false"
-          @node-click="handleTreeNodeClick"
-          highlight-current
-        />
+      <div class="sidebar-panel">
+        <div class="sidebar-content">
+          <div class="sidebar-title">Interface 列表</div>
+          <el-input
+            v-model="treeSearchText"
+            placeholder="搜索接口/类别/属性..."
+            clearable
+            prefix-icon="Search"
+            style="margin-bottom: 10px;"
+          />
+          <div class="tree-wrapper">
+            <el-tree
+              ref="treeRef"
+              :data="treeData"
+              :props="{ children: 'children', label: 'label' }"
+              node-key="id"
+              :expand-on-click-node="false"
+              @node-click="handleTreeNodeClick"
+              :filter-node-method="filterTreeNode"
+              highlight-current
+            />
+          </div>
+        </div>
       </div>
 
       <!-- 右侧主要内容 -->
-      <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;">
-        <!-- 顶部工具栏 -->
-        <div style="display: flex; gap: 10px; margin: 20px 20px 15px 20px; align-items: center; flex-shrink: 0;">
-          <el-button type="primary" @click="handleAdd">➕ 新增属性</el-button>
-          <el-button @click="loadData">🔄 刷新</el-button>
-          <el-button @click="handleExport">📥 导出Excel</el-button>
-          <el-input 
-            v-model="searchText" 
-            placeholder="搜索属性..."
-            style="width: 250px;"
-            clearable
-            @input="onSearch"
-          />
-        </div>
+      <div class="main-panel">
+        <div class="property-table-container">
+          <!-- 顶部工具栏 -->
+          <div class="table-header">
+            <div class="title-area">
+              <h3>属性管理</h3>
+              <el-tag v-if="selectedInterface" type="primary" effect="plain" class="ml-2">
+                {{ selectedInterface }}
+              </el-tag>
+            </div>
+            
+            <div class="actions">
+              <el-input 
+                v-model="searchText" 
+                placeholder="搜索属性..."
+                prefix-icon="Search"
+                clearable
+                @input="onSearch"
+                style="width: 200px; margin-right: 12px;"
+              />
+              <el-button-group>
+                <el-button type="primary" icon="Plus" @click="handleAdd">新增</el-button>
+                <el-button icon="Refresh" @click="loadData">刷新</el-button>
+                <el-button icon="Download" @click="handleExport">导出</el-button>
+              </el-button-group>
+            </div>
+          </div>
 
-        <!-- 属性表格 -->
-        <el-table 
-          :data="filteredPropertyList" 
-          border 
-          stripe
-          style="width: 100%; margin: 0 20px 10px 20px; flex: 1; overflow-y: auto;"
-          :default-sort="{ prop: 'id', order: 'ascending' }"
-          max-height="calc(100vh - 380px)"
-        >
+          <!-- 属性表格 -->
+          <el-table 
+            :data="filteredPropertyList" 
+            border 
+            stripe
+            style="width: 100%; flex: 1;"
+            v-loading="loading"
+            height="100%"
+            :default-sort="{ prop: 'id', order: 'ascending' }"
+          >
           <!-- 序号列 -->
           <el-table-column type="index" label="序号" width="60" />
           
@@ -155,22 +182,23 @@
           <!-- 操作列 -->
           <el-table-column 
             label="操作" 
-            width="150" 
+            width="120" 
             fixed="right"
             align="center"
           >
             <template #default="{ row }">
               <el-button 
-                link 
                 type="primary" 
+                link 
+                icon="Edit"
                 @click="handleEdit(row)"
               >
                 编辑
               </el-button>
-              <el-divider direction="vertical" />
               <el-button 
-                link 
                 type="danger" 
+                link 
+                icon="Delete"
                 @click="handleDelete(row)"
               >
                 删除
@@ -178,38 +206,6 @@
             </template>
           </el-table-column>
         </el-table>
-
-        <!-- 统计信息 - 紧凑底部栏 -->
-        <div style="background: white; border-top: 1px solid #dcdfe6; padding: 10px 20px; display: flex; gap: 15px; flex-shrink: 0; overflow-x: auto;">
-          <div style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-            <span style="color: #606266; font-size: 12px;">总数:</span>
-            <span style="color: #667eea; font-weight: bold; font-size: 14px;">{{ totalCount }}</span>
-          </div>
-          <div style="width: 1px; background: #dcdfe6;"></div>
-          <div style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-            <span style="color: #606266; font-size: 12px;">启用:</span>
-            <span style="color: #f5576c; font-weight: bold; font-size: 14px;">{{ enabledCount }}</span>
-          </div>
-          <div style="width: 1px; background: #dcdfe6;"></div>
-          <div style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-            <span style="color: #606266; font-size: 12px;">只读:</span>
-            <span style="color: #00f2fe; font-weight: bold; font-size: 14px;">{{ readOnlyCount }}</span>
-          </div>
-          <div style="width: 1px; background: #dcdfe6;"></div>
-          <div style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-            <span style="color: #606266; font-size: 12px;">符号:</span>
-            <span style="color: #38f9d7; font-weight: bold; font-size: 14px;">{{ symbolCount }}</span>
-          </div>
-          <div style="width: 1px; background: #dcdfe6;"></div>
-          <div style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-            <span style="color: #606266; font-size: 12px;">接口:</span>
-            <span style="color: #fee140; font-weight: bold; font-size: 14px;">{{ interfaceCount }}</span>
-          </div>
-          <div style="width: 1px; background: #dcdfe6;"></div>
-          <div style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-            <span style="color: #606266; font-size: 12px;">类型:</span>
-            <span style="color: #fed6e3; font-weight: bold; font-size: 14px;">{{ typeCount }}</span>
-          </div>
         </div>
       </div>
     </div>
@@ -284,7 +280,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as XLSX from 'xlsx'
 
@@ -294,8 +290,17 @@ const propertyList = ref([])
 // 目录树数据
 const treeData = ref([])
 
+// 树组件引用
+const treeRef = ref(null)
+
+// 树搜索文本
+const treeSearchText = ref('')
+
 // 搜索文本
 const searchText = ref('')
+
+// 加载状态
+const loading = ref(false)
 
 // 当前选中的Interface
 const selectedInterface = ref('')
@@ -383,6 +388,21 @@ const typeCount = computed(() => {
 function onSearch() {
   // 计算属性会自动更新
 }
+
+/**
+ * 树节点过滤方法
+ */
+function filterTreeNode(value, data) {
+  if (!value) return true
+  return data.label.toLowerCase().includes(value.toLowerCase())
+}
+
+/**
+ * 监听树搜索文本变化
+ */
+watch(treeSearchText, (val) => {
+  treeRef.value?.filter(val)
+})
 
 /**
  * 构建树形结构数据
@@ -531,6 +551,336 @@ function loadData() {
       codelistNamespace: '',
       onPropertyPage: true,
       readOnly: true,
+      symbolParameter: false
+    },
+    {
+      id: 7,
+      interfaceName: 'IJPipeRun',
+      categoryName: 'Specifications',
+      attributeName: 'OuterDiameter',
+      attributeUserName: 'Outer Diameter',
+      type: 'Double',
+      unitsType: 'Length',
+      primaryUnits: 'mm',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: true
+    },
+    {
+      id: 8,
+      interfaceName: 'IJPipeRun',
+      categoryName: 'Specifications',
+      attributeName: 'PipeSchedule',
+      attributeUserName: 'Pipe Schedule',
+      type: 'String',
+      unitsType: '',
+      primaryUnits: '',
+      codelist: 'PipeSchedule',
+      codelistNamespace: 'com.smartplant.piping',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 9,
+      interfaceName: 'IJPipeRun',
+      categoryName: 'Design',
+      attributeName: 'DesignPressure',
+      attributeUserName: 'Design Pressure',
+      type: 'Double',
+      unitsType: 'Pressure',
+      primaryUnits: 'MPa',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 10,
+      interfaceName: 'IJPipeRun',
+      categoryName: 'Design',
+      attributeName: 'DesignTemperature',
+      attributeUserName: 'Design Temperature',
+      type: 'Double',
+      unitsType: 'Temperature',
+      primaryUnits: '°C',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 11,
+      interfaceName: 'IJMaterial',
+      categoryName: 'Properties',
+      attributeName: 'MaterialSpec',
+      attributeUserName: 'Material Spec',
+      type: 'String',
+      unitsType: '',
+      primaryUnits: '',
+      codelist: 'MaterialSpec',
+      codelistNamespace: 'com.smartplant.materials',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 12,
+      interfaceName: 'IJMaterial',
+      categoryName: 'Properties',
+      attributeName: 'Density',
+      attributeUserName: 'Density',
+      type: 'Double',
+      unitsType: 'Density',
+      primaryUnits: 'kg/m³',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: true,
+      symbolParameter: false
+    },
+    {
+      id: 13,
+      interfaceName: 'IJMaterial',
+      categoryName: 'Thermal',
+      attributeName: 'ThermalExpansion',
+      attributeUserName: 'Thermal Expansion',
+      type: 'Double',
+      unitsType: 'Coefficient',
+      primaryUnits: '1/°C',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: true,
+      symbolParameter: false
+    },
+    {
+      id: 14,
+      interfaceName: 'IJEquipment',
+      categoryName: 'Identification',
+      attributeName: 'EquipmentTag',
+      attributeUserName: 'Equipment Tag',
+      type: 'String',
+      unitsType: '',
+      primaryUnits: '',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 15,
+      interfaceName: 'IJEquipment',
+      categoryName: 'Design',
+      attributeName: 'RatedCapacity',
+      attributeUserName: 'Rated Capacity',
+      type: 'Double',
+      unitsType: 'Volume',
+      primaryUnits: 'm³',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 16,
+      interfaceName: 'IJEquipment',
+      categoryName: 'Design',
+      attributeName: 'OperatingPressure',
+      attributeUserName: 'Operating Pressure',
+      type: 'Double',
+      unitsType: 'Pressure',
+      primaryUnits: 'MPa',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 17,
+      interfaceName: 'IJValve',
+      categoryName: 'BasicInfo',
+      attributeName: 'ValveType',
+      attributeUserName: 'Valve Type',
+      type: 'String',
+      unitsType: '',
+      primaryUnits: '',
+      codelist: 'ValveType',
+      codelistNamespace: 'com.smartplant.piping',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: true
+    },
+    {
+      id: 18,
+      interfaceName: 'IJValve',
+      categoryName: 'BasicInfo',
+      attributeName: 'ValveSize',
+      attributeUserName: 'Valve Size',
+      type: 'Double',
+      unitsType: 'Length',
+      primaryUnits: 'mm',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: true
+    },
+    {
+      id: 19,
+      interfaceName: 'IJValve',
+      categoryName: 'Specifications',
+      attributeName: 'EndConnection',
+      attributeUserName: 'End Connection',
+      type: 'String',
+      unitsType: '',
+      primaryUnits: '',
+      codelist: 'EndConnection',
+      codelistNamespace: 'com.smartplant.piping',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 20,
+      interfaceName: 'IJValve',
+      categoryName: 'Specifications',
+      attributeName: 'PressureRating',
+      attributeUserName: 'Pressure Rating',
+      type: 'String',
+      unitsType: '',
+      primaryUnits: '',
+      codelist: 'PressureRating',
+      codelistNamespace: 'com.smartplant.piping',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 21,
+      interfaceName: 'IJFitting',
+      categoryName: 'BasicInfo',
+      attributeName: 'FittingType',
+      attributeUserName: 'Fitting Type',
+      type: 'String',
+      unitsType: '',
+      primaryUnits: '',
+      codelist: 'FittingType',
+      codelistNamespace: 'com.smartplant.piping',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: true
+    },
+    {
+      id: 22,
+      interfaceName: 'IJFitting',
+      categoryName: 'BasicInfo',
+      attributeName: 'FittingSize',
+      attributeUserName: 'Fitting Size',
+      type: 'Double',
+      unitsType: 'Length',
+      primaryUnits: 'mm',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: true
+    },
+    {
+      id: 23,
+      interfaceName: 'IJFitting',
+      categoryName: 'Geometry',
+      attributeName: 'BendRadius',
+      attributeUserName: 'Bend Radius',
+      type: 'Double',
+      unitsType: 'Length',
+      primaryUnits: 'mm',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 24,
+      interfaceName: 'IJFitting',
+      categoryName: 'Geometry',
+      attributeName: 'BendAngle',
+      attributeUserName: 'Bend Angle',
+      type: 'Double',
+      unitsType: 'Angle',
+      primaryUnits: '°',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 25,
+      interfaceName: 'IJInstrument',
+      categoryName: 'Identification',
+      attributeName: 'TagNumber',
+      attributeUserName: 'Tag Number',
+      type: 'String',
+      unitsType: '',
+      primaryUnits: '',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 26,
+      interfaceName: 'IJInstrument',
+      categoryName: 'Identification',
+      attributeName: 'ServiceDescription',
+      attributeUserName: 'Service Description',
+      type: 'String',
+      unitsType: '',
+      primaryUnits: '',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 27,
+      interfaceName: 'IJInstrument',
+      categoryName: 'Specifications',
+      attributeName: 'MeasurementRange',
+      attributeUserName: 'Measurement Range',
+      type: 'String',
+      unitsType: '',
+      primaryUnits: '',
+      codelist: '',
+      codelistNamespace: '',
+      onPropertyPage: true,
+      readOnly: false,
+      symbolParameter: false
+    },
+    {
+      id: 28,
+      interfaceName: 'IJInstrument',
+      categoryName: 'Specifications',
+      attributeName: 'SignalType',
+      attributeUserName: 'Signal Type',
+      type: 'String',
+      unitsType: '',
+      primaryUnits: '',
+      codelist: 'SignalType',
+      codelistNamespace: 'com.smartplant.instrument',
+      onPropertyPage: true,
+      readOnly: false,
       symbolParameter: false
     }
   ]
@@ -688,9 +1038,187 @@ onMounted(() => {
 
 <style scoped>
 .property-page {
-  padding: 0;
+  height: 100%;
   background-color: #f0f2f5;
-  height: 100vh;
   overflow: hidden;
+  box-sizing: border-box;
+}
+
+.page-container {
+  display: flex;
+  height: 100%;
+  gap: 1vw;
+  padding: 1vh 1vw;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* 左侧面板 - 响应式宽度 */
+.sidebar-panel {
+  width: clamp(240px, 20vw, 320px);
+  flex-shrink: 0;
+  min-width: 200px;
+  height: 100%;
+}
+
+.sidebar-content {
+  background: #fff;
+  border-radius: 4px;
+  padding: clamp(12px, 1.2vw, 20px);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.sidebar-title {
+  font-size: clamp(14px, 1vw, 18px);
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: clamp(8px, 0.8vh, 16px);
+}
+
+.tree-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: clamp(6px, 0.5vh, 12px);
+}
+
+/* 统一滚动条样式 */
+.tree-wrapper::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.tree-wrapper::-webkit-scrollbar-thumb {
+  background-color: #dcdfe6;
+  border-radius: 3px;
+}
+
+.tree-wrapper::-webkit-scrollbar-thumb:hover {
+  background-color: #c0c4cc;
+}
+
+.tree-wrapper::-webkit-scrollbar-track {
+  background-color: #f5f7fa;
+  border-radius: 3px;
+}
+
+/* 主要内容区域 - 自适应 */
+.main-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  height: 100%;
+}
+
+.property-table-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  padding: clamp(12px, 1.2vw, 20px);
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: clamp(12px, 1vh, 20px);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.title-area {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.title-area h3 {
+  margin: 0;
+  font-size: clamp(16px, 1.2vw, 20px);
+  color: #303133;
+  font-weight: 600;
+}
+
+.ml-2 {
+  margin-left: clamp(4px, 0.5vw, 10px);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 响应式调整 */
+@media (max-width: 1400px) {
+  .sidebar-panel {
+    width: clamp(200px, 18vw, 280px);
+  }
+}
+
+@media (max-width: 1024px) {
+  .sidebar-panel {
+    width: clamp(180px, 25vw, 240px);
+  }
+  
+  .page-container {
+    gap: 0.8vw;
+    padding: 0.8vh 0.8vw;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-container {
+    flex-direction: column;
+  }
+  
+  .sidebar-panel {
+    width: 100%;
+    height: 30vh;
+    min-height: 200px;
+  }
+  
+  .table-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+:deep(.new-row-highlight) {
+  background-color: #f0f9eb !important;
+}
+
+/* 确保el-input和el-button也能响应式缩放 */
+:deep(.el-input) {
+  font-size: clamp(12px, 0.9vw, 14px);
+}
+
+:deep(.el-button) {
+  font-size: clamp(12px, 0.9vw, 14px);
+  padding: clamp(6px, 0.6vw, 10px) clamp(12px, 1vw, 16px);
+}
+
+:deep(.el-table) {
+  font-size: clamp(12px, 0.85vw, 14px);
+}
+
+:deep(.el-tree-node__content) {
+  font-size: clamp(12px, 0.85vw, 14px);
+  height: clamp(24px, 2vh, 32px);
 }
 </style>
