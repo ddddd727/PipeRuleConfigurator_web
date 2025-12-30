@@ -66,30 +66,84 @@
             height="100%"
             :default-sort="{ prop: 'id', order: 'ascending' }"
           >
+          <!-- 展开行 -->
+          <el-table-column type="expand" width="50">
+            <template #default="{ row }">
+              <div class="expand-content">
+                <el-row :gutter="20">
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">Category Name:</span>
+                      <span class="detail-value">{{ row.categoryName }}</span>
+                    </div>
+                  </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">Attribute Name:</span>
+                      <span class="detail-value">{{ row.attributeName }}</span>
+                    </div>
+                  </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">Units Type:</span>
+                      <span class="detail-value">{{ row.unitsType || '-' }}</span>
+                    </div>
+                  </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">Primary Units:</span>
+                      <span class="detail-value">{{ row.primaryUnits || '-' }}</span>
+                    </div>
+                  </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">Codelist:</span>
+                      <span class="detail-value">{{ row.codelist || '-' }}</span>
+                    </div>
+                  </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">CodeList Namespace:</span>
+                      <span class="detail-value">{{ row.codelistNamespace || '-' }}</span>
+                    </div>
+                  </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">OnPropertyPage:</span>
+                      <el-tag :type="row.onPropertyPage ? 'success' : 'info'" size="small">
+                        {{ row.onPropertyPage ? '是' : '否' }}
+                      </el-tag>
+                    </div>
+                  </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">ReadOnly:</span>
+                      <el-tag :type="row.readOnly ? 'danger' : 'success'" size="small">
+                        {{ row.readOnly ? '是' : '否' }}
+                      </el-tag>
+                    </div>
+                  </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">SymbolParameter:</span>
+                      <el-tag :type="row.symbolParameter ? 'warning' : 'info'" size="small">
+                        {{ row.symbolParameter ? '是' : '否' }}
+                      </el-tag>
+                    </div>
+                  </el-col>
+                </el-row>
+              </div>
+            </template>
+          </el-table-column>
+          
           <!-- 序号列 -->
-          <el-table-column type="index" label="序号" width="60" />
+          <el-table-column type="index" label="序号" width="50" />
           
           <!-- Interface Name -->
           <el-table-column 
             prop="interfaceName" 
             label="Interface Name"
-            width="180"
-            show-overflow-tooltip
-          />
-          
-          <!-- Category Name -->
-          <el-table-column 
-            prop="categoryName" 
-            label="Category Name"
-            width="150"
-            show-overflow-tooltip
-          />
-          
-          <!-- Attribute Name -->
-          <el-table-column 
-            prop="attributeName" 
-            label="Attribute Name"
-            width="150"
+            width="140"
             show-overflow-tooltip
           />
           
@@ -97,7 +151,7 @@
           <el-table-column 
             prop="attributeUserName" 
             label="Attribute UserName"
-            width="150"
+            width="140"
             show-overflow-tooltip
           />
           
@@ -108,105 +162,45 @@
             width="100"
           />
           
-          <!-- Units Type -->
-          <el-table-column 
-            prop="unitsType" 
-            label="Units Type"
-            width="120"
-            show-overflow-tooltip
-          />
-          
-          <!-- Primary Units -->
-          <el-table-column 
-            prop="primaryUnits" 
-            label="Primary Units"
-            width="120"
-            show-overflow-tooltip
-          />
-          
           <!-- Codelist -->
           <el-table-column 
             prop="codelist" 
             label="Codelist"
-            width="100"
+            width="120"
             show-overflow-tooltip
           />
-          
-          <!-- CodeList table namespace -->
-          <el-table-column 
-            prop="codelistNamespace" 
-            label="CodeList Namespace"
-            width="150"
-            show-overflow-tooltip
-          />
-          
-          <!-- OnPropertyPage -->
-          <el-table-column 
-            prop="onPropertyPage" 
-            label="OnPropertyPage"
-            width="130"
-          >
-            <template #default="{ row }">
-              <el-tag :type="row.onPropertyPage ? 'success' : 'info'">
-                {{ row.onPropertyPage ? '是' : '否' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          
-          <!-- ReadOnly -->
-          <el-table-column 
-            prop="readOnly" 
-            label="ReadOnly"
-            width="100"
-          >
-            <template #default="{ row }">
-              <el-tag :type="row.readOnly ? 'danger' : 'success'">
-                {{ row.readOnly ? '是' : '否' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          
-          <!-- SymbolParameter -->
-          <el-table-column 
-            prop="symbolParameter" 
-            label="SymbolParameter"
-            width="130"
-          >
-            <template #default="{ row }">
-              <el-tag :type="row.symbolParameter ? 'warning' : 'info'">
-                {{ row.symbolParameter ? '是' : '否' }}
-              </el-tag>
-            </template>
-          </el-table-column>
           
           <!-- 操作列 -->
           <el-table-column 
             label="操作" 
-            width="120" 
+            width="100" 
             fixed="right"
             align="center"
           >
             <template #default="{ row }">
-              <el-button 
-                type="primary" 
-                link 
-                icon="Edit"
-                @click="handleEdit(row)"
-              >
-                编辑
-              </el-button>
-              <el-button 
-                type="danger" 
-                link 
-                icon="Delete"
-                @click="handleDelete(row)"
-              >
-                删除
-              </el-button>
+              <div class="action-buttons">
+                <el-button 
+                  type="primary" 
+                  link 
+                  icon="Edit"
+                  @click="handleEdit(row)"
+                >
+                  编辑
+                </el-button>
+                <el-button 
+                  type="danger" 
+                  link 
+                  icon="Delete"
+                  @click="handleDelete(row)"
+                >
+                  删除
+                </el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
         </div>
+
       </div>
     </div>
 
@@ -1217,8 +1211,48 @@ onMounted(() => {
   font-size: clamp(12px, 0.85vw, 14px);
 }
 
+:deep(.el-table__row) {
+  height: 32px;
+}
+
+:deep(.el-table td.el-table__cell) {
+  padding: 4px 0;
+}
+
 :deep(.el-tree-node__content) {
   font-size: clamp(12px, 0.85vw, 14px);
   height: clamp(24px, 2vh, 32px);
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.expand-content {
+  padding: 20px;
+  background-color: #f5f7fa;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #606266;
+  min-width: 120px;
+  font-size: 12px;
+}
+
+.detail-value {
+  color: #303133;
+  word-break: break-word;
+  font-size: 12px;
 }
 </style>
