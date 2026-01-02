@@ -39,52 +39,52 @@ const formData = ref({
   wallThickness: ''
 })
 
-// 船级列表
-const shipClasses = ref([])
-const shipClassesLoading = ref(false)
+// 船型船号数据
+const shipInfos = ref([])
+const shipInfosLoading = ref(false)
 
-// 船号列表
-const shipNumbers = ref([])
-const shipNumbersLoading = ref(false)
-
-// 当前选中的船级和船号
+// 当前选中的船型和船号
 const selectedShipClass = ref(null)
 const selectedShipNumber = ref(null)
 
-// 获取船级列表
-const fetchShipClasses = async () => {
-  shipClassesLoading.value = true
-  try {
-    const res = await axios.get('/api/pipe-spec/ship-classes')
-    if (res.data.code === 200) {
-      shipClasses.value = res.data.data
-    } else {
-      ElMessage.error(res.data.msg || '获取船级列表失败')
-    }
-  } catch (error) {
-    console.error('获取船级列表错误:', error)
-    ElMessage.error('网络错误，获取船级列表失败')
-  } finally {
-    shipClassesLoading.value = false
-  }
-}
+// 船型列表（从后端数据中提取唯一的船型）
+const shipClasses = computed(() => {
+  const uniqueTypes = [...new Set(shipInfos.value.map(item => item.shipType))]
+  return uniqueTypes.map((type, index) => ({
+    id: index + 1,
+    name: type
+  }))
+})
 
-// 获取船号列表
-const fetchShipNumbers = async (shipClassId) => {
-  shipNumbersLoading.value = true
+// 船号列表（根据选中的船型过滤）
+const shipNumbers = computed(() => {
+  if (!selectedShipClass.value) return []
+  const shipType = shipClasses.value.find(item => item.id === selectedShipClass.value)?.name
+  if (!shipType) return []
+  
+  return shipInfos.value
+    .filter(item => item.shipType === shipType)
+    .map((item, index) => ({
+      id: index + 1,
+      name: item.shipNumber
+    }))
+})
+
+// 获取船型船号信息
+const fetchShipInfos = async () => {
+  shipInfosLoading.value = true
   try {
-    const params = shipClassId ? { shipClassId } : {}
-    const res = await axios.get('/api/pipe-spec/ship-numbers', { params })
+    const res = await axios.get('/api/PmcSpec/ShipInfos')
     if (res.data.code === 200) {
-      shipNumbers.value = res.data.data
+      shipInfos.value = res.data.data
     } else {
-      ElMessage.error(res.data.msg || '获取船号列表失败')
+      ElMessage.error(res.data.message || '获取船型船号信息失败')
     }
   } catch (error) {
-    console.error('获取船号列表错误:', error)
-    ElMessage.error('网络错误，获取船号列表失败')
+    console.error('获取船型船号信息错误:', error)
+    ElMessage.error('网络错误，获取船型船号信息失败')
   } finally {
-    shipNumbersLoading.value = false
+    shipInfosLoading.value = false
   }
 }
 
@@ -243,10 +243,9 @@ const getMaxNpdValue = () => {
 const selectedMin = ref(null)
 const selectedMax = ref(null)
 
-// 监听船级变化，自动获取船号列表
-watch(selectedShipClass, async (newVal) => {
+// 监听船型变化，自动重置船号选择
+watch(selectedShipClass, (newVal) => {
   selectedShipNumber.value = null // 重置船号选择
-  await fetchShipNumbers(newVal)
 })
 
 // 在组件挂载后初始化数据
@@ -256,7 +255,7 @@ onMounted(async () => {
     fetchTreeData(),
     fetchMaterialsData(),
     fetchDimensionData(),
-    fetchShipClasses()
+    fetchShipInfos()
   ])
   
   // 数据加载完成后初始化NPD默认选择范围
@@ -402,9 +401,9 @@ const handleConfigClick = (label) => {
         <div class="sidebar-header">
           <el-select 
             v-model="selectedShipClass" 
-            placeholder="船级" 
+            placeholder="船型" 
             style="width: 90px; margin-right: 10px;"
-            :loading="shipClassesLoading"
+            :loading="shipInfosLoading"
           >
             <el-option 
               v-for="classItem in shipClasses" 
@@ -417,7 +416,7 @@ const handleConfigClick = (label) => {
             v-model="selectedShipNumber" 
             placeholder="船号" 
             style="width: 90px;"
-            :loading="shipNumbersLoading"
+            :loading="shipInfosLoading"
           >
             <el-option 
               v-for="numberItem in shipNumbers" 

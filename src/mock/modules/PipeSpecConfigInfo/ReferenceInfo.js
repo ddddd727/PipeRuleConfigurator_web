@@ -119,38 +119,38 @@ Mock.mock(/\/api\/pipe-spec\/standard-files/, "get", () => ({
   }).data,
 }));
 
-// 船级列表
-Mock.mock(/\/api\/pipe-spec\/ship-classes/, "get", () => ({
-  code: 200,
-  msg: "success",
-  data: [
-    { id: 1, name: "民船" },
-    { id: 2, name: "邮轮" },
-    { id: 3, name: "海洋工程" },
-  ],
-}));
+// 船级列表 - 已注释，改用后端接口
+// Mock.mock(/\/api\/pipe-spec\/ship-classes/, "get", () => ({
+//   code: 200,
+//   msg: "success",
+//   data: [
+//     { id: 1, name: "民船" },
+//     { id: 2, name: "邮轮" },
+//     { id: 3, name: "海洋工程" },
+//   ],
+// }));
 
-// 船号列表（根据船级ID过滤）
-Mock.mock(/\/api\/pipe-spec\/ship-numbers/, "get", (options) => {
-  const url = new URL(options.url, "http://localhost");
-  const shipClassId = url.searchParams.get("shipClassId");
+// 船号列表（根据船级ID过滤）- 已注释，改用后端接口
+// Mock.mock(/\/api\/pipe-spec\/ship-numbers/, "get", (options) => {
+//   const url = new URL(options.url, "http://localhost");
+//   const shipClassId = url.searchParams.get("shipClassId");
 
-  return {
-    code: 200,
-    msg: "success",
-    data: Mock.mock({
-      "data|3-6": [
-        {
-          "id|+1": 1,
-          name: shipClassId
-            ? `H${shipClassId}@string("number", 3)`
-            : '@ctitle(2, 3)@string("number", 3)',
-          shipClassId: shipClassId || "@integer(1, 5)",
-        },
-      ],
-    }).data,
-  };
-});
+//   return {
+//     code: 200,
+//     msg: "success",
+//     data: Mock.mock({
+//       "data|3-6": [
+//         {
+//           "id|+1": 1,
+//           name: shipClassId
+//             ? `H${shipClassId}@string("number", 3)`
+//             : '@ctitle(2, 3)@string("number", 3)',
+//           shipClassId: shipClassId || "@integer(1, 5)",
+//         },
+//       ],
+//     }).data,
+//   };
+// });
 
 // 配置保存接口
 Mock.mock(/\/api\/pipe-spec\/configure/, "post", () => ({
