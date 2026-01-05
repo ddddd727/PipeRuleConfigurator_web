@@ -2,32 +2,23 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { ArrowLeft, ArrowRight, Setting } from '@element-plus/icons-vue'
 import PipeSpecConfigForm from '@/components/PipeSpecConfigForm.vue'    // 导入 PipeSpecConfigForm 组件，用于配置按钮的弹窗实现
 
 // 树形数据
 const treeData = ref([])
 const treeLoading = ref(false)
 
-// 获取树形数据
-const fetchTreeData = async () => {
-  treeLoading.value = true
-  try {
-    const res = await axios.get('/api/pipe-spec/tree')
-    if (res.data.code === 200) {
-      treeData.value = res.data.data
-    } else {
-      ElMessage.error(res.data.msg || '获取树形数据失败')
-    }
-  } catch (error) {
-    console.error('获取树形数据错误:', error)
-    ElMessage.error('网络错误，获取树形数据失败')
-  } finally {
-    treeLoading.value = false
-  }
-}
-
 // 当前选中的树形节点
 const currentNode = ref({ label: 'Piping Specification' })
+
+// 侧边栏折叠状态
+const sidebarCollapsed = ref(false)
+
+// 切换侧边栏折叠状态
+const toggleSidebar = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
 
 // 右侧表单数据
 const formData = ref({
@@ -88,21 +79,94 @@ const fetchShipInfos = async () => {
   }
 }
 
+// 获取船号的 PMC 规则数据
+const fetchPmcRules = async (shipNumber) => {
+  treeLoading.value = true
+  try {
+    const res = await axios.get(`/api/PmcSpec/PmcRules/${shipNumber}`)
+    if (res.data.code === 200) {
+      treeData.value = transformToTreeStructure(res.data.data)
+    } else {
+      ElMessage.error(res.data.message || '获取PMC规则数据失败')
+    }
+  } catch (error) {
+    console.error('获取PMC规则数据错误:', error)
+    ElMessage.error('网络错误，获取PMC规则数据失败')
+  } finally {
+    treeLoading.value = false
+  }
+}
+
+// 将后端返回的数据转换为树形结构
+const transformToTreeStructure = (data) => {
+  if (!data || data.length === 0) {
+    return []
+  }
+
+  const materialMap = new Map()
+
+  data.forEach(item => {
+    const material = item.material
+    const pipeStandard = item.pipeStadard
+    const pmcCode = item.pmcCode
+
+    if (!materialMap.has(material)) {
+      materialMap.set(material, {
+        label: material,
+        children: new Map()
+      })
+    }
+
+    const materialNode = materialMap.get(material)
+    
+    if (!materialNode.children.has(pipeStandard)) {
+      materialNode.children.set(pipeStandard, {
+        label: pipeStandard,
+        children: []
+      })
+    }
+
+    const pipeStandardNode = materialNode.children.get(pipeStandard)
+    pipeStandardNode.children.push({
+      label: pmcCode,
+      shipNumber: item.shipNumber,
+      material: item.material,
+      pipeStandard: item.pipeStadard,
+      status: item.status
+    })
+  })
+
+  const result = []
+  materialMap.forEach((value, key) => {
+    const children = []
+    value.children.forEach((childValue) => {
+      children.push(childValue)
+    })
+    result.push({
+      label: value.label,
+      children: children
+    })
+  })
+
+  return result
+}
+
 // 获取编码详细信息
 const fetchPmcCodeDetails = async (code) => {
   try {
-    const res = await axios.get(`/api/pipe-spec/pmc-details/${code}`)
+    const res = await axios.get(`/api/PmcSpec/Analyze/${code}`)
     if (res.data.code === 200) {
+      const data = res.data.data
       formData.value = {
-        service: res.data.data.service,
-        pipingMaterialClass: res.data.data.pipingMaterialClass,
-        pipe: res.data.data.pipe,
-        material: res.data.data.material,
-        pressureClass: res.data.data.pressureClass,
-        wallThickness: res.data.data.wallThickness
+        service: data.service || '',
+        pipingMaterialClass: data.pipingMaterialClass || code,
+        pipe: data.pipeStandard || '',
+        material: data.materialGrade || '',
+        pressureClass: data.pressureRating || '',
+        wallThickness: data.wallThickness || ''
       }
     } else {
-      ElMessage.error(res.data.msg || '获取编码详情失败')
+      ElMessage.error(res.data.message || '获取编码详情失败')
     }
   } catch (error) {
     console.error('获取编码详情错误:', error)
@@ -246,13 +310,25 @@ const selectedMax = ref(null)
 // 监听船型变化，自动重置船号选择
 watch(selectedShipClass, (newVal) => {
   selectedShipNumber.value = null // 重置船号选择
+  treeData.value = [] // 清空树形数据
+})
+
+// 监听船号变化，自动获取 PMC 规则数据
+watch(selectedShipNumber, async (newVal) => {
+  if (newVal) {
+    const shipNumber = shipNumbers.value.find(item => item.id === newVal)?.name
+    if (shipNumber) {
+      await fetchPmcRules(shipNumber)
+    }
+  } else {
+    treeData.value = [] // 清空树形数据
+  }
 })
 
 // 在组件挂载后初始化数据
 onMounted(async () => {
-  // 并行获取所有数据
+  // 并行获取所有数据（树形数据在船号选择时加载）
   await Promise.all([
-    fetchTreeData(),
     fetchMaterialsData(),
     fetchDimensionData(),
     fetchShipInfos()
@@ -345,25 +421,25 @@ const handleConfirm = (data) => {
   
   // 根据当前按钮标签更新对应的配置结果变量
   switch(currentButtonLabel.value) {
-    case 'BEND':
+    case 'Bend':
       bendConfigResult.value = configStr
       break
-    case 'RED':
+    case 'Red':
       redConfigResult.value = configStr
       break
-    case 'TEE':
+    case 'Tee':
       teeConfigResult.value = configStr
       break
-    case 'FLANGE':
+    case 'Flange':
       flangeConfigResult.value = configStr
       break
-    case 'SLEEVE':
+    case 'Sleeve':
       sleeveConfigResult.value = configStr
       break
     case 'Joints':
       jointsConfigResult.value = configStr
       break
-    case 'Blind flange':
+    case 'BlindFlange':
       blindFlangeConfigResult.value = configStr
       break
     case 'Gasket':
@@ -397,8 +473,9 @@ const handleConfigClick = (label) => {
   <div class="pipe-spec-container">
     <div class="pipe-spec-content">
       <!-- 左侧PMC编码选择树形结构 -->
-      <div class="pipe-spec-sidebar">
+      <div class="pipe-spec-sidebar" :class="{ 'collapsed': sidebarCollapsed }">
         <div class="sidebar-header">
+          <el-icon class="config-icon"><Setting /></el-icon>
           <el-select 
             v-model="selectedShipClass" 
             placeholder="船型" 
@@ -426,10 +503,22 @@ const handleConfigClick = (label) => {
             />
           </el-select>
         </div>
-        <div class="sidebar-tree">
+        <div class="sidebar-header-title">
+          <span v-show="!sidebarCollapsed">PMC编码列表</span>
+          <el-button 
+            class="collapse-btn" 
+            @click="toggleSidebar"
+            circle
+            size="small"
+          >
+            <el-icon><ArrowLeft v-if="!sidebarCollapsed" /><ArrowRight v-else /></el-icon>
+          </el-button>
+        </div>
+        <div class="sidebar-tree" v-show="!sidebarCollapsed">
           <el-tree
             :data="treeData"
             :highlight-current="true"
+            :default-expand-all="true"
             @node-click="handleNodeClick"
             v-loading="treeLoading">
             <template #default="{ node }">
@@ -544,7 +633,7 @@ const handleConfigClick = (label) => {
               <div class="form-section">
                 <el-row :gutter="20">
                   <el-col :span="12">
-                    <el-form-item label="BEND" label-width="80px">
+                    <el-form-item label="Bend" label-width="80px">
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="bendConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
                         <el-button @click="handleConfigClick('BEND')">配置</el-button>
@@ -552,7 +641,7 @@ const handleConfigClick = (label) => {
                     </el-form-item>
                   </el-col>
                   <el-col :span="12">
-                    <el-form-item label="RED" label-width="80px">
+                    <el-form-item label="Red" label-width="80px">
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="redConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示"/>
                         <el-button @click="handleConfigClick('RED')">配置</el-button>
@@ -562,7 +651,7 @@ const handleConfigClick = (label) => {
                 </el-row>
                 <el-row :gutter="20">
                   <el-col :span="12">
-                    <el-form-item label="TEE" label-width="80px">
+                    <el-form-item label="Tee" label-width="80px">
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="teeConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
                         <el-button @click="handleConfigClick('TEE')">配置</el-button>
@@ -570,7 +659,7 @@ const handleConfigClick = (label) => {
                     </el-form-item>
                   </el-col>
                   <el-col :span="12">
-                    <el-form-item label="FLANGE" label-width="80px">  
+                    <el-form-item label="Flange" label-width="80px">  
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="flangeConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
                         <el-button @click="handleConfigClick('FLANGE')">配置</el-button>
@@ -580,7 +669,7 @@ const handleConfigClick = (label) => {
                 </el-row>
                 <el-row :gutter="20">
                   <el-col :span="12">
-                    <el-form-item label="SLEEVE" label-width="80px">
+                    <el-form-item label="Sleeve" label-width="80px">
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="sleeveConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
                         <el-button @click="handleConfigClick('SLEEVE')">配置</el-button>
@@ -598,7 +687,7 @@ const handleConfigClick = (label) => {
                 </el-row>
                 <el-row :gutter="20">
                   <el-col :span="12">
-                    <el-form-item label="Blind flange" label-width="100px">
+                    <el-form-item label="BlindFlange" label-width="100px">
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="blindFlangeConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
                         <el-button @click="handleConfigClick('Blind flange')">配置</el-button>
@@ -725,12 +814,65 @@ const handleConfigClick = (label) => {
   display: flex;
   flex-direction: column;
   background-color: #fff;
+  transition: width 0.3s ease;
+}
+
+.pipe-spec-sidebar.collapsed {
+  width: 60px;
 }
 
 .sidebar-header {
+  display: flex;
+  align-items: center;
   padding: 15px;
   border-bottom: 1px solid #e6e8eb;
   background-color: #fafafa;
+}
+
+.config-icon {
+  font-size: 20px;
+  color: #333;
+  margin-right: 8px;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  background-color: #fff;
+  transition: all 0.3s ease;
+}
+
+.pipe-spec-sidebar.collapsed .sidebar-header .el-select {
+  display: none;
+}
+
+.pipe-spec-sidebar.collapsed .config-icon {
+  margin-right: 0;
+  border-color: #e6e8eb;
+}
+
+.sidebar-header-title {
+  padding: 12px 15px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #e6e8eb;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pipe-spec-sidebar.collapsed .sidebar-header-title {
+  border-bottom: none;
+}
+
+.collapse-btn {
+  flex-shrink: 0;
 }
 
 .sidebar-tree {

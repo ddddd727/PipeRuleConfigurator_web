@@ -1,51 +1,51 @@
 import Mock from "mockjs";
 
-// 树结构数据
-Mock.mock(/\/api\/pipe-spec\/tree/, "get", () => ({
-  code: 200,
-  msg: "success",
-  data: [
-    {
-      label: "PMC编码",
-      children: [
-        {
-          label: "碳钢管",
-          children: [
-            {
-              label: "GB/T 8163",
-              children: [
-                { label: "1C181AD" },
-                { label: "1C181AE" },
-                { label: "1C181AJ" },
-              ],
-            },
-            {
-              label: "GB/T 5312",
-              children: [
-                { label: "1C281AD" },
-                { label: "1C281AE" },
-                { label: "1C281AJ" },
-              ],
-            },
-          ],
-        },
-        {
-          label: "不锈钢",
-          children: [
-            {
-              label: "GB/T 14976",
-              children: [
-                { label: "1S181AD" },
-                { label: "1S181AE" },
-                { label: "1S181AJ" },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  ],
-}));
+// 树结构数据 - 已注释，改用后端接口 /api/PmcSpec/PmcRules/{shipNumber}
+// Mock.mock(/\/api\/pipe-spec\/tree/, "get", () => ({
+//   code: 200,
+//   msg: "success",
+//   data: [
+//     {
+//       label: "PMC编码",
+//       children: [
+//         {
+//           label: "碳钢管",
+//           children: [
+//             {
+//               label: "GB/T 8163",
+//               children: [
+//                 { label: "1C181AD" },
+//                 { label: "1C181AE" },
+//                 { label: "1C181AJ" },
+//               ],
+//             },
+//             {
+//               label: "GB/T 5312",
+//               children: [
+//                 { label: "1C281AD" },
+//                 { label: "1C281AE" },
+//                 { label: "1C281AJ" },
+//               ],
+//             },
+//           ],
+//         },
+//         {
+//           label: "不锈钢",
+//           children: [
+//             {
+//               label: "GB/T 14976",
+//               children: [
+//                 { label: "1S181AD" },
+//                 { label: "1S181AE" },
+//                 { label: "1S181AJ" },
+//               ],
+//             },
+//           ],
+//         },
+//       ],
+//     },
+//   ],
+// }));
 
 // 物料数据
 Mock.mock(/\/api\/pipe-spec\/material/, "get", () => ({
@@ -207,23 +207,23 @@ Mock.mock(/\/api\/pipe-spec\/fitting-config/, "get", (options) => {
   };
 });
 
-// PMC编码详情接口
-Mock.mock(/\/api\/pipe-spec\/pmc-details\/(.+)/, "get", (options) => {
-  // 提取编码
-  const urlParts = options.url.split("/");
-  const code = urlParts[urlParts.length - 1];
+// PMC编码详情接口 - 已注释，改用后端接口 /api/PmcSpec/Analyze/{pmcCode}
+// Mock.mock(/\/api\/pipe-spec\/pmc-details\/(.+)/, "get", (options) => {
+//   // 提取编码
+//   const urlParts = options.url.split("/");
+//   const code = urlParts[urlParts.length - 1];
 
-  return {
-    code: 200,
-    msg: "success",
-    data: Mock.mock({
-      code: code,
-      service: "@ctitle(10, 20)",
-      pipingMaterialClass: "@ctitle(8, 15)",
-      pipe: "@ctitle(12, 20)",
-      material: "@ctitle(6, 12)",
-      pressureClass: "@ctitle(6, 10)",
-      wallThickness: "@float(0, 100, 2, 3) mm",
-    }),
-  };
-});
+//   return {
+//     code: 200,
+//     msg: "success",
+//     data: Mock.mock({
+//       code: code,
+//       service: "@ctitle(10, 20)",
+//       pipingMaterialClass: "@ctitle(8, 15)",
+//       pipe: "@ctitle(12, 20)",
+//       material: "@ctitle(6, 12)",
+//       pressureClass: "@ctitle(6, 10)",
+//       wallThickness: "@float(0, 100, 2, 3) mm",
+//     }),
+//   };
+// });

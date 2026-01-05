@@ -86,7 +86,15 @@
                   />
                 </el-select>
               </div>
+              <div class="bend-radius-multiple" v-if="buttonLabel === 'BEND'">
+                <el-input
+                  v-model="config.bendRadiusMultiple"
+                  placeholder="弯管半径倍数"
+                  style="width: 150px"
+                />
+              </div>
             </div>
+            <div class="bend-radius-hint" v-if="buttonLabel === 'Bend'">填写的值为弯管半径的倍数</div>
           </div>
         </div>
         <div class="tip-text">请为每个选择的标准文件配置对应的NPD范围</div>
@@ -218,9 +226,10 @@ const handleStandardFileChange = (value) => {
     } else {
       newConfigurations.push({
         standardFile: fileId,
-        material: props.materials.length > 0 ? props.materials[0].id : null, // 默认选择第一个材料
-        minNpdValue: minNpdValue.value, // 默认选择最小值
-        maxNpdValue: maxNpdValue.value  // 默认选择最大值
+        material: props.materials.length > 0 ? props.materials[0].id : null,
+        minNpdValue: minNpdValue.value,
+        maxNpdValue: maxNpdValue.value,
+        bendRadiusMultiple: null
       })
     }
   })
@@ -271,7 +280,8 @@ const handleSubmit = async () => {
           standardFileName: getStandardFileName(config.standardFile),
           materialId: config.material,
           materialName: material ? material.name : '',
-          npdRange: [config.minNpdValue, config.maxNpdValue] // 简化为传递数组
+          npdRange: [config.minNpdValue, config.maxNpdValue],
+          bendRadiusMultiple: config.bendRadiusMultiple
         }
       })
     }
@@ -378,6 +388,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  gap: 10px;
   width: 100%;
 }
 
@@ -385,7 +396,6 @@ onMounted(() => {
 .material-selector {
   display: flex;
   align-items: center;
-  margin-right: 15px;
 }
 
 /* 为el-tag添加溢出处理 */
@@ -415,6 +425,19 @@ onMounted(() => {
   margin: 0 5px;
   color: #606266;
   font-weight: bold;
+}
+
+/* 弯管半径倍数样式 */
+.bend-radius-multiple {
+  display: flex;
+  align-items: center;
+}
+
+/* 弯管半径提示文字 */
+.bend-radius-hint {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 5px;
 }
 
 :deep(.el-select__tags) {
