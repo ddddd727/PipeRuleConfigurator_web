@@ -4,7 +4,6 @@ import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
-import './mock/index.js'
 import { createPinia } from 'pinia'
 import './assets/dirty-status.css' 
 
