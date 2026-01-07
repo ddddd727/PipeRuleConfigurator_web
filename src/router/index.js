@@ -2,24 +2,27 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 // 1. 引入所有独立的路由模块
 import dictRouter from './modules/dict'
-import basicRouter from './modules/basic'
+import designRouter from './modules/design'
 import specRouter from './modules/spec'
 import pmcRouter from './modules/pmc'
-import shipRouter from './modules/ship'
 import pipeRouter from './modules/pipe'
+import libraryRouter from './modules/library'
+import s3dRouter from './modules/s3d'
 
-// 2. 组装路由表
-// 这里的顺序决定了左侧菜单栏的显示顺序
 export const constantRoutes = [
-  // 根路径默认重定向
-  { path: '/', redirect: '/dict/business/grade' },
+  // 首页重定向到第一个菜单（字典定义的第一个页面）
+  { path: '/', redirect: '/dict/attribute/std-series' },
 
-  dictRouter,   // 字典模块
-  basicRouter,  // 基础类模块
-  specRouter,   // Spec模块
-  pmcRouter,    // PMC模块
-  shipRouter,   // 船型模块
-  pipeRouter,   // 管材模块
+  // ===================================
+  // 按照截图顺序排列 7 个一级菜单
+  // ===================================
+  dictRouter,     // 1. 字典定义
+  designRouter,   // 2. 设计规则类
+  specRouter,     // 3. Spec配置
+  pmcRouter,      // 4. PMC编码
+  pipeRouter,     // 5. 管材规格书配置
+  libraryRouter,  // 6. 基础库
+  s3dRouter,      // 7. S3D属性管理
 
   // 404 页面
   { path: '/:pathMatch(.*)*', redirect: '/' }

@@ -518,10 +518,10 @@ const fetchBendPipeData = async () => {
       cfg.data = rows
       configs['bend-pipe'] = cfg
     } else {
-      ElMessage.error(res?.data?.message || '弯管数据接口返回异常')
+      ElMessage.error('弯管数据接口返回异常')
     }
   } catch (e) {
-    ElMessage.error(`弯管数据接口请求失败：${e?.message || '网络错误'}`)
+    ElMessage.error('弯管数据接口请求失败')
   }
 }
 
