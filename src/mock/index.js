@@ -173,7 +173,6 @@ const db = {
       // { prop: 'id', label: '序号', width: 80 },
       { prop: 'diameter', label: '通径DN', editable: true },
       { prop: 'unit', label: '通径单位', editable: true },
-      { prop: 'material', label: '主材料', editable: true },
       { prop: 'l1', label: '前夹长L1', editable: true },
       { prop: 'l2', label: '后夹长L2', editable: true }
     ],
@@ -181,7 +180,6 @@ const db = {
       'id|+1': 1,
       'diameter|1': ['DN15', 'DN20', 'DN25', 'DN32', 'DN40', 'DN50'],
       'unit': 'mm',
-      'material|1': ['304不锈钢', '碳钢', '316不锈钢', 'PVC'],
       'l1|100-500': 1,
       'l2|100-500': 1
     }]
@@ -265,44 +263,7 @@ Mock.mock(/\/api\/dict\/[\w-]+/, 'get', (options) => {
   }
 })
 
-// 添加一个专门为 BasicClass 的 API 拦截器
-Mock.mock(/\/api\/basic-class\/([\w-]+)/, 'get', (options) => {
-  console.log('BasicClass Mock拦截:', options.url)
-  const urlParts = options.url.split('/')
-  const id = urlParts[urlParts.length - 1]
 
-  const result = db[id]
-
-  if (result) {
-    return {
-      code: 200,
-      message: 'success',
-      data: Mock.mock(result)
-    }
-  } else {
-    return {
-      code: 404,
-      message: `未找到 [${id}] 的配置数据`,
-      data: { 
-        title: '未定义', 
-        columns: [], 
-        data: [] 
-      }
-    }
-  }
-})
-
-// 为 BasicClass 添加保存接口
-Mock.mock(/\/api\/basic-class\/save/, 'post', (options) => {
-  console.log('BasicClass 保存数据:', options.body)
-  const data = JSON.parse(options.body)
-  
-  return {
-    code: 200,
-    message: '保存成功',
-    data: data
-  }
-})
 
 // 导出 db 对象供其他模块使用
 export { db }
