@@ -1,5 +1,5 @@
 import MainLayout from '@/layout/MainLayout.vue'
-import BasicClass from '@/views/BasicClass.vue'
+import DesignRuleConfig from '@/views/DesignRuleConfig.vue'
 
 export default {
   path: '/basic',
@@ -14,8 +14,8 @@ export default {
   children: [
     {
       path: 'list',
-      name: 'BasicClass',
-      component: BasicClass,
+      name: 'DesignRuleConfig',
+      component: DesignRuleConfig,
       meta: { title: '设计规则类' } // 如果父级显示为文件夹，这里就是子菜单名称
     },
     // 未来可以在这里轻松添加：
