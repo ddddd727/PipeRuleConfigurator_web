@@ -415,9 +415,17 @@ const columnCount = computed(() => {
 // 处理配置确认
 const handleConfirm = (data) => {
   // 将配置数据转换为指定格式的字符串
-  const configStr = data.configurations.map(item => 
-    `${item.standardFileName} - ${item.materialName} - ${item.npdRange[0]}~${item.npdRange[1]}mm`
-  ).join('\n')
+  const configStr = data.configurations.map(item => {
+    // 基础配置信息
+    let configLine = `${item.standardFileName} - ${item.materialName} - ${item.npdRange[0]}~${item.npdRange[1]}mm`
+    
+    // 如果是Bend配置且有弯管半径倍数信息，则添加
+    if (currentButtonLabel.value === 'Bend' && item.bendRadiusMultiple) {
+      configLine += ` - 弯管半径倍数: ${item.bendRadiusMultiple}`
+    }
+    
+    return configLine
+  }).join('\n')
   
   // 根据当前按钮标签更新对应的配置结果变量
   switch(currentButtonLabel.value) {
@@ -518,7 +526,6 @@ const handleConfigClick = (label) => {
           <el-tree
             :data="treeData"
             :highlight-current="true"
-            :default-expand-all="true"
             @node-click="handleNodeClick"
             v-loading="treeLoading">
             <template #default="{ node }">
@@ -636,7 +643,7 @@ const handleConfigClick = (label) => {
                     <el-form-item label="Bend" label-width="80px">
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="bendConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('BEND')">配置</el-button>
+                        <el-button @click="handleConfigClick('Bend')">配置</el-button>
                       </div>
                     </el-form-item>
                   </el-col>
@@ -644,7 +651,7 @@ const handleConfigClick = (label) => {
                     <el-form-item label="Red" label-width="80px">
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="redConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示"/>
-                        <el-button @click="handleConfigClick('RED')">配置</el-button>
+                        <el-button @click="handleConfigClick('Red')">配置</el-button>
                       </div>
                     </el-form-item>
                   </el-col>
@@ -654,7 +661,7 @@ const handleConfigClick = (label) => {
                     <el-form-item label="Tee" label-width="80px">
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="teeConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('TEE')">配置</el-button>
+                        <el-button @click="handleConfigClick('Tee')">配置</el-button>
                       </div>
                     </el-form-item>
                   </el-col>
@@ -662,7 +669,7 @@ const handleConfigClick = (label) => {
                     <el-form-item label="Flange" label-width="80px">  
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="flangeConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('FLANGE')">配置</el-button>
+                        <el-button @click="handleConfigClick('Flange')">配置</el-button>
                       </div>
                     </el-form-item>
                   </el-col>
@@ -672,7 +679,7 @@ const handleConfigClick = (label) => {
                     <el-form-item label="Sleeve" label-width="80px">
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="sleeveConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('SLEEVE')">配置</el-button>
+                        <el-button @click="handleConfigClick('Sleeve')">配置</el-button>
                       </div>
                     </el-form-item>
                   </el-col>
@@ -690,7 +697,7 @@ const handleConfigClick = (label) => {
                     <el-form-item label="BlindFlange" label-width="100px">
                       <div style="display: flex; align-items: flex-start; flex:0.8">
                         <el-input v-model="blindFlangeConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Blind flange')">配置</el-button>
+                        <el-button @click="handleConfigClick('BlindFlange')">配置</el-button>
                       </div>
                     </el-form-item>
                   </el-col>

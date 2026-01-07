@@ -86,7 +86,7 @@
                   />
                 </el-select>
               </div>
-              <div class="bend-radius-multiple" v-if="buttonLabel === 'BEND'">
+              <div class="bend-radius-multiple" v-if="buttonLabel === 'Bend'">
                 <el-input
                   v-model="config.bendRadiusMultiple"
                   placeholder="弯管半径倍数"
