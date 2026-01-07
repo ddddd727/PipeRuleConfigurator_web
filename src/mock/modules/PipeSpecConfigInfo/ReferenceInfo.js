@@ -1,229 +1,171 @@
-import Mock from "mockjs";
+import Mock from 'mockjs'
 
-// 树结构数据 - 已注释，改用后端接口 /api/PmcSpec/PmcRules/{shipNumber}
-// Mock.mock(/\/api\/pipe-spec\/tree/, "get", () => ({
-//   code: 200,
-//   msg: "success",
-//   data: [
-//     {
-//       label: "PMC编码",
-//       children: [
-//         {
-//           label: "碳钢管",
-//           children: [
-//             {
-//               label: "GB/T 8163",
-//               children: [
-//                 { label: "1C181AD" },
-//                 { label: "1C181AE" },
-//                 { label: "1C181AJ" },
-//               ],
-//             },
-//             {
-//               label: "GB/T 5312",
-//               children: [
-//                 { label: "1C281AD" },
-//                 { label: "1C281AE" },
-//                 { label: "1C281AJ" },
-//               ],
-//             },
-//           ],
-//         },
-//         {
-//           label: "不锈钢",
-//           children: [
-//             {
-//               label: "GB/T 14976",
-//               children: [
-//                 { label: "1S181AD" },
-//                 { label: "1S181AE" },
-//                 { label: "1S181AJ" },
-//               ],
-//             },
-//           ],
-//         },
-//       ],
-//     },
-//   ],
-// }));
+// 精简并统一对 PipeSpec.vue 使用到的接口 mock
 
 // 物料数据
-Mock.mock(/\/api\/pipe-spec\/material/, "get", () => ({
+Mock.mock(/\/api\/pipe-spec\/material/, 'get', () => ({
   code: 200,
-  msg: "success",
-  data: Mock.mock([
-    { id: 1, name: "碳钢 (CS)" },
-    { id: 2, name: "不锈钢 (SS304)" },
-    { id: 3, name: "不锈钢 (SS316)" },
-    { id: 4, name: "合金钢 (Alloy Steel)" },
-    { id: 5, name: "铜合金 (Copper Alloy)" },
-    { id: 6, name: "铝合金 (Aluminum Alloy)" },
-    { id: 7, name: "钛合金 (Titanium Alloy)" },
-  ]),
-}));
+  msg: 'success',
+  data: [
+    { id: 1, name: '碳钢 (CS)' },
+    { id: 2, name: '不锈钢 (SS304)' },
+    { id: 3, name: '不锈钢 (SS316)' },
+    { id: 4, name: '合金钢 (Alloy Steel)' },
+    { id: 5, name: '铜合金 (Copper Alloy)' },
+    { id: 6, name: '铝合金 (Aluminum Alloy)' },
+    { id: 7, name: '钛合金 (Titanium Alloy)' }
+  ]
+}))
 
-// 尺寸数据
-Mock.mock(/\/api\/pipe-spec\/dimension/, "get", () => {
-  // 生成包含NPD等参数的表格数据
-  const generateColumnData = (count) => {
-    const data = [];
-    // 添加NPD行
-    const npdRow = {
-      id: 1,
-      name: "NPD",
-    };
-    // 添加其他参数行
-    const paramNames = ["DN", "Thickness"];
-    paramNames.forEach((name, index) => {
-      const row = {
-        id: index + 2,
-        name: name,
-      };
-      // 为每行生成20个col字段
-      for (let i = 1; i <= 20; i++) {
-        if (name === "NPD") {
-          row[`col${i}`] = 5 * i; // NPD按5递增
-        } else {
-          row[`col${i}`] = Mock.mock("@float(0, 500, 0 , 1)");
-        }
+// 尺寸数据（通径/外径/壁厚表格）
+Mock.mock(/\/api\/pipe-spec\/dimension/, 'get', () => {
+  const generateColumnData = (cols = 20) => {
+    const data = []
+    const npdRow = { id: 1, name: 'NPD' }
+    const paramNames = ['DN', 'Thickness']
+
+    paramNames.forEach((name, idx) => {
+      const row = { id: idx + 2, name }
+      for (let i = 1; i <= cols; i++) {
+        row[`col${i}`] = Mock.mock('@float(1, 500, 0, 0)')
       }
-      data.push(row);
-    });
-    // 最后添加NPD行
-    for (let i = 1; i <= 20; i++) {
-      npdRow[`col${i}`] = 5 * i;
-    }
-    data.unshift(npdRow);
-    return data;
-  };
+      data.push(row)
+    })
 
-  return {
-    code: 200,
-    msg: "success",
-    data: generateColumnData(),
-  };
-});
+    for (let i = 1; i <= cols; i++) {
+      npdRow[`col${i}`] = 5 * i
+    }
+    data.unshift(npdRow)
+    return data
+  }
+
+  return { code: 200, msg: 'success', data: generateColumnData() }
+})
 
 // 标准文件列表
-Mock.mock(/\/api\/pipe-spec\/standard-files/, "get", () => ({
+Mock.mock(/\/api\/pipe-spec\/standard-files/, 'get', () => ({
   code: 200,
-  msg: "success",
+  msg: 'success',
   data: Mock.mock({
-    "data|9-15": [
+    'list|9-15': [
       {
-        "id|+1": 1,
-        name: "@ctitle(10, 20)",
-        code: /GB\/T \d{4}-\d{4}/,
-      },
-    ],
-  }).data,
-}));
+        'id|+1': 1,
+        name: '@ctitle(6, 12)',
+        code: /GB\/T \d{4}-\d{4}/
+      }
+    ]
+  }).list
+}))
 
-// 船级列表 - 已注释，改用后端接口
-// Mock.mock(/\/api\/pipe-spec\/ship-classes/, "get", () => ({
-//   code: 200,
-//   msg: "success",
-//   data: [
-//     { id: 1, name: "民船" },
-//     { id: 2, name: "邮轮" },
-//     { id: 3, name: "海洋工程" },
-//   ],
-// }));
-
-// 船号列表（根据船级ID过滤）- 已注释，改用后端接口
-// Mock.mock(/\/api\/pipe-spec\/ship-numbers/, "get", (options) => {
-//   const url = new URL(options.url, "http://localhost");
-//   const shipClassId = url.searchParams.get("shipClassId");
-
-//   return {
-//     code: 200,
-//     msg: "success",
-//     data: Mock.mock({
-//       "data|3-6": [
-//         {
-//           "id|+1": 1,
-//           name: shipClassId
-//             ? `H${shipClassId}@string("number", 3)`
-//             : '@ctitle(2, 3)@string("number", 3)',
-//           shipClassId: shipClassId || "@integer(1, 5)",
-//         },
-//       ],
-//     }).data,
-//   };
-// });
-
-// 配置保存接口
-Mock.mock(/\/api\/pipe-spec\/configure/, "post", () => ({
+// 保存配置
+Mock.mock(/\/api\/pipe-spec\/configure/, 'post', () => ({
   code: 200,
-  msg: "success",
-  data: {
-    id: Mock.mock("@integer(1000, 9999)"),
-    success: true,
-  },
-}));
+  msg: 'success',
+  data: { id: Mock.mock('@integer(1000,9999)'), success: true }
+}))
 
-// 管道规格数据接口（根据ID获取）
-Mock.mock(/\/api\/pipe-spec\/specification/, "get", (options) => {
-  const urlParts = options.url.split("/");
-  const id = urlParts[urlParts.length - 1];
-
+// 获取标准化的 pipe-spec 规格（按 id）
+Mock.mock(/\/api\/pipe-spec\/specification\//, 'get', (options) => {
+  const urlParts = options.url.split('/')
+  const id = urlParts[urlParts.length - 1]
   return {
     code: 200,
-    msg: "success",
-    data: Mock.mock({
-      id: parseInt(id) || "@integer(1, 100)",
-      name: "@ctitle(10, 20)",
-      description: "@cparagraph(1, 3)",
-      standardFile: "@ctitle(8, 15)",
-      shipClass: "@ctitle(4, 6)",
-      shipNumber: '@string("number", 5)',
-      createTime: '@datetime("yyyy-MM-dd HH:mm:ss")',
-      updateTime: '@datetime("yyyy-MM-dd HH:mm:ss")',
-    }),
-  };
-});
+    msg: 'success',
+    data: {
+      id: parseInt(id) || Mock.mock('@integer(1,100)'),
+      name: Mock.mock('@ctitle(8, 15)'),
+      description: Mock.mock('@cparagraph(1,3)')
+    }
+  }
+})
 
-// 管件配置详情接口
-Mock.mock(/\/api\/pipe-spec\/fitting-config/, "get", (options) => {
-  const url = new URL(options.url, "http://localhost");
-  const specId = url.searchParams.get("specId");
-
+// 管件配置详情
+Mock.mock(/\/api\/pipe-spec\/fitting-config/, 'get', (options) => {
   return {
     code: 200,
-    msg: "success",
+    msg: 'success',
     data: Mock.mock({
-      "data|8-12": [
+      'data|6-10': [
         {
-          "id|+1": 1,
-          specId: specId || "@integer(1, 100)",
-          fittingName: "@ctitle(6, 12)",
-          fittingType: "@ctitle(4, 6)",
-          material: "@ctitle(6, 10)",
-          dimension: "@float(0, 100, 1, 2)",
-          standard: "@ctitle(8, 12)",
-        },
-      ],
-    }).data,
-  };
-});
+          'id|+1': 1,
+          fittingName: '@ctitle(4,8)',
+          fittingType: '@ctitle(2,5)',
+          material: '@ctitle(4,8)',
+          dimension: '@float(0,100,1,2)',
+          standard: '@ctitle(6,12)'
+        }
+      ]
+    }).data
+  }
+})
 
-// PMC编码详情接口 - 已注释，改用后端接口 /api/PmcSpec/Analyze/{pmcCode}
-// Mock.mock(/\/api\/pipe-spec\/pmc-details\/(.+)/, "get", (options) => {
-//   // 提取编码
-//   const urlParts = options.url.split("/");
-//   const code = urlParts[urlParts.length - 1];
+// 船型与船号信息（PipeSpec.vue 使用 /api/PmcSpec/ShipInfos）
+Mock.mock(/\/api\/PmcSpec\/ShipInfos/, 'get', () => ({
+  code: 200,
+  message: '获取船型船号信息成功',
+  data: [
+    { shipNumber: 'H1508', shipType: '邮轮' },
+    { shipNumber: 'H1509', shipType: '邮轮' },
+    { shipNumber: 'H1403', shipType: '民船' },
+    { shipNumber: 'H1404', shipType: '民船' },
+    { shipNumber: 'H1301', shipType: '货船' },
+    { shipNumber: 'H1603', shipType: '民船' }
+  ],
+  timestamp: '0001-01-01T00:00:00',
+  traceId: '40000004-0009-fd00-b63f-84710c7967bb'
+}))
 
-//   return {
-//     code: 200,
-//     msg: "success",
-//     data: Mock.mock({
-//       code: code,
-//       service: "@ctitle(10, 20)",
-//       pipingMaterialClass: "@ctitle(8, 15)",
-//       pipe: "@ctitle(12, 20)",
-//       material: "@ctitle(6, 12)",
-//       pressureClass: "@ctitle(6, 10)",
-//       wallThickness: "@float(0, 100, 2, 3) mm",
-//     }),
-//   };
-// });
+// PMC 规则树（根据船号返回）
+Mock.mock(/\/api\/PmcSpec\/PmcRules\//, 'get', (options) => {
+  const urlParts = options.url.split('/')
+  const shipNumber = urlParts[urlParts.length - 1]
+
+  // 返回扁平数组，字段与 PipeSpec.vue 中 transformToTreeStructure 期望一致
+  const data = [
+    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AD', shipNumber, status: 'active' },
+    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AE', shipNumber, status: 'active' },
+    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AJ', shipNumber, status: 'active' },
+    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AD', shipNumber, status: 'active' },
+    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AE', shipNumber, status: 'active' },
+    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AJ', shipNumber, status: 'inactive' },
+    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AD', shipNumber, status: 'active' },
+    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AE', shipNumber, status: 'active' },
+    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AJ', shipNumber, status: 'active' }
+  ]
+
+  return {
+    code: 200,
+    msg: 'success',
+    data
+  }
+})
+
+// PMC 编码详情
+Mock.mock(/\/api\/PmcSpec\/Analyze\//, 'get', (options) => {
+  const urlParts = options.url.split('/')
+  const code = urlParts[urlParts.length - 1]
+  return {
+    code: 200,
+    msg: 'success',
+    data: {
+      code,
+      service: Mock.mock('@ctitle(6,12)'),
+      pipingMaterialClass: Mock.mock('@ctitle(4,8)'),
+      pipeStandard: Mock.mock('@ctitle(6,12)'),
+      materialGrade: Mock.mock('@ctitle(4,8)'),
+      pressureRating: Mock.mock('@ctitle(2,6)'),
+      wallThickness: Mock.mock('@float(1,50,1,2)') + ' mm'
+    }
+  }
+})
+
+// 部件类型列表（用于配置对话框）
+Mock.mock(/\/api\/pipe-spec\/part-types/, 'get', () => ({
+  code: 200,
+  msg: 'success',
+  data: ['Pipe', 'Bend',
+    'Elbow', 'Red', 'Tee',
+    'Sleeve', 'Bosses', 'Saddles',
+    'Caps', 'Overpass',
+    'Flange', 'Blind Flange']
+}))

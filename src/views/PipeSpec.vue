@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, ArrowRight, Setting } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Setting, Plus, Ship } from '@element-plus/icons-vue'
 import PipeSpecConfigForm from '@/components/PipeSpecConfigForm.vue'    // 导入 PipeSpecConfigForm 组件，用于配置按钮的弹窗实现
 
 // 树形数据
@@ -259,19 +259,16 @@ const fetchDimensionData = async () => {
   }
 }
 
-// 管件配置结果变量 - 存储每个管件类型的配置结果
-const bendConfigResult = ref('')
-const redConfigResult = ref('')
-const teeConfigResult = ref('')
-const flangeConfigResult = ref('')
-const sleeveConfigResult = ref('')
-const jointsConfigResult = ref('')
-const blindFlangeConfigResult = ref('')
-const gasketConfigResult = ref('')
-const boltsConfigResult = ref('')
-const nutsConfigResult = ref('')
-const washersConfigResult = ref('')
-const crossesConfigResult = ref('')
+// 配置按钮列表
+const configButtons = ref([
+  { id: 1, type: '', configResult: '' },
+  { id: 2, type: '', configResult: '' },
+  { id: 3, type: '', configResult: '' },
+  { id: 4, type: '', configResult: '' }
+])
+
+// 当前选中的按钮ID
+const currentButtonId = ref(null)
 
 // 获取所有NPD值并计算最小和最大值
 const getAllNpdValues = () => {
@@ -420,59 +417,33 @@ const handleConfirm = (data) => {
     let configLine = `${item.standardFileName} - ${item.materialName} - ${item.npdRange[0]}~${item.npdRange[1]}mm`
     
     // 如果是Bend配置且有弯管半径倍数信息，则添加
-    if (currentButtonLabel.value === 'Bend' && item.bendRadiusMultiple) {
+    if (data.partType === 'Bend' && item.bendRadiusMultiple) {
       configLine += ` - 弯管半径倍数: ${item.bendRadiusMultiple}`
     }
     
     return configLine
   }).join('\n')
   
-  // 根据当前按钮标签更新对应的配置结果变量
-  switch(currentButtonLabel.value) {
-    case 'Bend':
-      bendConfigResult.value = configStr
-      break
-    case 'Red':
-      redConfigResult.value = configStr
-      break
-    case 'Tee':
-      teeConfigResult.value = configStr
-      break
-    case 'Flange':
-      flangeConfigResult.value = configStr
-      break
-    case 'Sleeve':
-      sleeveConfigResult.value = configStr
-      break
-    case 'Joints':
-      jointsConfigResult.value = configStr
-      break
-    case 'BlindFlange':
-      blindFlangeConfigResult.value = configStr
-      break
-    case 'Gasket':
-      gasketConfigResult.value = configStr
-      break
-    case 'Bolts':
-      boltsConfigResult.value = configStr
-      break
-    case 'Nuts':
-      nutsConfigResult.value = configStr
-      break
-    case 'Washers':
-      washersConfigResult.value = configStr
-      break
-    case 'Crosses':
-      crossesConfigResult.value = configStr
-      break
-    default:
-      break
+  // 根据当前选中的按钮ID更新配置结果
+  if (currentButtonId.value) {
+    const buttonIndex = configButtons.value.findIndex(btn => btn.id === currentButtonId.value)
+    if (buttonIndex !== -1) {
+      configButtons.value[buttonIndex].type = data.partType
+      configButtons.value[buttonIndex].configResult = configStr
+      
+      // 检查是否需要添加新按钮
+      const hasEmptyButton = configButtons.value.some(btn => !btn.type && !btn.configResult)
+      if (!hasEmptyButton) {
+        const newId = Math.max(...configButtons.value.map(btn => btn.id)) + 1
+        configButtons.value.push({ id: newId, type: '', configResult: '' })
+      }
+    }
   }
 }
 
 // 处理配置按钮点击
-const handleConfigClick = (label) => {
-  currentButtonLabel.value = label
+const handleConfigClick = (buttonId) => {
+  currentButtonId.value = buttonId
   showDialog.value = true
 }
 </script>
@@ -483,7 +454,7 @@ const handleConfigClick = (label) => {
       <!-- 左侧PMC编码选择树形结构 -->
       <div class="pipe-spec-sidebar" :class="{ 'collapsed': sidebarCollapsed }">
         <div class="sidebar-header">
-          <el-icon class="config-icon"><Setting /></el-icon>
+          <el-icon v-show="sidebarCollapsed" class="config-icon"><Ship /></el-icon>
           <el-select 
             v-model="selectedShipClass" 
             placeholder="船型" 
@@ -539,13 +510,10 @@ const handleConfigClick = (label) => {
 
       <!-- 右侧表单区域 -->
       <div class="pipe-spec-main">
-        <!-- 顶部操作条 -->
+        <!-- 顶部操作条（已移除 查询/编辑/保存 按钮） -->
         <div class="main-header">
           <div class="filter-section">
-            <el-button type="primary" style="margin-right: 10px;">查询</el-button>
-            <el-button type="info" style="margin-right: 10px;">编辑</el-button>
-            <el-button type="success" style="margin-right: 10px;">保存</el-button>
-            <el-button type="warning">生成规格书</el-button>
+            <el-button type="primary" plain>生成规格书</el-button>
           </div>
         </div>
 
@@ -635,151 +603,40 @@ const handleConfigClick = (label) => {
               </div>
             </el-form-item>
 
-            <!-- 管件选择 -->
+            <!-- 配置按钮区域 -->
             <el-form-item label-width="0" prop="">
-              <div class="form-section">
-                <el-row :gutter="20">
-                  <el-col :span="12">
-                    <el-form-item label="Bend" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="bendConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Bend')">配置</el-button>
+              <div class="form-section-pmc" style="flex:1">
+                <el-row :gutter="20" v-for="row in Math.ceil(configButtons.length / 2)" :key="row" class="config-row">
+                  <el-col :span="12" v-for="i in 2" :key="i">
+                    <div v-if="configButtons[(row-1)*2 + (i-1)]" class="config-cell">
+                      <div v-if="configButtons[(row-1)*2 + (i-1)].configResult" class="config-result-container frosted">
+                        <div v-if="configButtons[(row-1)*2 + (i-1)].type" class="config-type-label">{{ configButtons[(row-1)*2 + (i-1)].type }}</div>
+                        <div class="config-result-scroll">
+                          <div v-for="(line, index) in configButtons[(row-1)*2 + (i-1)].configResult.split('\n')" :key="index" class="config-result-line">{{ line }}</div>
+                        </div>
+                        <el-button 
+                          type="primary" 
+                          size="small" 
+                          class="reconfig-btn"
+                          @click="handleConfigClick(configButtons[(row-1)*2 + (i-1)].id)"
+                        >
+                          重新配置
+                        </el-button>
                       </div>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="12">
-                    <el-form-item label="Red" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="redConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示"/>
-                        <el-button @click="handleConfigClick('Red')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                </el-row>
-                <el-row :gutter="20">
-                  <el-col :span="12">
-                    <el-form-item label="Tee" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="teeConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Tee')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="12">
-                    <el-form-item label="Flange" label-width="80px">  
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="flangeConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Flange')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                </el-row>
-                <el-row :gutter="20">
-                  <el-col :span="12">
-                    <el-form-item label="Sleeve" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="sleeveConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Sleeve')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="12">
-                    <el-form-item label="Joints" label-width="80px">    
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="jointsConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Joints')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                </el-row>
-                <el-row :gutter="20">
-                  <el-col :span="12">
-                    <el-form-item label="BlindFlange" label-width="100px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="blindFlangeConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('BlindFlange')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="12">
-                    <el-form-item label="Gasket" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="gasketConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Gasket')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                </el-row>
-                <el-row :gutter="20">
-                  <el-col :span="12">
-                    <el-form-item label="Bolts" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="boltsConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Bolts')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="12">
-                    <el-form-item label="Nuts" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="nutsConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Nuts')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                </el-row>
-                <el-row :gutter="20">
-                  <el-col :span="12">
-                    <el-form-item label="Washers" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="washersConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Washers')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="12">
-                    <el-form-item label="Crosses" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input v-model="crossesConfigResult" type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Crosses')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                </el-row>
-                <el-row :gutter="20">
-                  <el-col :span="12">
-                    <el-form-item label="Saddles" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Saddles')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="12">
-                    <el-form-item label="Caps" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Caps')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                </el-row>
-                <el-row :gutter="20">
-                  <el-col :span="12">
-                    <el-form-item label="Accessories" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Accessories')">配置</el-button>
-                      </div>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="12">
-                    <el-form-item label="Overpass" label-width="80px">
-                      <div style="display: flex; align-items: flex-start; flex:0.8">
-                        <el-input type="textarea" :rows="3" :disabled="true" style="flex: 1; margin-right: 10px;" placeholder="多行文本显示" />
-                        <el-button @click="handleConfigClick('Overpass')">配置</el-button>
-                      </div>
-                    </el-form-item>
+                      <el-button 
+                        v-else
+                        type="primary" 
+                        round 
+                        size="large" 
+                        class="config-add-btn frosted"
+                        @click="handleConfigClick(configButtons[(row-1)*2 + (i-1)].id)"
+                      >
+                        <div class="config-add-content">
+                          <el-icon class="plus-icon"><Plus /></el-icon>
+                          <div class="config-add-text">配置</div>
+                        </div>
+                      </el-button>
+                    </div>
                   </el-col>
                 </el-row>
               </div>
@@ -984,5 +841,128 @@ const handleConfigClick = (label) => {
 .spec-form .el-input[style*="width"],
 .spec-form .el-select[style*="width"] {
   width: auto;
+}
+
+/* 配置按钮区域样式，避免已配置内容遮挡其他控件 */
+.config-row {
+  margin-bottom: 24px;
+}
+
+
+.config-cell {
+  padding: 6px;
+  box-sizing: border-box;
+  height: 140px; /* 固定高度，保证按钮与显示区域高度一致 */
+}
+
+.config-result-container {
+  background-color: #f0f9ff;
+  border: 1px solid #91d5ff;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  height: calc(100% - 12px); /* 保证容器在父项内有固定高度 */
+  overflow: hidden;
+  position: relative;
+}
+
+.config-result-scroll {
+  overflow-y: auto; /* 内容超出时滚动显示 */
+  flex-grow: 1;
+  min-height: 0;
+  padding-right: 6px;
+  padding-top: 24px; /* 给顶部的类型标签留出空间，不随内容滚动 */
+}
+
+.config-result-line {
+  margin-bottom: 6px;
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.reconfig-btn {
+  align-self: flex-end;
+  margin-top: 8px;
+}
+
+.config-type-label {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  z-index: 2;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.85);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.config-add-btn {
+  width: 100%;
+  height: 140px; /* 与已配置项高度一致 */
+  padding: 18px 0;
+}
+
+.config-add-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.config-add-text { font-size: 14px; }
+
+/* 毛玻璃效果（浅蓝色基调）用于配置按钮和已配置项背景 */
+.frosted {
+  background: rgba(224, 242, 255, 0.55); /* 浅蓝色半透明 */
+  backdrop-filter: blur(6px) saturate(120%);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+  box-shadow: 0 6px 16px rgba(11, 40, 80, 0.06);
+  border: 1px solid rgba(170, 200, 230, 0.45);
+  color: #033a66; /* 默认文字颜色为深蓝，保证可见 */
+}
+
+.config-result-container.frosted {
+  background: rgba(220, 235, 255, 0.6);
+  border: 1px solid rgba(150, 185, 230, 0.45);
+  color: #033a66;
+}
+
+.config-add-btn.frosted {
+  background: rgba(220, 235, 255, 0.6);
+  border: 1px solid rgba(150, 185, 230, 0.45);
+  color: #033a66;
+}
+
+/* 确保按钮内部文字和图标可见，覆盖 ElementPlus 默认样式 */
+.config-add-btn.frosted,
+.config-add-btn.frosted .el-icon,
+.config-add-btn.frosted .config-add-text {
+  color: #033a66 !important;
+}
+
+.reconfig-btn {
+  align-self: flex-end;
+  margin-top: 8px;
+  color: #033a66; /* 小按钮文字为深蓝色 */
+}
+
+.config-type-label {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  z-index: 2;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(230, 245, 255, 0.9);
+  color: #033a66;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(140,170,210,0.35);
 }
 </style>

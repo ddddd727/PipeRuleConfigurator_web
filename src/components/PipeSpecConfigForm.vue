@@ -1,11 +1,18 @@
 <template>
   <el-dialog
   v-model="dialogVisible"
-  :title="`${buttonLabel ? buttonLabel + ' - ' : ''}标准文件选择与配置`"
   width="700px"
   :close-on-click-modal="false"
   @close="handleClose"
 >
+    <template #title>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span>{{ buttonLabel ? buttonLabel + ' - ' : '' }}标准文件选择与配置</span>
+        <el-select v-model="form.partType" placeholder="部件类型" size="small" style="width:160px">
+          <el-option v-for="pt in partTypes" :key="pt" :label="pt" :value="pt" />
+        </el-select>
+      </div>
+    </template>
     <el-form
       ref="formRef"
       :model="form"
@@ -144,6 +151,7 @@ const dialogVisible = computed({
 const form = ref({
   standardFileIds: [], // 选择的标准文件ID数组
   standardFileConfigurations: [], // 每个元素包含standardFile、minNpdValue和maxNpdValue
+  partType: '',
   effectiveDate: '',
   remarks: ''
 })
@@ -248,6 +256,9 @@ const getStandardFileName = (fileId) => {
 // 提交状态
 const submitting = ref(false)
 const formRef = ref()
+
+// 可选的部件类型
+const partTypes = ['Bend', 'Pipe', 'Fitting', 'Other']
 
 // 处理提交
 const handleSubmit = async () => {
