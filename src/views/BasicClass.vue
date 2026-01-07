@@ -195,10 +195,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { db } from '@/mock/index.js'
 import Mock from 'mockjs'
+import axios from 'axios'
 import {
   Folder,
   Document,
@@ -495,9 +496,45 @@ const handleImageError = () => {
   ElMessage.error('标准规范图片加载失败，请检查文件路径')
 }
 
+const fetchBendPipeData = async () => {
+  try {
+    const res = await axios.get('/api/DspSpmcDictPipingBend')
+    if (res?.data?.code === 200) {
+      const rows = Array.isArray(res.data.data) ? res.data.data : []
+      const cfg = configs['bend-pipe'] || {
+        id: 'bend-pipe',
+        title: '弯管数据',
+        editMode: false,
+        selectedRows: [],
+        columns: [],
+        data: []
+      }
+      cfg.columns = [
+        { prop: 'outSideDiameter', label: '通径DN', editable: false },
+        { prop: 'outSideDiameterUnit', label: '通径单位', editable: false },
+        { prop: 'headerClampLength', label: '前夹长L1', editable: false },
+        { prop: 'tailClampLength', label: '后夹长L2', editable: false }
+      ]
+      cfg.data = rows
+      configs['bend-pipe'] = cfg
+    } else {
+      ElMessage.error('弯管数据接口返回异常')
+    }
+  } catch (e) {
+    ElMessage.error('弯管数据接口请求失败')
+  }
+}
+
 // 初始化
 onMounted(() => {
   initializeConfigs()
+  fetchBendPipeData()
+})
+
+watch(currentNode, (node) => {
+  if (node?.id === 'bend-pipe') {
+    fetchBendPipeData()
+  }
 })
 </script>
 
