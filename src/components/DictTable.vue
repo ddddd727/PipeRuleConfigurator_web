@@ -86,9 +86,16 @@ const toggleEdit = () => {
 const handleAddRow = () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
   const newRow = { id: Date.now(), _isNew: true }
-  tableConfig.value.columns.forEach(col => newRow[col.prop] = '')
   
-  // 【修改点 5】推送到 list
+  // 【改动点】初始化默认值：Switch 默认为 true，其他为空
+  tableConfig.value.columns.forEach(col => {
+    if (col.type === 'switch') {
+      newRow[col.prop] = true 
+    } else {
+      newRow[col.prop] = ''
+    }
+  })
+  
   if (!tableConfig.value.list) tableConfig.value.list = []
   tableConfig.value.list.push(newRow)
   
@@ -98,19 +105,86 @@ const handleAddRow = () => {
   }, 100)
 }
 
-const handleSave = () => {
-  loading.value = true
-  setTimeout(() => {
-    // 【修改点 6】保存 list
-    console.log(`提交 ${props.dictId} 数据:`, JSON.stringify(tableConfig.value.list))
-    if (tableConfig.value.list) {
-      tableConfig.value.list.forEach(row => delete row._isNew)
-      initSnapshot(tableConfig.value.list)
+// --- 辅助验证函数：判断值是否为空 ---
+const isEmpty = (val) => {
+  return val === null || val === undefined || val === ''
+}
+// --- 保存逻辑：校验 + 发送 POST 请求 ---
+const handleSave = async () => {
+  const currentList = tableConfig.value.list || []
+  const columns = tableConfig.value.columns || []
+
+  // 1. 【通用校验引擎】
+  for (let i = 0; i < currentList.length; i++) {
+    const row = currentList[i]
+    
+    // 遍历每一列定义
+    for (const col of columns) {
+      const val = row[col.prop]
+      const label = col.label
+
+      // --- A. 兼容旧的简单校验 (required: true) ---
+      // Switch 类型如果是 boolean false 是合法的，不应该报错
+      if (col.required && isEmpty(val) && col.type !== 'switch') {
+         ElMessage.warning(`第 ${i + 1} 行：[${label}] 不能为空`)
+         return
+      }
+
+      // --- B. 新的高级校验 (rules 数组) ---
+      if (col.rules && Array.isArray(col.rules)) {
+        for (const rule of col.rules) {
+          // B1. 校验必填
+          if (rule.required && isEmpty(val)) {
+             ElMessage.warning(`第 ${i + 1} 行：${rule.message || label + ' 不能为空'}`)
+             return 
+          }
+
+          // B2. 校验最大长度
+          if (rule.max && String(val).length > rule.max) {
+             ElMessage.warning(`第 ${i + 1} 行：[${label}] ${rule.message || '长度超限'}`)
+             return
+          }
+
+          // B3. 校验正则模式 (pattern)
+          if (rule.pattern && !isEmpty(val)) {
+            try {
+              // 将 JSON 字符串转为正则对象
+              const regex = new RegExp(rule.pattern)
+              if (!regex.test(String(val))) {
+                ElMessage.warning(`第 ${i + 1} 行：[${label}] ${rule.message || '格式不正确'}`)
+                return
+              }
+            } catch (e) {
+              console.warn('正则解析失败:', rule.pattern)
+            }
+          }
+        }
+      }
     }
+  }
+
+  // 2. 【发送请求】
+  loading.value = true
+  try {
+    const res = await axios.post(`/api/dict/${props.dictId}`, {
+      list: currentList
+    })
+    
+    // 兼容处理：只要状态码 200 即视为成功
+    if (res.status === 200 && (res.data?.code === 200 || res.data?.code === undefined)) {
+      ElMessage.success('保存成功')
+      currentList.forEach(row => delete row._isNew)
+      initSnapshot(currentList)
+      isEdit.value = false
+    } else {
+      ElMessage.error(res.data?.msg || '保存失败')
+    }
+  } catch (error) {
+    console.error('Save error:', error)
+    ElMessage.error('保存请求失败')
+  } finally {
     loading.value = false
-    isEdit.value = false
-    ElMessage.success('保存成功 (已打印到控制台)')
-  }, 600)
+  }
 }
 
 const handleDeleteRow = (row) => {
@@ -177,18 +251,30 @@ const handleDeleteRow = (row) => {
             <el-select 
               v-if="col.type === 'select'" 
               v-model="scope.row[col.prop]" 
-              size="small" 
-              placeholder="请选择"
+              size="small"
             >
               <el-option v-for="opt in col.options" :key="opt" :label="opt" :value="opt" />
             </el-select>
+
+            <el-switch
+              v-else-if="col.type === 'switch'"
+              v-model="scope.row[col.prop]"
+              inline-prompt
+              active-text="启"
+              inactive-text="停"
+            />
 
             <el-input v-else v-model="scope.row[col.prop]" size="small" />
 
             <div v-if="isModified(scope.row, col.prop)" class="dirty-marker"></div>
           </div>
           
-          <span v-else>{{ scope.row[col.prop] }}</span>
+          <span v-else>
+            <el-tag v-if="col.type === 'switch'" :type="scope.row[col.prop] ? 'success' : 'info'">
+              {{ scope.row[col.prop] ? '启用' : '停用' }}
+            </el-tag>
+            <span v-else>{{ scope.row[col.prop] }}</span>
+          </span>
         </template>
       </el-table-column>
 
