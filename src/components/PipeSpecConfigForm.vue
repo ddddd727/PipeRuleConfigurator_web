@@ -257,8 +257,21 @@ const getStandardFileName = (fileId) => {
 const submitting = ref(false)
 const formRef = ref()
 
-// 可选的部件类型
-const partTypes = ['Bend', 'Pipe', 'Fitting', 'Other']
+// 可选的部件类型（从后端获取）
+const partTypes = ref([])
+
+const fetchPartTypes = async () => {
+  try {
+    const res = await axios.get('/api/pipe-spec/part-types')
+    // 兼容不同 mock 返回字段（code/data 或 msg/data）
+    if (res && res.data) {
+      const payload = res.data
+      partTypes.value = payload.data || []
+    }
+  } catch (error) {
+    console.error('获取部件类型失败:', error)
+  }
+}
 
 // 处理提交
 const handleSubmit = async () => {
@@ -343,12 +356,14 @@ watch(dialogVisible, (val) => {
     })
     // 对话框打开时获取标准文件列表
     fetchStandardFiles()
+    fetchPartTypes()
   }
 })
 
 // 组件挂载时获取标准文件列表
 onMounted(() => {
   fetchStandardFiles()
+  fetchPartTypes()
 })
 </script>
 
