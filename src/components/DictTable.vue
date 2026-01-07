@@ -13,6 +13,7 @@ const props = defineProps({
 
 const { initSnapshot, isModified } = useDirtyData()
 
+// 【修改点 1】初始化改为 list
 const tableConfig = ref({ title: '', columns: [], list: [] }) 
 const loading = ref(false)
 const isEdit = ref(false)
@@ -20,6 +21,7 @@ const searchKeyword = ref('')
 
 // --- 搜索过滤 ---
 const displayData = computed(() => {
+  // 【修改点 2】从 list 获取数据
   const rawData = tableConfig.value.list || [] 
   const keyword = searchKeyword.value.trim().toLowerCase()
   if (!keyword) return rawData
@@ -34,6 +36,7 @@ const getColumnFilters = (col) => {
   if (col.options) {
     return col.options.map(opt => ({ text: opt, value: opt }))
   }
+  // 【修改点 3】从 list 获取筛选源
   const rawData = tableConfig.value.list || []
   const values = rawData.map(item => item[col.prop])
   return [...new Set(values)]
@@ -53,11 +56,11 @@ const fetchData = async () => {
   loading.value = true
   try {
     const res = await axios.get(`/api/dict/${dictType}`)
-    // 注意：这里 axios 返回的是 res.data，Apifox 的结构也是 res.data.data
-    // 如果你的 Apifox 返回结构是 { code: 200, data: { ... } }
+    // Apifox 返回结构通常是 { code: 200, data: { columns: [], list: [] } }
     const resData = res.data 
     if (resData.code === 200) {
       tableConfig.value = resData.data
+      // 【修改点 4】初始化快照时使用 list
       initSnapshot(tableConfig.value.list || []) 
       isEdit.value = false
       searchKeyword.value = ''
@@ -66,7 +69,7 @@ const fetchData = async () => {
     }
   } catch (error) {
     console.error('Fetch error:', error)
-    ElMessage.error('网络错误，请检查 Apifox 代理或 Mock 数据')
+    ElMessage.error('网络错误，请检查 Apifox 代理配置')
   } finally {
     loading.value = false
   }
@@ -85,6 +88,7 @@ const handleAddRow = () => {
   const newRow = { id: Date.now(), _isNew: true }
   tableConfig.value.columns.forEach(col => newRow[col.prop] = '')
   
+  // 【修改点 5】推送到 list
   if (!tableConfig.value.list) tableConfig.value.list = []
   tableConfig.value.list.push(newRow)
   
@@ -97,6 +101,7 @@ const handleAddRow = () => {
 const handleSave = () => {
   loading.value = true
   setTimeout(() => {
+    // 【修改点 6】保存 list
     console.log(`提交 ${props.dictId} 数据:`, JSON.stringify(tableConfig.value.list))
     if (tableConfig.value.list) {
       tableConfig.value.list.forEach(row => delete row._isNew)
@@ -110,6 +115,7 @@ const handleSave = () => {
 
 const handleDeleteRow = (row) => {
   ElMessageBox.confirm('确定删除该行吗？', '提示', { type: 'warning' }).then(() => {
+    // 【修改点 7】从 list 删除
     const index = tableConfig.value.list.indexOf(row)
     if (index > -1) {
       tableConfig.value.list.splice(index, 1)
