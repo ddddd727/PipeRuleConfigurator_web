@@ -11,13 +11,13 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  // 👇 核心配置：添加代理转发
   server: {
     proxy: {
-      "/api": {
-        target: "https://localhost:44347",
-        changeOrigin: true,
-        secure: false,
-      },
-    },
+      '/api': {
+        target: 'http://localhost:5022',
+        changeOrigin: true
+      }
+    }
   }
 })
