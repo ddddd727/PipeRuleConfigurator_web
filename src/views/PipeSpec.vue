@@ -615,7 +615,7 @@ const handleConfigClick = (buttonId) => {
                           <div v-for="(line, index) in configButtons[(row-1)*2 + (i-1)].configResult.split('\n')" :key="index" class="config-result-line">{{ line }}</div>
                         </div>
                         <el-button 
-                          type="primary" plain
+                          type="primary" 
                           size="small" 
                           class="reconfig-btn"
                           @click="handleConfigClick(configButtons[(row-1)*2 + (i-1)].id)"
@@ -946,6 +946,11 @@ const handleConfigClick = (buttonId) => {
   color: #033a66 !important;
 }
 
+.reconfig-btn {
+  align-self: flex-end;
+  margin-top: 8px;
+  color: #033a66; /* 小按钮文字为深蓝色 */
+}
 
 .config-type-label {
   position: absolute;
