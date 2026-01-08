@@ -67,7 +67,7 @@
             :default-sort="{ prop: 'id', order: 'ascending' }"
           >
           <!-- 展开行 -->
-          <el-table-column type="expand" width="50">
+          <el-table-column type="expand" min-width="45">
             <template #default="{ row }">
               <div class="expand-content">
                 <el-row :gutter="20">
@@ -137,13 +137,13 @@
           </el-table-column>
           
           <!-- 序号列 -->
-          <el-table-column type="index" label="序号" width="50" />
+          <el-table-column type="index" label="序号" min-width="60" />
           
           <!-- Interface Name -->
           <el-table-column 
             prop="interfaceName" 
             label="Interface Name"
-            min-width="140"
+            min-width="150"
             show-overflow-tooltip
           />
           
@@ -151,7 +151,7 @@
           <el-table-column 
             prop="attributeUserName" 
             label="Attribute UserName"
-            min-width="160"
+            min-width="180"
             show-overflow-tooltip
           />
           
@@ -159,21 +159,22 @@
           <el-table-column 
             prop="type" 
             label="Type"
-            min-width="120"
+            min-width="100"
+            show-overflow-tooltip
           />
           
           <!-- Codelist -->
           <el-table-column 
             prop="codelist" 
             label="Codelist"
-            min-width="140"
+            min-width="130"
             show-overflow-tooltip
           />
           
           <!-- 操作列 -->
           <el-table-column 
             label="操作" 
-            width="100" 
+            min-width="120" 
             fixed="right"
             align="center"
           >
