@@ -29,25 +29,29 @@
 
       <!-- 右侧主要内容 -->
       <div class="main-panel">
-        <div class="property-table-container">
-          <!-- 顶部工具栏 -->
-          <div class="table-header">
-            <div class="title-area">
-              <h3>属性管理</h3>
-              <el-tag v-if="selectedInterface" type="primary" effect="plain" class="ml-2">
-                {{ selectedInterface }}
-              </el-tag>
-            </div>
-            
-            <div class="actions">
-              <el-input 
-                v-model="searchText" 
-                placeholder="搜索属性..."
-                prefix-icon="Search"
-                clearable
-                @input="onSearch"
-                style="width: 200px; margin-right: 12px;"
-              />
+        <!-- 标签页 -->
+        <el-tabs v-model="activeTab" class="tabs-container">
+          <!-- 属性管理标签页 -->
+          <el-tab-pane label="属性管理" name="property">
+            <div class="property-table-container">
+              <!-- 顶部工具栏 -->
+              <div class="table-header">
+                <div class="title-area">
+                  <h3>属性管理</h3>
+                  <el-tag v-if="selectedInterface" type="primary" effect="plain" class="ml-2">
+                    {{ selectedInterface }}
+                  </el-tag>
+                </div>
+                
+                <div class="actions">
+                  <el-input 
+                    v-model="searchText" 
+                    placeholder="搜索属性..."
+                    prefix-icon="Search"
+                    clearable
+                    @input="onSearch"
+                    style="width: 200px; margin-right: 12px;"
+                  />
               <el-button-group>
                 <el-button type="primary" icon="Plus" @click="handleAdd">新增</el-button>
                 <el-button icon="Refresh" @click="loadData">刷新</el-button>
@@ -224,8 +228,40 @@
             </template>
           </el-table-column>
         </el-table>
-        </div>
+            </div>
+          </el-tab-pane>
 
+          <!-- 维护Object Type和Interface的标签页 -->
+          <el-tab-pane label="维护配置" name="config">
+            <div class="config-container">
+              <div class="config-header">
+                <h3>对象类型与接口维护</h3>
+                <el-button type="primary" icon="Plus" @click="handleAddObjectType">新增对象类型</el-button>
+              </div>
+
+              <el-table :data="objectTypeConfigList" border stripe style="width: 100%; margin-top: 20px;">
+                <el-table-column prop="objectType" label="对象类型" width="200" />
+                <el-table-column prop="interfaces" label="关联接口" min-width="300">
+                  <template #default="{ row }">
+                    <el-space wrap>
+                      <el-tag v-for="iface in row.interfaces" :key="iface" closable @close="handleRemoveInterface(row.objectType, iface)">
+                        {{ iface }}
+                      </el-tag>
+                      <el-button type="primary" link size="small" @click="handleAddInterface(row.objectType)">
+                        添加接口
+                      </el-button>
+                    </el-space>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="120" align="center">
+                  <template #default="{ row }">
+                    <el-button type="danger" link icon="Delete" @click="handleDeleteObjectType(row.objectType)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
       </div>
     </div>
 
@@ -241,8 +277,16 @@
         :rules="rules"
         ref="formRef"
       >
+        <el-form-item label="Object Type" prop="objectType">
+          <el-select v-model="formData.objectType" placeholder="请选择对象类型" clearable>
+            <el-option v-for="type in objectTypeList" :key="type" :label="type" :value="type" />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="Interface Name" prop="interfaceName">
-          <el-input v-model="formData.interfaceName" placeholder="请输入Interface Name" />
+          <el-select v-model="formData.interfaceName" placeholder="请选择接口" clearable :disabled="!formData.objectType">
+            <el-option v-for="iface in interfaceList" :key="iface" :label="iface" :value="iface" />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="Category Name" prop="categoryName">
@@ -330,6 +374,12 @@ const treeRef = ref(null)
 // 树搜索文本
 const treeSearchText = ref('')
 
+// 标签页激活状态
+const activeTab = ref('property')
+
+// 映射Object Type和Interface的配置数据
+const objectTypeConfigList = ref([])
+
 // 搜索文本
 const searchText = ref('')
 
@@ -339,6 +389,29 @@ const loading = ref(false)
 // 当前选中的Interface
 const selectedInterface = ref('')
 
+// 对象类型列表（从现有数据提取）
+const objectTypeList = computed(() => {
+  const types = new Set()
+  propertyList.value.forEach(item => {
+    const objectType = item.interfaceName.replace(/^IJ/, '') || 'Other'
+    types.add(objectType)
+  })
+  return Array.from(types).sort()
+})
+
+// 根据选中的对象类型获取接口列表
+const interfaceList = computed(() => {
+  if (!formData.value.objectType) return []
+  const interfaces = new Set()
+  propertyList.value.forEach(item => {
+    const objectType = item.interfaceName.replace(/^IJ/, '') || 'Other'
+    if (objectType === formData.value.objectType) {
+      interfaces.add(item.interfaceName)
+    }
+  })
+  return Array.from(interfaces).sort()
+})
+
 // 对话框控制
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -347,6 +420,7 @@ const formRef = ref(null)
 // 表单数据
 const formData = ref({
   id: null,
+  objectType: '',
   interfaceName: '',
   categoryName: '',
   attributeName: '',
@@ -956,8 +1030,114 @@ function loadData() {
     }
   })
   
+  // 构建 Object Type 配置映射
+  buildObjectTypeConfig()
+  
   buildTreeData()
   ElMessage.success('数据已加载')
+}
+
+/**
+ * 构建 Object Type 配置映射
+ */
+function buildObjectTypeConfig() {
+  const configMap = new Map()
+  
+  propertyList.value.forEach(item => {
+    const objectType = item.interfaceName.replace(/^IJ/, '') || 'Other'
+    if (!configMap.has(objectType)) {
+      configMap.set(objectType, new Set())
+    }
+    configMap.get(objectType).add(item.interfaceName)
+  })
+  
+  objectTypeConfigList.value = Array.from(configMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([objectType, interfaces]) => ({
+      objectType: objectType,
+      interfaces: Array.from(interfaces).sort()
+    }))
+}
+
+/**
+ * 添加新的Object Type
+ */
+function handleAddObjectType() {
+  ElMessageBox.prompt('请输入新的对象类型名称', '添加对象类型', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputPattern: /^[a-zA-Z][a-zA-Z0-9]*$/,
+    inputErrorMessage: '对象类型名仅能为字母数字'
+  })
+    .then(({ value }) => {
+      const exists = objectTypeConfigList.value.some(item => item.objectType === value)
+      if (exists) {
+        ElMessage.warning('该对象类型已存在')
+        return
+      }
+      objectTypeConfigList.value.push({ objectType: value, interfaces: [] })
+      objectTypeConfigList.value.sort((a, b) => a.objectType.localeCompare(b.objectType))
+      ElMessage.success('添加成功')
+    })
+    .catch(() => {})
+}
+
+/**
+ * 为对象类型添加接口
+ */
+function handleAddInterface(objectType) {
+  ElMessageBox.prompt('请输入接口名称（应以IJ开头）', `为 ${objectType} 添加接口`, {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputPattern: /^IJ[a-zA-Z0-9]*$/,
+    inputErrorMessage: '接口名必须以IJ开头'
+  })
+    .then(({ value }) => {
+      const config = objectTypeConfigList.value.find(item => item.objectType === objectType)
+      if (config) {
+        if (config.interfaces.includes(value)) {
+          ElMessage.warning('该接口已经存在')
+          return
+        }
+        config.interfaces.push(value)
+        config.interfaces.sort()
+        ElMessage.success('添加成功')
+      }
+    })
+    .catch(() => {})
+}
+
+/**
+ * 移除接口
+ */
+function handleRemoveInterface(objectType, iface) {
+  const config = objectTypeConfigList.value.find(item => item.objectType === objectType)
+  if (config) {
+    const index = config.interfaces.indexOf(iface)
+    if (index > -1) {
+      config.interfaces.splice(index, 1)
+      ElMessage.success('删除成功')
+    }
+  }
+}
+
+/**
+ * 删除Object Type
+ */
+function handleDeleteObjectType(objectType) {
+  ElMessageBox.confirm(`确定删除对象类型 "${objectType}" 吗?会同时删除其下所有接口`, '会议', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+    .then(() => {
+      const index = objectTypeConfigList.value.findIndex(item => item.objectType === objectType)
+      if (index > -1) {
+        objectTypeConfigList.value.splice(index, 1)
+        ElMessage.success('删除成功')
+      }
+    })
+    .catch(() => {})
 }
 
 /**
@@ -968,6 +1148,7 @@ function handleAdd() {
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
   formData.value = {
     id: null,
+    objectType: '',
     interfaceName: '',
     categoryName: '',
     attributeName: '',
@@ -993,7 +1174,11 @@ function handleAdd() {
  */
 function handleEdit(row) {
   isEdit.value = true
-  formData.value = { ...row }
+  const objectType = row.interfaceName.replace(/^IJ/, '') || 'Other'
+  formData.value = { 
+    ...row,
+    objectType: objectType
+  }
   dialogVisible.value = true
 }
 
@@ -1203,6 +1388,23 @@ onMounted(() => {
   height: 100%;
 }
 
+/* 标签页容器 */
+.tabs-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.el-tabs__content) {
+  flex: 1;
+  overflow: auto;
+}
+
+:deep(.el-tab-pane) {
+  height: 100%;
+}
+
+/* 属性表格容器 */
 .property-table-container {
   height: 100%;
   display: flex;
@@ -1211,6 +1413,28 @@ onMounted(() => {
   padding: clamp(12px, 1.2vw, 20px);
   border-radius: 4px;
   box-sizing: border-box;
+}
+
+/* 配置维护容器 */
+.config-container {
+  padding: clamp(12px, 1.2vw, 20px);
+  background: #fff;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.config-header h3 {
+  margin: 0;
+  font-size: clamp(16px, 1.2vw, 20px);
+  color: #303133;
+  font-weight: 600;
 }
 
 .table-header {
