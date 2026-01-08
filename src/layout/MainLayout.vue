@@ -42,11 +42,11 @@ const breadcrumbs = computed(() => {
           </template>
         </el-menu-item>
 
-        <sidebar-item 
-          v-for="route in menuList" 
-          :key="route.path" 
-          :item="route" 
-          :basePath="''"  
+        <sidebar-item
+          v-for="route in menuList"
+          :key="route.path"
+          :item="route"
+          :basePath="''"
         />
       </el-menu>
     </el-aside>
