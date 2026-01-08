@@ -1,4 +1,6 @@
 import Mock from 'mockjs'
+// 导入管道规格配置相关的Mock数据
+import './modules/PipeSpecConfigInfo/ReferenceInfo.js'
 
 Mock.setup({
   timeout: '200-600'
@@ -12,10 +14,10 @@ const db = {
       { prop: 'id', label: '序号', width: 60 },
       { prop: 'code', label: '等级代码' },
       // 【关键点】开启筛选
-      { prop: 'name', label: '等级名称', filterable: true }, 
+      { prop: 'name', label: '等级名称', filterable: true },
       { prop: 'desc', label: '说明' },
       // 【关键点】开启筛选
-      { prop: 'status', label: '状态', filterable: true, width: 100 } 
+      { prop: 'status', label: '状态', filterable: true, width: 100 }
     ],
     'data|5-10': [{
       'id|+1': 1,
@@ -32,10 +34,10 @@ const db = {
     columns: [
       { prop: 'id', label: '序号', width: 60 },
       // 【关键点】标准号下拉筛选
-      { prop: 'stdNo', label: '标准号', filterable: true }, 
-      { prop: 'name', label: '标准名称' }, 
+      { prop: 'stdNo', label: '标准号', filterable: true },
+      { prop: 'name', label: '标准名称' },
       // 【关键点】年份下拉筛选
-      { prop: 'year', label: '年份版本', filterable: true, width: 120 } 
+      { prop: 'year', label: '年份版本', filterable: true, width: 120 }
     ],
     'data|15-20': [{ // 生成多一点数据方便测试筛选
       'id|+1': 1,
@@ -166,7 +168,7 @@ const db = {
     }]
   },
 
-   // 1. 弯管数据 (bend-pipe)
+  // 1. 弯管数据 (bend-pipe)
   'bend-pipe': {
     title: '部件库名称：PlainPipingGenericData',
     columns: [
@@ -223,7 +225,7 @@ const db = {
     }]
   },
 
-    // 4. Spec (spec)
+  // 4. Spec (spec)
   'spec': {
     title: '部件库名称：PipingCommodityFilter',
     columns: [
@@ -263,7 +265,3 @@ Mock.mock(/\/api\/dict\/[\w-]+/, 'get', (options) => {
   }
 })
 
-
-
-// 导出 db 对象供其他模块使用
-export { db }
