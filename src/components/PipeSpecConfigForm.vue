@@ -7,7 +7,7 @@
 >
     <template #title>
       <div style="display:flex; align-items:center; gap:12px;">
-        <span>标准文件选择与配置</span>
+        <span>{{ buttonLabel ? buttonLabel + ' - ' : '' }}标准文件选择与配置</span>
         <el-select v-model="form.partType" placeholder="部件类型" size="small" style="width:160px">
           <el-option v-for="pt in partTypes" :key="pt" :label="pt" :value="pt" />
         </el-select>
@@ -93,7 +93,7 @@
                   />
                 </el-select>
               </div>
-              <div class="bend-radius-multiple" v-if="form.partType === 'Bend'">
+              <div class="bend-radius-multiple" v-if="buttonLabel === 'Bend'">
                 <el-input
                   v-model="config.bendRadiusMultiple"
                   placeholder="弯管半径倍数"
@@ -101,7 +101,7 @@
                 />
               </div>
             </div>
-            <div class="bend-radius-hint" v-if="form.partType === 'Bend'">填写的值为弯管半径的倍数</div>
+            <div class="bend-radius-hint" v-if="buttonLabel === 'Bend'">填写的值为弯管半径的倍数</div>
           </div>
         </div>
         <div class="tip-text">请为每个选择的标准文件配置对应的NPD范围</div>
@@ -129,6 +129,10 @@ const props = defineProps({
   pathRanges: {
     type: Array,
     default: () => []
+  },
+  buttonLabel: {
+    type: String,
+    default: ''
   },
   materials: {
     type: Array,
