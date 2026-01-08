@@ -7,7 +7,6 @@ import specRouter from './modules/spec'
 import pmcRouter from './modules/pmc'
 import pipeRouter from './modules/pipe'
 import libraryRouter from './modules/library'
-import s3dRouter from './modules/s3d'
 import propertyRouter from './modules/property'
 export const constantRoutes = [
   // 首页重定向到第一个菜单（字典定义的第一个页面）

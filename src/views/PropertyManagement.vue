@@ -143,7 +143,7 @@
           <el-table-column 
             prop="interfaceName" 
             label="Interface Name"
-            width="140"
+            min-width="140"
             show-overflow-tooltip
           />
           
@@ -151,7 +151,7 @@
           <el-table-column 
             prop="attributeUserName" 
             label="Attribute UserName"
-            width="140"
+            min-width="160"
             show-overflow-tooltip
           />
           
@@ -159,14 +159,14 @@
           <el-table-column 
             prop="type" 
             label="Type"
-            width="100"
+            min-width="120"
           />
           
           <!-- Codelist -->
           <el-table-column 
             prop="codelist" 
             label="Codelist"
-            width="120"
+            min-width="140"
             show-overflow-tooltip
           />
           
@@ -1209,6 +1209,14 @@ onMounted(() => {
 
 :deep(.el-table) {
   font-size: clamp(12px, 0.85vw, 14px);
+}
+
+/* 让表格内层包装自适应卡片宽度 */
+:deep(.el-table__inner-wrapper),
+:deep(.el-table__body-wrapper),
+:deep(.el-table__header-wrapper) {
+  width: 100% !important;
+  max-width: 100%;
 }
 
 :deep(.el-table__row) {
