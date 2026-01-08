@@ -1,4 +1,6 @@
 import Mock from 'mockjs'
+// 导入管道规格配置相关的Mock数据
+import './modules/PipeSpecConfigInfo/ReferenceInfo.js'
 
 Mock.setup({
   timeout: '200-600'
@@ -12,10 +14,10 @@ const db = {
       { prop: 'id', label: '序号', width: 60 },
       { prop: 'code', label: '等级代码' },
       // 【关键点】开启筛选
-      { prop: 'name', label: '等级名称', filterable: true }, 
+      { prop: 'name', label: '等级名称', filterable: true },
       { prop: 'desc', label: '说明' },
       // 【关键点】开启筛选
-      { prop: 'status', label: '状态', filterable: true, width: 100 } 
+      { prop: 'status', label: '状态', filterable: true, width: 100 }
     ],
     'data|5-10': [{
       'id|+1': 1,
@@ -32,10 +34,10 @@ const db = {
     columns: [
       { prop: 'id', label: '序号', width: 60 },
       // 【关键点】标准号下拉筛选
-      { prop: 'stdNo', label: '标准号', filterable: true }, 
-      { prop: 'name', label: '标准名称' }, 
+      { prop: 'stdNo', label: '标准号', filterable: true },
+      { prop: 'name', label: '标准名称' },
       // 【关键点】年份下拉筛选
-      { prop: 'year', label: '年份版本', filterable: true, width: 120 } 
+      { prop: 'year', label: '年份版本', filterable: true, width: 120 }
     ],
     'data|15-20': [{ // 生成多一点数据方便测试筛选
       'id|+1': 1,
@@ -164,7 +166,79 @@ const db = {
       'name': '@ctitle(5, 12)',
       'status|1': ['现行', '废止', '即将实施']
     }]
-  }
+  },
+
+  // 1. 弯管数据 (bend-pipe)
+  'bend-pipe': {
+    title: '部件库名称：PlainPipingGenericData',
+    columns: [
+      // { prop: 'id', label: '序号', width: 80 },
+      { prop: 'diameter', label: '通径DN', editable: true },
+      { prop: 'unit', label: '通径单位', editable: true },
+      { prop: 'l1', label: '前夹长L1', editable: true },
+      { prop: 'l2', label: '后夹长L2', editable: true }
+    ],
+    'data|5': [{
+      'id|+1': 1,
+      'diameter|1': ['DN15', 'DN20', 'DN25', 'DN32', 'DN40', 'DN50'],
+      'unit': 'mm',
+      'l1|100-500': 1,
+      'l2|100-500': 1
+    }]
+  },
+
+  // 2. 壁厚系列 (wall-thickness-series)
+  'wall-thickness-series': {
+    title: '部件库名称：PlainPipingGenericData',
+    columns: [
+      // { prop: 'id', label: '序号', width: 80 },
+      { prop: 'diameter', label: '通径DN', editable: true },
+      { prop: 'unit', label: '通径单位', editable: true },
+      { prop: 'standard', label: '管材标准EndStandard', editable: true },
+      { prop: 'series', label: '壁厚系列', editable: true },
+      { prop: 'outer', label: '外径', editable: true },
+      { prop: 'value', label: '壁厚值', editable: true }
+    ],
+    'data|5': [{
+      'id|+1': 1,
+      'diameter|1': ['DN15', 'DN20', 'DN25', 'DN32', 'DN40', 'DN50'],
+      'unit': 'mm',
+      'standard|1': ['ASTM A106', 'GB/T 8163', 'ASTM A53'],
+      'series|1': ['Sch10', 'Sch20', 'Sch40', 'Sch80', 'Sch160'],
+      'outer|20-200': 1,
+      'value|1.0-10.0': 1
+    }]
+  },
+
+  // 3. ShortCode (shortcode)
+  'shortcode': {
+    title: '部件库名称：ShortCodeHierarchyRule',
+    columns: [
+      // { prop: 'id', label: '序号', width: 80 },
+      { prop: 'type', label: 'ShortCodeHierarchyType', editable: true },
+      { prop: 'shortcode', label: 'ShortCode', editable: true }
+    ],
+    'data|5': [{
+      'id|+1': 1,
+      'type|1': ['PIPE', 'VALVE', 'FLANGE', 'FITTING', 'INSTRUMENT', 'EQUIPMENT'],
+      'shortcode|1': ['管道', '阀门', '法兰', '管件', '仪表', '设备']
+    }]
+  },
+
+  // 4. Spec (spec)
+  'spec': {
+    title: '部件库名称：PipingCommodityFilter',
+    columns: [
+      // { prop: 'id', label: '序号', width: 80 },
+      { prop: 'shortcode', label: 'ShortCode', editable: true },
+      { prop: 'type', label: 'GeometricIndustryStandard', editable: true },
+      { prop: 'type', label: 'CommodityCode', editable: true }
+    ],
+    'data|5': [{
+      'id|+1': 1,
+      'shortcode|1': ['管道', '阀门', '法兰', '管件', '仪表', '设备']
+    }]
+  },
 }
 
 // 拦截请求
