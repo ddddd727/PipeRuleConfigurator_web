@@ -6,7 +6,7 @@ Mock.setup({
   timeout: '200-600'
 })
 
-const db = {
+export const db = {
   // 1. A-管材等级 (grade)
   'grade': {
     title: 'A-管材等级配置',
@@ -271,7 +271,8 @@ Mock.mock(/\/api\/dict\/[\w-]+/, 'get', (options) => {
 Mock.mock(/\/api\/pmc\/ship-numbers/, 'get', (options) => {
   console.log('Mock拦截: 获取船号', options.url)
   // 解析 query 参数 (简单解析)
-  const type = options.url.match(/type=([^&]+)/)?.[1]
+  const matchType = options.url.match(/type=([^&]+)/)
+  const type = matchType ? matchType[1] : undefined
   
   if (type === 'bulk') {
     return {
@@ -297,44 +298,40 @@ Mock.mock(/\/api\/pmc\/ship-numbers/, 'get', (options) => {
 
 // 2. 主材料规则内容 (B1, B2, B3, D)
 Mock.mock(/\/api\/pmc\/rules\/main-material/, 'get', (options) => {
-  console.log('Mock拦截: 主材料规则', options.url)
   return Mock.mock({
     code: 200,
-    // 模拟数据：生成 5-10 条
     'data|5-10': [{
       'id|+1': 1,
-      'code|1': ['C', 'S', 'A'],   // B1: 材料代码
-      'std|1': ['GB/T 8163', 'ASTM A106'], // B2: 标准
-      'grade|1': ['20#', 'Gr.B', '304'],   // B3: 牌号
-      'thickness|1': ['SCH40', 'SCH80', 'STD'] // D: 壁厚
+      'code|1': ['A', 'B', 'C', 'D'],
+      'std|1': ['1', '2', '3', '4'],
+      'grade|1': ['1', '2', '3', '4'],
+      'thickness|1': ['1', '2', '3', '4']
     }]
   })
 })
 
 // 3. 法兰规则内容 (C1, C2)
 Mock.mock(/\/api\/pmc\/rules\/flange/, 'get', (options) => {
-  console.log('Mock拦截: 法兰规则', options.url)
   return Mock.mock({
     code: 200,
     'data|3-6': [{
       'id|+1': 1,
-      'std|1': ['GB/T 9119', 'ASME B16.5'], // C1: 法兰标准
-      'press|1': ['10bar', '16bar', '150LB', '300LB'] // C2: 压力等级
+      'std|1': ['A', 'B', 'C', 'D'],
+      'press|1': ['1', '2', '3', '4']
     }]
   })
 })
 
 // 4. 管材一二级限定规则 (A, B2, B3, C2)
 Mock.mock(/\/api\/pmc\/rules\/pipe-limit/, 'get', (options) => {
-  console.log('Mock拦截: 管材限定规则', options.url)
   return Mock.mock({
     code: 200,
     'data|4-8': [{
       'id|+1': 1,
-      'grade|1': ['I', 'II', 'III'], // A: 管材等级
-      'std|1': ['GB/T 8163', 'ASTM A106'], // B2
-      'gradeCode|1': ['20#', 'Gr.B'], // B3 (注意这里字段名是 gradeCode 与主材料区分)
-      'press|1': ['10bar', '16bar', '150LB'] // C2
+      'grade|1': ['A', 'B', 'C', 'D'],
+      'std|1': ['1', '2', '3', '4'],
+      'gradeCode|1': ['1', '2', '3', '4'],
+      'press|1': ['1', '2', '3', '4']
     }]
   })
 })
@@ -342,7 +339,8 @@ Mock.mock(/\/api\/pmc\/rules\/pipe-limit/, 'get', (options) => {
 // 5. 获取规则下拉列表 (主材料、法兰、管材限定)
 Mock.mock(/\/api\/pmc\/rules\/list/, 'get', (options) => {
   console.log('Mock拦截: 获取规则列表', options.url)
-  const type = options.url.match(/type=([^&]+)/)?.[1]
+  const matchType2 = options.url.match(/type=([^&]+)/)
+  const type = matchType2 ? matchType2[1] : undefined
   
   if (type === 'main-material') {
     return {
