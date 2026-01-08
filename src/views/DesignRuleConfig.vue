@@ -60,32 +60,22 @@
               
               <el-button 
                 size="small" 
+                type="danger" 
+                @click="handleDeleteRows(currentConfig.id)"
+                :disabled="currentConfig.selectedRows.length === 0"
+              >
+                <el-icon><Delete /></el-icon>
+                删除 ({{ currentConfig.selectedRows.length }})
+              </el-button>
+
+              <el-button 
+                size="small" 
                 type="primary" 
                 @click="handleAddRow(currentConfig.id)"
                 :disabled="!currentConfig.editMode"
               >
                 <el-icon><Plus /></el-icon>
-                增加行
-              </el-button>
-              
-              <el-button 
-                size="small" 
-                type="primary" 
-                @click="showAddColumnDialog(currentConfig.id)"
-                :disabled="!currentConfig.editMode"
-              >
-                <el-icon><Plus /></el-icon>
-                增加列
-              </el-button>
-              
-              <el-button 
-                size="small" 
-                type="danger" 
-                @click="handleDeleteRows(currentConfig.id)"
-                :disabled="!currentConfig.editMode || currentConfig.selectedRows.length === 0"
-              >
-                <el-icon><Delete /></el-icon>
-                删除 ({{ currentConfig.selectedRows.length }})
+                新增
               </el-button>
               
               <el-button 
@@ -120,7 +110,7 @@
                   :width="col.width || 'auto'"
                 >
                   <template #default="{ row, $index }">
-                    <template v-if="currentConfig.editMode && col.editable">
+                    <template v-if="currentConfig.editMode">
                       <el-input
                         v-model="row[col.prop]"
                         size="small"
@@ -169,28 +159,6 @@
       </div>
     </el-dialog>
 
-    <!-- 添加列对话框 -->
-    <el-dialog
-      v-model="addColumnDialogVisible"
-      :title="`为${currentAddColumnConfig?.title || ''}添加新列`"
-      width="500px"
-      @close="handleAddColumnDialogClose"
-    >
-      <el-form :model="newColumnForm" :rules="columnFormRules" ref="columnFormRef">
-        <el-form-item label="列名" prop="label">
-          <el-input v-model="newColumnForm.label" placeholder="请输入列名" />
-        </el-form-item>
-        <el-form-item label="字段名" prop="prop">
-          <el-input v-model="newColumnForm.prop" placeholder="请输入英文字段名" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="addColumnDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmAddColumn">确定</el-button>
-        </span>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -279,14 +247,6 @@ const currentConfig = computed(() => {
 })
 
 // ========== 通用状态 ==========
-const columnFormRef = ref()
-const addColumnDialogVisible = ref(false)
-const currentAddColumnConfig = ref(null)
-const newColumnForm = reactive({
-  label: '',
-  prop: '',
-  editable: true
-})
 
 // ========== 标准图片相关状态 ==========
 const standardImageDialogVisible = ref(false)
@@ -296,13 +256,6 @@ const imageLoaded = ref(false)
 const imageError = ref(false)
 
 // ========== 表单验证规则 ==========
-const columnFormRules = {
-  label: [{ required: true, message: '请输入列名', trigger: 'blur' }],
-  prop: [
-    { required: true, message: '请输入字段名', trigger: 'blur' },
-    { pattern: /^[a-zA-Z][a-zA-Z0-9_]*$/, message: '字段名只能包含字母、数字和下划线，且以字母开头', trigger: 'blur' }
-  ]
-}
 
 // ========== 通用方法 ==========
 const handleNodeClick = (node) => {
@@ -333,14 +286,56 @@ const handleNodeClick = (node) => {
   }
 }
 
-const toggleEditMode = (configId) => {
-  const config = configs[configId]
-  if (config) {
-    config.editMode = !config.editMode
-    if (!config.editMode) {
-      config.selectedRows = []
-    }
+const refreshConfigData = async (configId) => {
+  if (configId === 'bend-pipe') {
+    await fetchBendPipeData()
+    return
   }
+  try {
+    const res = await axios.get(`/api/dict/${configId}`)
+    if (res?.data?.code === 200) {
+      const mockData = res.data.data || {}
+      const cfg = configs[configId] || {
+        id: configId,
+        title: mockData.title || configId,
+        editMode: false,
+        selectedRows: [],
+        columns: [],
+        data: []
+      }
+      cfg.columns = (mockData.columns || []).map(col => ({
+        ...col,
+        editable: col.editable !== false
+      }))
+      cfg.data = mockData.data || []
+      configs[configId] = cfg
+    } else {
+      ElMessage.error(res?.data?.message || '数据获取失败')
+    }
+  } catch (e) {
+    ElMessage.error(e?.message || '网络错误')
+  }
+}
+
+const toggleEditMode = async (configId) => {
+  const config = configs[configId]
+  if (!config) return
+  if (!config.editMode) {
+    config.editMode = true
+    return
+  }
+  ElMessageBox.confirm(
+    `确定要取消所有更改吗？`,
+    '取消确认',
+    { confirmButtonText: '确定', cancelButtonText: '保留', type: 'warning' }
+  ).then(async () => {
+    await refreshConfigData(configId)
+    config.editMode = false
+    config.selectedRows = []
+    ElMessage.info('已取消更改并刷新数据')
+  }).catch(() => {
+    // 用户选择保留，不做任何操作，继续停留在编辑模式
+  })
 }
 
 const handleCellChange = (configId, row, prop, index) => {
@@ -397,67 +392,24 @@ const handleAddRow = (configId) => {
   })
   
   config.data.push(newRow)
-  ElMessage.success('新增一行成功')
-}
 
-const showAddColumnDialog = (configId) => {
-  const config = configs[configId]
-  if (!config) return
-  
-  currentAddColumnConfig.value = config
-  Object.assign(newColumnForm, {
-    label: '',
-    prop: '',
-    editable: true
-  })
-  addColumnDialogVisible.value = true
-}
-
-const confirmAddColumn = () => {
-  if (!columnFormRef.value) return
-  
-  columnFormRef.value.validate((valid) => {
-    if (!valid) return
-    
-    const config = currentAddColumnConfig.value
-    const newColumn = {
-      prop: newColumnForm.prop,
-      label: newColumnForm.label,
-      width: 'auto',
-      editable: newColumnForm.editable
+  setTimeout(() => {
+    const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
+                      || document.querySelector('.el-table__body-wrapper')
+    if (tableBody) {
+      tableBody.scrollTop = tableBody.scrollHeight
     }
-    
-    // 检查列是否已存在
-    if (config.columns.some(col => col.prop === newColumn.prop)) {
-      ElMessage.error('字段名已存在，请使用其他字段名')
-      return
-    }
-    
-    config.columns.push(newColumn)
-    
-    // 为所有行添加新字段
-    config.data.forEach(row => {
-      row[newColumn.prop] = ''
-    })
-    
-    addColumnDialogVisible.value = false
-    ElMessage.success('添加列成功')
-  })
+  }, 100)
 }
 
-const handleAddColumnDialogClose = () => {
-  if (columnFormRef.value) {
-    columnFormRef.value.resetFields()
-  }
-  currentAddColumnConfig.value = null
-}
+ 
 
 const handleSave = async (configId) => {
   const config = configs[configId]
   if (!config) return
   
   ElMessageBox.confirm(
-    `确定要保存${config.title}的所有更改吗？`,
+    `确定要保存所有更改吗？`,
     '保存确认',
     { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
   ).then(async () => {
@@ -465,7 +417,7 @@ const handleSave = async (configId) => {
       // 这里可以添加保存到服务器的逻辑
       console.log('保存数据:', config)
       
-      ElMessage.success(`${config.title}保存成功`)
+      ElMessage.success(`保存成功`)
       config.editMode = false
       config.selectedRows = []
     } catch (error) {
