@@ -131,6 +131,30 @@
                       </el-tag>
                     </div>
                   </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">Version:</span>
+                      <el-tag type="success" size="small">v{{ row.version || 1 }}</el-tag>
+                    </div>
+                  </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">Modifier:</span>
+                      <span class="detail-value">{{ row.modifier || '-' }}</span>
+                    </div>
+                  </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">Created:</span>
+                      <span class="detail-value">{{ row.createdTime || '-' }}</span>
+                    </div>
+                  </el-col>
+                  <el-col :xs="24" :sm="12" :md="8">
+                    <div class="detail-item">
+                      <span class="detail-label">Updated:</span>
+                      <span class="detail-value">{{ row.updatedTime || '-' }}</span>
+                    </div>
+                  </el-col>
                 </el-row>
               </div>
             </template>
@@ -264,11 +288,26 @@
         <el-form-item label="SymbolParameter" prop="symbolParameter">
           <el-switch v-model="formData.symbolParameter" />
         </el-form-item>
+
+        <!-- 版本管理信息（仅读） -->
+        <el-divider>版本管理</el-divider>
+        <el-form-item label="Version">
+          <el-input :value="`v${formData.version || 1}`" disabled />
+        </el-form-item>
+        <el-form-item label="Modifier">
+          <el-input v-model="formData.modifier" :placeholder="isEdit ? '修改人信息自动更新' : '创建者（可编辑）'" />
+        </el-form-item>
+        <el-form-item label="Created Time">
+          <el-input v-model="formData.createdTime" disabled />
+        </el-form-item>
+        <el-form-item label="Updated Time">
+          <el-input v-model="formData.updatedTime" disabled />
+        </el-form-item>
       </el-form>
 
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSave">保存</el-button>
+        <el-button type="primary" @click="handleSave">{{ isEdit ? '更新（版本号自动升级）' : '新增' }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -319,7 +358,11 @@ const formData = ref({
   codelistNamespace: '',
   onPropertyPage: false,
   readOnly: false,
-  symbolParameter: false
+  symbolParameter: false,
+  version: 1,
+  createdTime: '',
+  updatedTime: '',
+  modifier: 'admin'
 })
 
 // 表单验证规则
@@ -400,56 +443,70 @@ watch(treeSearchText, (val) => {
 })
 
 /**
- * 构建树形结构数据
+ * 构建树形结构数据 - 三层结构：对象类型 -> 接口 -> 属性
  */
 function buildTreeData() {
-  const interfaceMap = new Map()
+  const objectTypeMap = new Map()
   
   propertyList.value.forEach(item => {
+    // 从interfaceName提取objectType（去掉'IJ'前缀）
+    const objectType = item.interfaceName.replace(/^IJ/, '') || 'Other'
+    
+    if (!objectTypeMap.has(objectType)) {
+      objectTypeMap.set(objectType, new Map())
+    }
+    const interfaceMap = objectTypeMap.get(objectType)
     if (!interfaceMap.has(item.interfaceName)) {
-      interfaceMap.set(item.interfaceName, new Map())
+      interfaceMap.set(item.interfaceName, [])
     }
-    const categoryMap = interfaceMap.get(item.interfaceName)
-    if (!categoryMap.has(item.categoryName)) {
-      categoryMap.set(item.categoryName, [])
-    }
-    categoryMap.get(item.categoryName).push(item)
+    interfaceMap.get(item.interfaceName).push(item)
   })
   
   const tree = []
-  interfaceMap.forEach((categoryMap, interfaceName) => {
-    const children = []
-    categoryMap.forEach((properties, categoryName) => {
-      children.push({
-        id: `${interfaceName}-${categoryName}`,
-        label: `${categoryName} (${properties.length})`,
-        children: properties.map(p => ({
-          id: `${interfaceName}-${categoryName}-${p.id}`,
-          label: p.attributeUserName || p.attributeName
-        }))
+  // 按对象类型排序
+  Array.from(objectTypeMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .forEach(([objectType, interfaceMap]) => {
+      const interfaceChildren = []
+      // 按接口名排序
+      Array.from(interfaceMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .forEach(([interfaceName, properties]) => {
+          interfaceChildren.push({
+            id: `${objectType}-${interfaceName}`,
+            label: interfaceName,
+            children: properties.map((p, index) => ({
+              id: `${objectType}-${interfaceName}-${index}`,
+              label: p.attributeUserName || p.attributeName
+            }))
+          })
+        })
+      tree.push({
+        id: objectType,
+        label: `${objectType} (${interfaceMap.size})`,
+        children: interfaceChildren
       })
     })
-    tree.push({
-      id: interfaceName,
-      label: interfaceName,
-      children: children
-    })
-  })
   
   treeData.value = tree
 }
 
 /**
- * 树节点点击事件
+ * 树节点点击事件 - 三层结构处理
  */
 function handleTreeNodeClick(data) {
-  if (data.id && data.id.includes('-')) {
-    // 点击的是类别或属性，则选择对应的Interface
-    const interfaceName = data.id.split('-')[0]
+  const parts = data.id.split('-')
+  if (parts.length === 2) {
+    // 点击的是接口层（objectType-interfaceName）
+    const interfaceName = parts[1]
+    selectedInterface.value = interfaceName === selectedInterface.value ? '' : interfaceName
+  } else if (parts.length > 2) {
+    // 点击的是属性层或其他层，则选择对应的Interface
+    const interfaceName = parts[1]
     selectedInterface.value = interfaceName
   } else {
-    // 点击的是Interface
-    selectedInterface.value = data.id === selectedInterface.value ? '' : data.id
+    // 点击的是对象类型层，清空选择
+    selectedInterface.value = ''
   }
 }
 
@@ -471,7 +528,10 @@ function loadData() {
       codelistNamespace: '',
       onPropertyPage: true,
       readOnly: false,
-      symbolParameter: false
+      symbolParameter: false,
+      version: 1,
+      createdTime: '2026-01-01 10:00:00',
+      updatedTime: '2026-01-01 10:00:00'
     },
     {
       id: 2,
@@ -486,7 +546,10 @@ function loadData() {
       codelistNamespace: '',
       onPropertyPage: true,
       readOnly: false,
-      symbolParameter: false
+      symbolParameter: false,
+      version: 1,
+      createdTime: '2026-01-01 10:05:00',
+      updatedTime: '2026-01-01 10:05:00'
     },
     {
       id: 3,
@@ -879,6 +942,20 @@ function loadData() {
       symbolParameter: false
     }
   ]
+  
+  // 为所有记录添加版本管理字段
+  const now = new Date()
+  propertyList.value = propertyList.value.map((item, index) => {
+    const timestamp = new Date(now.getTime() - (propertyList.value.length - index) * 60000)
+    return {
+      ...item,
+      version: item.version || 1,
+      createdTime: item.createdTime || timestamp.toISOString().slice(0, 19).replace('T', ' '),
+      updatedTime: item.updatedTime || timestamp.toISOString().slice(0, 19).replace('T', ' '),
+      modifier: item.modifier || 'admin'
+    }
+  })
+  
   buildTreeData()
   ElMessage.success('数据已加载')
 }
@@ -888,6 +965,7 @@ function loadData() {
  */
 function handleAdd() {
   isEdit.value = false
+  const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
   formData.value = {
     id: null,
     interfaceName: '',
@@ -901,7 +979,11 @@ function handleAdd() {
     codelistNamespace: '',
     onPropertyPage: false,
     readOnly: false,
-    symbolParameter: false
+    symbolParameter: false,
+    version: 1,
+    createdTime: now,
+    updatedTime: now,
+    modifier: 'admin'
   }
   dialogVisible.value = true
 }
@@ -947,20 +1029,32 @@ function handleDelete(row) {
 function handleSave() {
   formRef.value.validate((valid) => {
     if (!valid) return
+    
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
     if (isEdit.value) {
-      // 更新现有属性
+      // 更新现有属性 - 增加版本号并更新修改人
       const index = propertyList.value.findIndex(item => item.id === formData.value.id)
       if (index > -1) {
-        propertyList.value[index] = { ...formData.value }
+        const updated = { 
+          ...formData.value,
+          version: (formData.value.version || 1) + 1,
+          updatedTime: now,
+          modifier: formData.value.modifier || 'admin'
+        }
+        propertyList.value[index] = updated
         buildTreeData()
       }
-      ElMessage.success('更新成功')
+      ElMessage.success('更新成功，版本已升级')
     } else {
       // 新增属性
       const newProperty = {
         id: Math.max(...propertyList.value.map(p => p.id || 0), 0) + 1,
-        ...formData.value
+        ...formData.value,
+        version: 1,
+        createdTime: now,
+        updatedTime: now,
+        modifier: formData.value.modifier || 'admin'
       }
       propertyList.value.push(newProperty)
       buildTreeData()
