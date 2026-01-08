@@ -1,29 +1,30 @@
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, watch, onMounted, computed, nextTick } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useDirtyData } from '@/hooks/useDirtyData' // 引入脏数据检测 Hook
+import { useDirtyData } from '@/hooks/useDirtyData'
 
-const route = useRoute()
+const props = defineProps({
+  dictId: {
+    type: String,
+    required: true
+  }
+})
+
 const { initSnapshot, isModified } = useDirtyData()
 
-// 表格配置
-const tableConfig = ref({ title: '', columns: [], data: [] })
+// 【修改点 1】初始化改为 list
+const tableConfig = ref({ title: '', columns: [], list: [] }) 
 const loading = ref(false)
 const isEdit = ref(false)
-const searchKeyword = ref('') // 搜索关键词
+const searchKeyword = ref('')
 
-// --- 核心逻辑：数据处理 ---
-
-// 1. 计算显示的数据：先过滤搜索关键词，再传给表格显示
+// --- 搜索过滤 ---
 const displayData = computed(() => {
-  const rawData = tableConfig.value.data || []
+  // 【修改点 2】从 list 获取数据
+  const rawData = tableConfig.value.list || [] 
   const keyword = searchKeyword.value.trim().toLowerCase()
-
   if (!keyword) return rawData
-
-  // 全字段模糊搜索
   return rawData.filter(row => {
     return Object.values(row).some(val => 
       String(val).toLowerCase().includes(keyword)
@@ -31,108 +32,174 @@ const displayData = computed(() => {
   })
 })
 
-// 2. 动态生成列筛选选项 (自动去重)
-const getColumnFilters = (prop) => {
-  const rawData = tableConfig.value.data || []
-  const values = rawData.map(item => item[prop])
+const getColumnFilters = (col) => {
+  if (col.options) {
+    return col.options.map(opt => ({ text: opt, value: opt }))
+  }
+  // 【修改点 3】从 list 获取筛选源
+  const rawData = tableConfig.value.list || []
+  const values = rawData.map(item => item[col.prop])
   return [...new Set(values)]
     .filter(v => v !== null && v !== undefined && v !== '')
     .map(v => ({ text: v, value: v }))
 }
 
-// 3. 列筛选回调
 const filterHandler = (value, row, column) => {
-  const property = column['property']
-  return row[property] === value
+  return row[column.property] === value
 }
 
-// --- 数据获取 ---
+// --- 获取数据 ---
 const fetchData = async () => {
-  const dictType = route.params.id 
+  const dictType = props.dictId 
   if (!dictType) return
-
+  
   loading.value = true
   try {
     const res = await axios.get(`/api/dict/${dictType}`)
-    if (res.data.code === 200) {
-      tableConfig.value = res.data.data
-      
-      // 数据加载后，初始化脏数据快照
-      initSnapshot(tableConfig.value.data)
-      
+    // Apifox 返回结构通常是 { code: 200, data: { columns: [], list: [] } }
+    const resData = res.data 
+    if (resData.code === 200) {
+      tableConfig.value = resData.data
+      // 【修改点 4】初始化快照时使用 list
+      initSnapshot(tableConfig.value.list || []) 
       isEdit.value = false
-      searchKeyword.value = '' // 切换页面重置搜索
+      searchKeyword.value = ''
+    } else {
+      ElMessage.error(resData.msg || '获取数据失败')
     }
   } catch (error) {
     console.error('Fetch error:', error)
+    ElMessage.error('网络错误，请检查 Apifox 代理配置')
   } finally {
     loading.value = false
   }
 }
 
+watch(() => props.dictId, fetchData)
 onMounted(fetchData)
-watch(() => route.params.id, fetchData)
 
-// --- 编辑与交互逻辑 ---
+// --- 编辑逻辑 ---
+const toggleEdit = () => {
+  isEdit.value = !isEdit.value
+}
 
-const toggleEdit = () => isEdit.value = !isEdit.value
-
-// 新增行
 const handleAddRow = () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
+  const newRow = { id: Date.now(), _isNew: true }
   
-  const newRow = { id: Date.now(), _isNew: true } // 标记新行
-  // 补全字段
-  tableConfig.value.columns.forEach(col => newRow[col.prop] = '')
+  // 【改动点】初始化默认值：Switch 默认为 true，其他为空
+  tableConfig.value.columns.forEach(col => {
+    if (col.type === 'switch') {
+      newRow[col.prop] = true 
+    } else {
+      newRow[col.prop] = ''
+    }
+  })
   
-  tableConfig.value.data.push(newRow)
+  if (!tableConfig.value.list) tableConfig.value.list = []
+  tableConfig.value.list.push(newRow)
   
-  // 自动滚动到底部
   setTimeout(() => {
     const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap')
     if(tableBody) tableBody.scrollTop = tableBody.scrollHeight
   }, 100)
 }
 
-// 新增列
-const handleAddColumn = async () => {
-  if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
-  try {
-    const { value } = await ElMessageBox.prompt('请输入新列名', '新增列', { inputPattern: /\S/ })
-    const newProp = 'col_' + Date.now()
-    tableConfig.value.columns.push({ prop: newProp, label: value, width: 150, filterable: true }) // 新增列也可以开启筛选
-    tableConfig.value.data.forEach(row => row[newProp] = '')
-  } catch(e) {}
+// --- 辅助验证函数：判断值是否为空 ---
+const isEmpty = (val) => {
+  return val === null || val === undefined || val === ''
 }
+// --- 保存逻辑：校验 + 发送 POST 请求 ---
+const handleSave = async () => {
+  const currentList = tableConfig.value.list || []
+  const columns = tableConfig.value.columns || []
 
-// 保存
-const handleSave = () => {
-  loading.value = true
-  setTimeout(() => {
-    console.log('提交数据:', JSON.stringify(tableConfig.value.data))
+  // 1. 【通用校验引擎】
+  for (let i = 0; i < currentList.length; i++) {
+    const row = currentList[i]
     
-    // 清除新行标记，更新快照
-    tableConfig.value.data.forEach(row => delete row._isNew)
-    initSnapshot(tableConfig.value.data)
-    
-    loading.value = false
-    isEdit.value = false
-    ElMessage.success('保存成功')
-  }, 600)
-}
+    // 遍历每一列定义
+    for (const col of columns) {
+      const val = row[col.prop]
+      const label = col.label
 
-// 删除行
-// 【重要修正】因为有搜索过滤，不能直接用 index 删除，需要用 row 对象去找
-const handleDeleteRow = (row) => {
-  const index = tableConfig.value.data.indexOf(row)
-  if (index > -1) {
-    tableConfig.value.data.splice(index, 1)
+      // --- A. 兼容旧的简单校验 (required: true) ---
+      // Switch 类型如果是 boolean false 是合法的，不应该报错
+      if (col.required && isEmpty(val) && col.type !== 'switch') {
+         ElMessage.warning(`第 ${i + 1} 行：[${label}] 不能为空`)
+         return
+      }
+
+      // --- B. 新的高级校验 (rules 数组) ---
+      if (col.rules && Array.isArray(col.rules)) {
+        for (const rule of col.rules) {
+          // B1. 校验必填
+          if (rule.required && isEmpty(val)) {
+             ElMessage.warning(`第 ${i + 1} 行：${rule.message || label + ' 不能为空'}`)
+             return 
+          }
+
+          // B2. 校验最大长度
+          if (rule.max && String(val).length > rule.max) {
+             ElMessage.warning(`第 ${i + 1} 行：[${label}] ${rule.message || '长度超限'}`)
+             return
+          }
+
+          // B3. 校验正则模式 (pattern)
+          if (rule.pattern && !isEmpty(val)) {
+            try {
+              // 将 JSON 字符串转为正则对象
+              const regex = new RegExp(rule.pattern)
+              if (!regex.test(String(val))) {
+                ElMessage.warning(`第 ${i + 1} 行：[${label}] ${rule.message || '格式不正确'}`)
+                return
+              }
+            } catch (e) {
+              console.warn('正则解析失败:', rule.pattern)
+            }
+          }
+        }
+      }
+    }
   }
+
+  // 2. 【发送请求】
+  loading.value = true
+  try {
+    const res = await axios.post(`/api/dict/${props.dictId}`, {
+      list: currentList
+    })
+    
+    // 兼容处理：只要状态码 200 即视为成功
+    if (res.status === 200 && (res.data?.code === 200 || res.data?.code === undefined)) {
+      ElMessage.success('保存成功')
+      currentList.forEach(row => delete row._isNew)
+      initSnapshot(currentList)
+      isEdit.value = false
+    } else {
+      ElMessage.error(res.data?.msg || '保存失败')
+    }
+  } catch (error) {
+    console.error('Save error:', error)
+    ElMessage.error('保存请求失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleDeleteRow = (row) => {
+  ElMessageBox.confirm('确定删除该行吗？', '提示', { type: 'warning' }).then(() => {
+    // 【修改点 7】从 list 删除
+    const index = tableConfig.value.list.indexOf(row)
+    if (index > -1) {
+      tableConfig.value.list.splice(index, 1)
+    }
+  }).catch(() => {})
 }
 </script>
 
 <template>
-  <div class="dict-table">
+  <div class="dict-table-container">
     <div class="table-header">
       <div class="title-area">
         <h3>{{ tableConfig.title || '数据列表' }}</h3>
@@ -140,20 +207,10 @@ const handleDeleteRow = (row) => {
       </div>
       
       <div class="actions">
-        <el-input 
-          v-model="searchKeyword"
-          placeholder="全表搜索..." 
-          prefix-icon="Search" 
-          clearable
-          style="width: 220px; margin-right: 12px;" 
-        />
-
+        <el-input v-model="searchKeyword" placeholder="搜索..." prefix-icon="Search" clearable style="width: 200px; margin-right: 12px;" />
         <el-button-group>
-          <el-button :type="isEdit ? 'info' : 'primary'" @click="toggleEdit">
-            {{ isEdit ? '退出' : '编辑' }}
-          </el-button>
+          <el-button :type="isEdit ? 'info' : 'primary'" @click="toggleEdit">{{ isEdit ? '取消' : '编辑' }}</el-button>
           <el-button type="success" :disabled="!isEdit" icon="Plus" @click="handleAddRow">行</el-button>
-          <el-button type="warning" :disabled="!isEdit" icon="Menu" @click="handleAddColumn">列</el-button>
           <el-button type="primary" :disabled="!isEdit" icon="Check" @click="handleSave">保存</el-button>
         </el-button-group>
       </div>
@@ -163,38 +220,65 @@ const handleDeleteRow = (row) => {
       :data="displayData" 
       border 
       stripe
-      style="width: 100%" 
+      style="width: 100%; flex: 1;" 
       v-loading="loading"
-      max-height="calc(100vh - 200px)"
+      height="100%"
       :row-class-name="({ row }) => row._isNew ? 'new-row-highlight' : ''"
     >
-      <el-table-column type="index" label="#" width="50" align="center" />
+      <el-table-column type="index" label="#" width="50" align="center" fixed />
 
       <el-table-column
         v-for="(col, index) in tableConfig.columns"
         :key="col.prop + index"
         :prop="col.prop"
-        :label="col.label"
-        :width="col.width || 150"
+        :min-width="col.width || 150" 
         show-overflow-tooltip
-        :filters="col.filterable ? getColumnFilters(col.prop) : null"
+        :filters="col.filterable ? getColumnFilters(col) : null"
         :filter-method="col.filterable ? filterHandler : null"
-        filter-placement="bottom-end"
       >
+        <template #header>
+          <span>
+            <span v-if="col.required" style="color: red; margin-right: 4px;">*</span>
+            {{ col.label }}
+          </span>
+        </template>
+
         <template #default="scope">
-          <div v-if="isEdit && col.prop !== 'id'" 
+          <div v-if="isEdit && col.editable !== false" 
                class="dirty-cell-wrapper"
                :class="{ 'is-modified': isModified(scope.row, col.prop) }"
           >
-            <el-input v-model="scope.row[col.prop]" size="small" />
+            <el-select 
+              v-if="col.type === 'select'" 
+              v-model="scope.row[col.prop]" 
+              size="small"
+            >
+              <el-option v-for="opt in col.options" :key="opt" :label="opt" :value="opt" />
+            </el-select>
+
+            <el-switch
+              v-else-if="col.type === 'switch'"
+              v-model="scope.row[col.prop]"
+              inline-prompt
+              active-text="启"
+              inactive-text="停"
+            />
+
+            <el-input v-else v-model="scope.row[col.prop]" size="small" />
+
             <div v-if="isModified(scope.row, col.prop)" class="dirty-marker"></div>
           </div>
           
-          <span v-else>{{ scope.row[col.prop] }}</span>
+          <span v-else>
+            <el-tag v-if="col.type === 'switch'" :type="scope.row[col.prop] ? 'success' : 'info'">
+              {{ scope.row[col.prop] ? '启用' : '停用' }}
+            </el-tag>
+            <span v-else>{{ scope.row[col.prop] }}</span>
+          </span>
         </template>
       </el-table-column>
 
-      <el-table-column v-if="isEdit" label="操作" width="60" fixed="right" align="center">
+      <el-table-column v-if="isEdit" label="操作" width="80" fixed="right" align="center">
         <template #default="scope">
           <el-button type="danger" link icon="Delete" @click="handleDeleteRow(scope.row)" />
         </template>
@@ -204,10 +288,12 @@ const handleDeleteRow = (row) => {
 </template>
 
 <style scoped>
-.dict-table { height: 100%; display: flex; flex-direction: column; }
-.table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; flex-shrink: 0; }
+.dict-table-container { height: 100%; display: flex; flex-direction: column; background: #fff; padding: 16px; border-radius: 4px; }
+.table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-shrink: 0; }
 .title-area { display: flex; align-items: center; }
-.title-area h3 { margin: 0; color: #333; }
+.title-area h3 { margin: 0; font-size: 18px; color: #303133; }
 .ml-2 { margin-left: 8px; }
-.actions { display: flex; align-items: center; }
+.dirty-cell-wrapper { position: relative; width: 100%; }
+.dirty-marker { position: absolute; top: 0; right: 0; width: 0; height: 0; border-top: 6px solid #f56c6c; border-left: 6px solid transparent; }
+:deep(.new-row-highlight) { background-color: #f0f9eb !important; }
 </style>
