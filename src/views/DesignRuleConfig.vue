@@ -51,13 +51,13 @@
             <div class="action-buttons">
               <el-button 
                 size="small" 
-                :type="currentConfig.editMode ? 'danger' : 'warning'"
-                @click="toggleEditMode(currentConfig.id)"
+                type="primary" 
+                @click="openAddDialog(currentConfig.id)"
               >
-                <el-icon><Edit /></el-icon>
-                {{ currentConfig.editMode ? '取消' : '编辑' }} 
+                <el-icon><Plus /></el-icon>
+                新增
               </el-button>
-              
+
               <el-button 
                 size="small" 
                 type="danger" 
@@ -68,25 +68,6 @@
                 删除 ({{ currentConfig.selectedRows.length }})
               </el-button>
 
-              <el-button 
-                size="small" 
-                type="primary" 
-                @click="handleAddRow(currentConfig.id)"
-                :disabled="!currentConfig.editMode"
-              >
-                <el-icon><Plus /></el-icon>
-                新增
-              </el-button>
-              
-              <el-button 
-                size="small" 
-                type="success" 
-                @click="handleSave(currentConfig.id)"
-                :disabled="!currentConfig.editMode"
-              >
-                <el-icon><Check /></el-icon>
-                保存
-              </el-button>
             </div>
           </div>
 
@@ -98,10 +79,11 @@
               stripe
               style="width: 100%"
               height="100%"
+              @row-dblclick="(row) => handleRowDblClick(row)"
               @selection-change="(val) => handleSelectionChange(currentConfig.id, val)"
             >
               <el-table-column type="selection" width="55" />
-              <el-table-column prop="id" label="序号" width="80" />
+              <el-table-column type="index" label="序号" width="80" align="center" />
               
               <template v-for="col in currentConfig.columns" :key="col.prop">
                 <el-table-column
@@ -110,16 +92,7 @@
                   :width="col.width || 'auto'"
                 >
                   <template #default="{ row, $index }">
-                    <template v-if="currentConfig.editMode">
-                      <el-input
-                        v-model="row[col.prop]"
-                        size="small"
-                        @change="handleCellChange(currentConfig.id, row, col.prop, $index)"
-                      />
-                    </template>
-                    <template v-else>
-                      {{ row[col.prop] }}
-                    </template>
+                    {{ row[col.prop] }}
                   </template>
                 </el-table-column>
               </template>
@@ -138,6 +111,84 @@
         </div>
       </div>
     </div>
+
+    <!-- 批量新增对话框 -->
+    <el-dialog
+      v-model="batchAddDialogVisible"
+      :title="`批量新增 - ${currentConfig?.title || ''}`"
+      width="80%"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <div class="batch-add-toolbar" style="margin-bottom: 10px;">
+        <el-button type="primary" @click="handleAddBatchRow">
+          <el-icon><Plus /></el-icon> 增加一行
+        </el-button>
+      </div>
+      
+      <el-table :data="batchAddData" border stripe height="400">
+        
+        <template v-if="currentConfig">
+          <el-table-column 
+            v-for="col in currentConfig.columns" 
+            :key="col.prop" 
+            :label="col.label"
+            :prop="col.prop"
+          >
+            <template #default="{ row }">
+              <el-input v-model="row[col.prop]" size="small" />
+            </template>
+          </el-table-column>
+        </template>
+
+        <el-table-column label="操作" width="80" align="center" fixed="right">
+          <template #default="{ $index }">
+            <el-button 
+              type="danger" 
+              link 
+              @click="handleDeleteBatchRow($index)"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="batchAddDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmBatchAdd" :loading="batchSaveLoading">
+            确定
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 单行编辑对话框 -->
+    <el-dialog
+      v-model="editDialogVisible"
+      :title="`编辑 - ${currentConfig?.title || ''}`"
+      width="60%"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <el-table :data="[editRowData]" border stripe height="auto" v-if="editRowData && currentConfig">
+        <template v-for="col in currentConfig.columns" :key="col.prop">
+          <el-table-column :label="col.label" :prop="col.prop">
+            <template #default>
+              <el-input v-model="editRowData[col.prop]" size="small" />
+            </template>
+          </el-table-column>
+        </template>
+      </el-table>
+
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="cancelEdit">取消</el-button>
+          <el-button type="primary" @click="confirmEdit" :loading="editSaveLoading">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
 
     <!-- 标准规范图片对话框 -->
     <el-dialog
@@ -172,9 +223,7 @@ import {
   Folder,
   Document,
   Plus,
-  Edit,
   Delete,
-  Check,
   View
 } from '@element-plus/icons-vue'
 
@@ -206,12 +255,10 @@ const initializeConfigs = () => {
   configIds.forEach(configId => {
     if (db[configId]) {
       const mockData = Mock.mock(db[configId])
-      console.log(`加载配置 ${configId}:`, mockData) // 调试用
       
       configs[configId] = {
         id: configId,
         title: mockData.title || configId,
-        editMode: false,
         selectedRows: [],
         columns: mockData.columns ? mockData.columns.map(col => ({
           ...col,
@@ -225,7 +272,6 @@ const initializeConfigs = () => {
       configs[configId] = {
         id: configId,
         title: configId,
-        editMode: false,
         selectedRows: [],
         columns: [],
         data: []
@@ -266,7 +312,6 @@ const handleNodeClick = (node) => {
       configs[node.id] = {
         id: node.id,
         title: mockData.title || node.id,
-        editMode: false,
         selectedRows: [],
         columns: mockData.columns ? mockData.columns.map(col => ({
           ...col,
@@ -286,61 +331,6 @@ const handleNodeClick = (node) => {
   }
 }
 
-const refreshConfigData = async (configId) => {
-  if (configId === 'bend-pipe') {
-    await fetchBendPipeData()
-    return
-  }
-  try {
-    const res = await axios.get(`/api/dict/${configId}`)
-    if (res?.data?.code === 200) {
-      const mockData = res.data.data || {}
-      const cfg = configs[configId] || {
-        id: configId,
-        title: mockData.title || configId,
-        editMode: false,
-        selectedRows: [],
-        columns: [],
-        data: []
-      }
-      cfg.columns = (mockData.columns || []).map(col => ({
-        ...col,
-        editable: col.editable !== false
-      }))
-      cfg.data = mockData.data || []
-      configs[configId] = cfg
-    } else {
-      ElMessage.error(res?.data?.message || '数据获取失败')
-    }
-  } catch (e) {
-    ElMessage.error(e?.message || '网络错误')
-  }
-}
-
-const toggleEditMode = async (configId) => {
-  const config = configs[configId]
-  if (!config) return
-  if (!config.editMode) {
-    config.editMode = true
-    return
-  }
-  ElMessageBox.confirm(
-    `确定要取消所有更改吗？`,
-    '取消确认',
-    { confirmButtonText: '确定', cancelButtonText: '保留', type: 'warning' }
-  ).then(async () => {
-    await refreshConfigData(configId)
-    config.editMode = false
-    config.selectedRows = []
-    ElMessage.info('已取消更改并刷新数据')
-  }).catch(() => {
-    // 用户选择保留，不做任何操作，继续停留在编辑模式
-  })
-}
-
-const handleCellChange = (configId, row, prop, index) => {
-  console.log(`${configId} 行${index + 1}的${prop}字段修改为:`, row[prop])
-}
 
 const handleSelectionChange = (configId, selection) => {
   const config = configs[configId]
@@ -362,7 +352,26 @@ const handleDeleteRows = (configId) => {
     `确定要删除选中的 ${config.selectedRows.length} 行数据吗？`,
     '删除确认',
     { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
-  ).then(() => {
+  ).then(async () => {
+    // 针对 bend-pipe 走后端删除接口
+    if (configId === 'bend-pipe') {
+      try {
+        const deletePromises = config.selectedRows.map(row => 
+          axios.delete(`/api/DspSpmcDictPipingBend/${row.id}`)
+        )
+        await Promise.all(deletePromises)
+        ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
+        // 刷新数据
+        await fetchBendPipeData()
+        config.selectedRows = []
+      } catch (error) {
+        console.error('删除失败:', error)
+        ElMessage.error('删除失败，请重试')
+      }
+      return
+    }
+
+    // 其他配置走前端假删除
     const selectedIds = config.selectedRows.map(row => row.id)
     config.data = config.data.filter(row => !selectedIds.includes(row.id))
     
@@ -376,55 +385,214 @@ const handleDeleteRows = (configId) => {
   })
 }
 
-const handleAddRow = (configId) => {
+const batchAddDialogVisible = ref(false)
+const batchAddData = ref([])
+const batchSaveLoading = ref(false)
+
+const openAddDialog = (configId) => {
   const config = configs[configId]
   if (!config) return
   
-  const newId = config.data.length > 0 
-    ? Math.max(...config.data.map(item => item.id)) + 1 
-    : 1
+  batchAddData.value = []
+  handleAddBatchRow() // 默认添加一行
+  batchAddDialogVisible.value = true
+}
+
+const handleAddBatchRow = () => {
+  const config = currentConfig.value
+  if (!config) return
   
-  const newRow = { id: newId }
-  
-  // 为每个列添加空值
+  const newRow = {}
   config.columns.forEach(col => {
     newRow[col.prop] = ''
   })
-  
-  config.data.push(newRow)
-
-  setTimeout(() => {
-    const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
-                      || document.querySelector('.el-table__body-wrapper')
-    if (tableBody) {
-      tableBody.scrollTop = tableBody.scrollHeight
-    }
-  }, 100)
+  batchAddData.value.push(newRow)
 }
 
- 
+const handleDeleteBatchRow = (index) => {
+  batchAddData.value.splice(index, 1)
+}
 
-const handleSave = async (configId) => {
-  const config = configs[configId]
+const confirmBatchAdd = async () => {
+  if (batchAddData.value.length === 0) {
+    ElMessage.warning('请至少添加一行数据')
+    return
+  }
+
+  const config = currentConfig.value
   if (!config) return
-  
-  ElMessageBox.confirm(
-    `确定要保存所有更改吗？`,
-    '保存确认',
-    { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
-  ).then(async () => {
-    try {
-      // 这里可以添加保存到服务器的逻辑
-      console.log('保存数据:', config)
-      
-      ElMessage.success(`保存成功`)
-      config.editMode = false
-      config.selectedRows = []
-    } catch (error) {
-      console.error('保存失败:', error)
-      ElMessage.error('保存失败，请重试')
+
+  // 校验数据：所有字段必填
+  for (let i = 0; i < batchAddData.value.length; i++) {
+    const row = batchAddData.value[i]
+    for (const col of config.columns) {
+      const val = row[col.prop]
+      if (val === undefined || val === null || String(val).trim() === '') {
+        ElMessage.warning(`第 ${i + 1} 行的 "${col.label}" 不能为空`)
+        return
+      }
     }
+  }
+
+  // 校验重复数据
+  // 1. 检查批量新增列表中是否有重复行
+  const batchRowsStr = batchAddData.value.map(row => {
+    // 提取所有列的值组合成字符串用于比较
+    return config.columns.map(col => String(row[col.prop]).trim()).join('|')
   })
+  
+  const batchSet = new Set()
+  for (let i = 0; i < batchRowsStr.length; i++) {
+    const str = batchRowsStr[i]
+    if (batchSet.has(str)) {
+      ElMessage.warning(`新增列表中存在重复数据（第 ${i + 1} 行与其他行重复）`)
+      return
+    }
+    batchSet.add(str)
+  }
+
+  // 2. 检查是否与数据库已有数据重复
+  if (config.data && config.data.length > 0) {
+    const existingRowsStr = config.data.map(row => {
+      return config.columns.map(col => String(row[col.prop]).trim()).join('|')
+    })
+    
+    for (let i = 0; i < batchRowsStr.length; i++) {
+      const str = batchRowsStr[i]
+      if (existingRowsStr.includes(str)) {
+        ElMessage.warning(`第 ${i + 1} 行数据已存在于数据库中，不能重复添加`)
+        return
+      }
+    }
+  }
+
+  batchSaveLoading.value = true
+  
+  try {
+    if (config.id === 'bend-pipe') {
+      // 弯管数据：循环调用POST接口
+      const promises = batchAddData.value.map(row => {
+        // 构造请求体，确保数据格式正确
+        const payload = {
+          ...row,
+          // 确保数值类型正确转换
+          outSideDiameter: Number(row.outSideDiameter) || 0,
+          headerClampLength: Number(row.headerClampLength) || 0,
+          tailClampLength: Number(row.tailClampLength) || 0
+        }
+        return axios.post('/api/DspSpmcDictPipingBend', payload)
+      })
+      
+      await Promise.all(promises)
+      await fetchBendPipeData()
+      ElMessage.success(`成功添加 ${batchAddData.value.length} 条数据`)
+    } else {
+      // 其他配置：前端模拟添加
+      let newId = config.data.length > 0 
+        ? Math.max(...config.data.map(item => item.id)) + 1 
+        : 1
+        
+      const newRows = batchAddData.value.map((row, index) => ({
+        ...row,
+        id: newId + index
+      }))
+      
+      config.data.push(...newRows)
+      ElMessage.success(`成功添加 ${batchAddData.value.length} 条数据`)
+      
+      // 自动滚动到底部
+      setTimeout(() => {
+        const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
+                          || document.querySelector('.el-table__body-wrapper')
+        if (tableBody) {
+          tableBody.scrollTop = tableBody.scrollHeight
+        }
+      }, 100)
+    }
+    
+    batchAddDialogVisible.value = false
+    batchAddData.value = []
+  } catch (error) {
+    console.error('批量新增失败:', error)
+    ElMessage.error('批量新增失败，请检查数据格式或网络连接')
+  } finally {
+    batchSaveLoading.value = false
+  }
+}
+
+const editDialogVisible = ref(false)
+const editRowData = ref(null)
+const editSaveLoading = ref(false)
+
+const handleRowDblClick = (row) => {
+  const config = currentConfig.value
+  if (!config) return
+  editRowData.value = { ...row }
+  editDialogVisible.value = true
+}
+
+const cancelEdit = async () => {
+  editDialogVisible.value = false
+  editRowData.value = null
+  if (currentConfig.value?.id === 'bend-pipe') {
+    await fetchBendPipeData()
+  }
+}
+
+const confirmEdit = async () => {
+  const config = currentConfig.value
+  if (!config || !editRowData.value) return
+
+  for (const col of config.columns) {
+    const val = editRowData.value[col.prop]
+    if (val === undefined || val === null || String(val).trim() === '') {
+      ElMessage.warning(`"${col.label}" 不能为空`)
+      return
+    }
+  }
+
+  if (config.data && config.data.length > 0) {
+    const targetId = editRowData.value.id
+    const existingRowsStr = config.data
+      .filter(r => r.id !== targetId)
+      .map(r => config.columns.map(col => String(r[col.prop]).trim()).join('|'))
+    const currentStr = config.columns.map(col => String(editRowData.value[col.prop]).trim()).join('|')
+    if (existingRowsStr.includes(currentStr)) {
+      ElMessage.warning('该数据已存在，不能重复添加')
+      return
+    }
+  }
+
+  editSaveLoading.value = true
+  try {
+    if (config.id === 'bend-pipe') {
+      const payload = {
+        ...editRowData.value,
+        outSideDiameter: Number(editRowData.value.outSideDiameter) || 0,
+        headerClampLength: Number(editRowData.value.headerClampLength) || 0,
+        tailClampLength: Number(editRowData.value.tailClampLength) || 0
+      }
+      await axios.put('http://localhost:5022/api/DspSpmcDictPipingBend', payload)
+      await fetchBendPipeData()
+      ElMessage.success('更新成功')
+    } else {
+      const idx = config.data.findIndex(r => r.id === editRowData.value.id)
+      if (idx !== -1) {
+        config.data[idx] = { ...config.data[idx], ...editRowData.value }
+        ElMessage.success('更新成功')
+      }
+    }
+    editDialogVisible.value = false
+    editRowData.value = null
+  } catch (e) {
+    ElMessage.error(e?.message || '更新失败，请重试')
+  } finally {
+    editSaveLoading.value = false
+  }
+}
+
+const handleAddRow = (configId) => {
+  // Deprecated, replaced by openAddDialog
 }
 
 // ========== 标准图片相关方法 ==========
@@ -456,14 +624,13 @@ const fetchBendPipeData = async () => {
       const cfg = configs['bend-pipe'] || {
         id: 'bend-pipe',
         title: '弯管数据',
-        editMode: false,
         selectedRows: [],
         columns: [],
         data: []
       }
       cfg.columns = [
-        { prop: 'outSideDiameter', label: '通径DN', editable: false },
-        { prop: 'outSideDiameterUnit', label: '通径单位', editable: false },
+        { prop: 'outSideDiameter', label: '外径DN', editable: false },
+        { prop: 'outSideDiameterUnit', label: '外径单位', editable: false },
         { prop: 'headerClampLength', label: '前夹长L1', editable: false },
         { prop: 'tailClampLength', label: '后夹长L2', editable: false }
       ]
