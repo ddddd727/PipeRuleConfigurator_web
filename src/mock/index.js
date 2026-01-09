@@ -173,8 +173,8 @@ export const db = {
     title: '部件库名称：PlainPipingGenericData',
     columns: [
       // { prop: 'id', label: '序号', width: 80 },
-      { prop: 'diameter', label: '通径DN', editable: true },
-      { prop: 'unit', label: '通径单位', editable: true },
+      { prop: 'diameter', label: '外径DN', editable: true },
+      { prop: 'unit', label: '外径单位', editable: true },
       { prop: 'l1', label: '前夹长L1', editable: true },
       { prop: 'l2', label: '后夹长L2', editable: true }
     ],
