@@ -242,28 +242,7 @@ export const db = {
 }
 
 // 拦截请求
-Mock.mock(/\/api\/dict\/[\w-]+/, 'get', (options) => {
-  console.log('Mock拦截:', options.url)
-  // 兼容带 - 的 id
-  const urlParts = options.url.split('/')
-  const id = urlParts[urlParts.length - 1]
 
-  const result = db[id]
-
-  if (result) {
-    return {
-      code: 200,
-      message: 'success',
-      data: Mock.mock(result)
-    }
-  } else {
-    return {
-      code: 404,
-      message: `未找到 [${id}] 的配置数据`,
-      data: { title: '未定义', columns: [], data: [] }
-    }
-  }
-})
 
 // --- PMC 模块 Mock ---
 
