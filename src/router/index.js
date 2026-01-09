@@ -7,11 +7,11 @@ import specRouter from './modules/spec'
 import pmcRouter from './modules/pmc'
 import pipeRouter from './modules/pipe'
 import libraryRouter from './modules/library'
-import s3dRouter from './modules/s3d'
-
+import propertyRouter from './modules/property'
 export const constantRoutes = [
   // 首页重定向到第一个菜单（字典定义的第一个页面）
   { path: '/', redirect: '/dict/attribute/std-series' },
+
 
   // ===================================
   // 按照截图顺序排列 7 个一级菜单
@@ -22,8 +22,7 @@ export const constantRoutes = [
   pmcRouter,      // 4. PMC编码
   pipeRouter,     // 5. 管材规格书配置
   libraryRouter,  // 6. 基础库
-  s3dRouter,      // 7. S3D属性管理
-
+  propertyRouter,  // 7. 属性管理模块
   // 404 页面
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
