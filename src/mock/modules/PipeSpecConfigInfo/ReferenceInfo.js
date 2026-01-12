@@ -22,7 +22,7 @@ Mock.mock(/\/api\/pipe-spec\/dimension/, 'get', () => {
   const generateColumnData = (cols = 20) => {
     const data = []
     const npdRow = { id: 1, name: 'NPD' }
-    const paramNames = ['DN', 'Thickness']
+    const paramNames = ['OD', 'Thickness']
 
     paramNames.forEach((name, idx) => {
       const row = { id: idx + 2, name }

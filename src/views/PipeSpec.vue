@@ -589,12 +589,12 @@ const getStatusLabel = (status) => {
             :highlight-current="true"
             @node-click="handleNodeClick"
             v-loading="treeLoading">
-            <template #default="{ node }">
+            <template #default="{ node, data }">
               <div class="custom-tree-node">
                 <span class="tree-label">{{ node.label }}</span>
                 <!-- 只有编码节点（第四级）才显示状态指示器 -->
-                <span v-if="node.status" class="status-indicator" :class="`status-${node.status}`" :title="getStatusLabel(node.status)">
-                  {{ getStatusLabel(node.status) }}
+                <span v-if="data?.status" class="status-indicator" :class="`status-${data.status}`" :title="getStatusLabel(data.status)">
+                  {{ getStatusLabel(data.status) }}
                 </span>
               </div>
             </template>
