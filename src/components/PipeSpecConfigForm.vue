@@ -18,8 +18,7 @@
       :model="form"
       :rules="rules"
       label-width="120px"
-      label-position="right"
-    >
+      label-position="right">
       <!-- 标准文件选择 -->
       <el-form-item label="标准文件：">
         <el-select
@@ -93,7 +92,7 @@
                   />
                 </el-select>
               </div>
-              <div class="bend-radius-multiple" v-if="buttonLabel === 'Bend'">
+              <div class="bend-radius-multiple" v-if="form.partType === 'Bend'">
                 <el-input
                   v-model="config.bendRadiusMultiple"
                   placeholder="弯管半径倍数"
@@ -101,7 +100,7 @@
                 />
               </div>
             </div>
-            <div class="bend-radius-hint" v-if="buttonLabel === 'Bend'">填写的值为弯管半径的倍数</div>
+            <div class="bend-radius-hint" v-if="form.partType === 'Bend'">填写的值为弯管半径的倍数</div>
           </div>
         </div>
         <div class="tip-text">请为每个选择的标准文件配置对应的NPD范围</div>
@@ -278,6 +277,12 @@ const handleSubmit = async () => {
   if (!formRef.value) return
   
   try {
+    // 首先验证部件类型是否已选择
+    if (!form.value.partType) {
+      ElMessage.error('请选择部件类型')
+      return
+    }
+    
     // 表单基本验证
     await formRef.value.validate()
     

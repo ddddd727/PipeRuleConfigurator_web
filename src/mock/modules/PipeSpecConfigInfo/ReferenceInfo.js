@@ -121,16 +121,17 @@ Mock.mock(/\/api\/PmcSpec\/PmcRules\//, 'get', (options) => {
   const shipNumber = urlParts[urlParts.length - 1]
 
   // 返回扁平数组，字段与 PipeSpec.vue 中 transformToTreeStructure 期望一致
+  // status 枚举值：'pending'（待配置-蓝色）、'review'（待审核-黄色）、'approved'（已审核-绿色）
   const data = [
-    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AD', shipNumber, status: 'active' },
-    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AE', shipNumber, status: 'active' },
-    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AJ', shipNumber, status: 'active' },
-    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AD', shipNumber, status: 'active' },
-    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AE', shipNumber, status: 'active' },
-    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AJ', shipNumber, status: 'inactive' },
-    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AD', shipNumber, status: 'active' },
-    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AE', shipNumber, status: 'active' },
-    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AJ', shipNumber, status: 'active' }
+    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AD', shipNumber, status: 'pending' },
+    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AE', shipNumber, status: 'review' },
+    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AJ', shipNumber, status: 'approved' },
+    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AD', shipNumber, status: 'pending' },
+    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AE', shipNumber, status: 'review' },
+    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AJ', shipNumber, status: 'approved' },
+    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AD', shipNumber, status: 'pending' },
+    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AE', shipNumber, status: 'review' },
+    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AJ', shipNumber, status: 'approved' }
   ]
 
   return {

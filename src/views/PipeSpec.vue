@@ -1,9 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, Setting, Plus, Ship } from '@element-plus/icons-vue'
 import PipeSpecConfigForm from '@/components/PipeSpecConfigForm.vue'    // 导入 PipeSpecConfigForm 组件，用于配置按钮的弹窗实现
+import PipeSpecPreviewForm from '@/components/PipeSpecPreviewForm.vue'  // 导入规格书预览窗口组件
 
 // 树形数据
 const treeData = ref([])
@@ -411,6 +412,51 @@ const columnCount = computed(() => {
 
 // 处理配置确认
 const handleConfirm = (data) => {
+  // 检查部件类型是否已配置（排除当前正在编辑的按钮）
+  const existingButton = configButtons.value.find(btn => {
+    return btn.type === data.partType && 
+           btn.configResult && 
+           btn.id !== currentButtonId.value
+  })
+  
+  if (existingButton) {
+    // 部件类型已配置，询问用户是否重新配置
+    ElMessageBox.confirm(
+      `部件类型 "${data.partType}" 已经配置过了，是否重新配置该部件类型？`,
+      '提示',
+      {
+        confirmButtonText: '重新配置',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    ).then(() => {
+      // 用户确认重新配置，清空之前的配置并更新
+      const existingButtonIndex = configButtons.value.findIndex(btn => btn.id === existingButton.id)
+      if (existingButtonIndex !== -1) {
+        // 更新已存在的配置按钮
+        updateConfigButton(data, existingButton.id)
+        // 清空当前按钮
+        const currentButtonIndex = configButtons.value.findIndex(btn => btn.id === currentButtonId.value)
+        if (currentButtonIndex !== -1 && currentButtonId.value !== existingButton.id) {
+          configButtons.value[currentButtonIndex].type = ''
+          configButtons.value[currentButtonIndex].configResult = ''
+        }
+        // 关闭对话框
+        showDialog.value = false
+        ElMessage.success('重新配置成功，已更新该部件类型的配置')
+      }
+    }).catch(() => {
+      // 用户取消，不做任何操作
+      ElMessage.info('已取消操作')
+    })
+  } else {
+    // 部件类型未配置过，直接保存配置
+    updateConfigButton(data, currentButtonId.value)
+  }
+}
+
+// 更新配置按钮的辅助方法
+const updateConfigButton = (data, buttonId) => {
   // 将配置数据转换为指定格式的字符串
   const configStr = data.configurations.map(item => {
     // 基础配置信息
@@ -424,9 +470,9 @@ const handleConfirm = (data) => {
     return configLine
   }).join('\n')
   
-  // 根据当前选中的按钮ID更新配置结果
-  if (currentButtonId.value) {
-    const buttonIndex = configButtons.value.findIndex(btn => btn.id === currentButtonId.value)
+  // 根据按钮ID更新配置结果
+  if (buttonId) {
+    const buttonIndex = configButtons.value.findIndex(btn => btn.id === buttonId)
     if (buttonIndex !== -1) {
       configButtons.value[buttonIndex].type = data.partType
       configButtons.value[buttonIndex].configResult = configStr
@@ -441,10 +487,39 @@ const handleConfirm = (data) => {
   }
 }
 
+// 检查部件类型是否已配置
+const isPartTypeConfigured = (partType) => {
+  if (!partType) return false
+  return configButtons.value.some(btn => btn.type === partType && btn.configResult)
+}
+
+// 获取已配置的部件类型对应的按钮
+const getConfiguredButtonByPartType = (partType) => {
+  return configButtons.value.find(btn => btn.type === partType && btn.configResult)
+}
+
 // 处理配置按钮点击
 const handleConfigClick = (buttonId) => {
   currentButtonId.value = buttonId
   showDialog.value = true
+}
+
+// 规格书预览窗口显示状态
+const showPreviewDialog = ref(false)
+
+// 处理生成规格书按钮点击
+const handleGenerateSpecification = () => {
+  showPreviewDialog.value = true
+}
+
+// 获取状态标签
+const getStatusLabel = (status) => {
+  const statusMap = {
+    'pending': '待配置',
+    'review': '待审核',
+    'approved': '已审核'
+  }
+  return statusMap[status] || status
 }
 </script>
 
@@ -493,6 +568,21 @@ const handleConfigClick = (buttonId) => {
             <el-icon><ArrowLeft v-if="!sidebarCollapsed" /><ArrowRight v-else /></el-icon>
           </el-button>
         </div>
+        <!-- 状态颜色图例 -->
+        <div class="status-legend" v-show="!sidebarCollapsed">
+          <div class="legend-item">
+            <span class="legend-dot pending"></span>
+            <span class="legend-text">待配置</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot review"></span>
+            <span class="legend-text">待审核</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot approved"></span>
+            <span class="legend-text">已审核</span>
+          </div>
+        </div>
         <div class="sidebar-tree" v-show="!sidebarCollapsed">
           <el-tree
             :data="treeData"
@@ -502,6 +592,10 @@ const handleConfigClick = (buttonId) => {
             <template #default="{ node }">
               <div class="custom-tree-node">
                 <span class="tree-label">{{ node.label }}</span>
+                <!-- 只有编码节点（第四级）才显示状态指示器 -->
+                <span v-if="node.status" class="status-indicator" :class="`status-${node.status}`" :title="getStatusLabel(node.status)">
+                  {{ getStatusLabel(node.status) }}
+                </span>
               </div>
             </template>
           </el-tree>
@@ -513,7 +607,7 @@ const handleConfigClick = (buttonId) => {
         <!-- 顶部操作条（已移除 查询/编辑/保存 按钮） -->
         <div class="main-header">
           <div class="filter-section">
-            <el-button type="primary" plain>生成规格书</el-button>
+            <el-button type="primary" plain @click="handleGenerateSpecification">生成规格书</el-button>
           </div>
         </div>
 
@@ -652,6 +746,9 @@ const handleConfigClick = (buttonId) => {
       :materials="materials"
       @confirm="handleConfirm"
     />
+    <PipeSpecPreviewForm
+      v-model:modelValue="showPreviewDialog"
+    />
   </div>
 </template>
 
@@ -752,6 +849,74 @@ const handleConfigClick = (buttonId) => {
 
 .tree-label {
   font-size: 14px;
+}
+
+/* 状态颜色图例 */
+.status-legend {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  padding: 12px 15px;
+  background-color: #f9fafc;
+  border-bottom: 1px solid #e6e8eb;
+  font-size: 12px;
+  align-items: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-dot.pending {
+  background-color: #409eff;
+}
+
+.legend-dot.review {
+  background-color: #e6a23c;
+}
+
+.legend-dot.approved {
+  background-color: #67c23a;
+}
+
+.legend-text {
+  color: #606266;
+}
+
+/* 树节点状态指示器 */
+.status-indicator {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-pending {
+  background-color: #e6f7ff;
+  color: #0050b3;
+}
+
+.status-review {
+  background-color: #fff7e6;
+  color: #ad6800;
+}
+
+.status-approved {
+  background-color: #f6ffed;
+  color: #274a17;
 }
 
 /* 右侧表单区域 */
