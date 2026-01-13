@@ -79,17 +79,21 @@
               stripe
               style="width: 100%"
               height="100%"
+              :row-class-name="tableRowClassName"
               @row-dblclick="(row) => handleRowDblClick(row)"
               @selection-change="(val) => handleSelectionChange(currentConfig.id, val)"
             >
               <el-table-column type="selection" width="55" />
-              <el-table-column type="index" label="序号" width="80" align="center" />
+              <el-table-column type="index" label="序号" width="60" align="center" />
               
               <template v-for="col in currentConfig.columns" :key="col.prop">
                 <el-table-column
+                  v-if="!col.hidden"
                   :prop="col.prop"
                   :label="col.label"
                   :width="col.width || 'auto'"
+                  min-width="120"
+                  align="center"
                 >
                   <template #default="{ row, $index }">
                     {{ row[col.prop] }}
@@ -116,7 +120,7 @@
     <el-dialog
       v-model="batchAddDialogVisible"
       :title="`批量新增 - ${currentConfig?.title || ''}`"
-      width="80%"
+      width="60%"
       :close-on-click-modal="false"
       destroy-on-close
     >
@@ -126,7 +130,7 @@
         </el-button>
       </div>
       
-      <el-table :data="batchAddData" border stripe height="400">
+      <el-table :data="batchAddData" border stripe height="auto">
         
         <template v-if="currentConfig">
           <el-table-column 
@@ -134,9 +138,21 @@
             :key="col.prop" 
             :label="col.label"
             :prop="col.prop"
+            header-align="center"
+            align="center"
           >
             <template #default="{ row }">
-              <el-input v-model="row[col.prop]" size="small" />
+              <div v-if="col.prop === 'status'" style="display: flex; align-items: center; justify-content: center;">
+                <el-switch
+                  v-model="row[col.prop]"
+                  :active-value="true"
+                  :inactive-value="false"
+                  active-text="启用"
+                  inactive-text="禁用"
+                  inline-prompt
+                />
+              </div>
+              <el-input v-else v-model="row[col.prop]" size="small" />
             </template>
           </el-table-column>
         </template>
@@ -174,9 +190,19 @@
     >
       <el-table :data="[editRowData]" border stripe height="auto" v-if="editRowData && currentConfig">
         <template v-for="col in currentConfig.columns" :key="col.prop">
-          <el-table-column :label="col.label" :prop="col.prop">
+          <el-table-column :label="col.label" :prop="col.prop" align="center">
             <template #default>
-              <el-input v-model="editRowData[col.prop]" size="small" />
+              <div v-if="col.prop === 'status'" style="display: flex; align-items: center; justify-content: center;">
+                <el-switch
+                  v-model="editRowData[col.prop]"
+                  :active-value="true"
+                  :inactive-value="false"
+                  active-text="启用"
+                  inactive-text="禁用"
+                  inline-prompt
+                />
+              </div>
+              <el-input v-else v-model="editRowData[col.prop]" size="small" />
             </template>
           </el-table-column>
         </template>
@@ -234,10 +260,17 @@ const treeData = ref([
     label: '设计规则类',
     icon: Folder,
     children: [
-      { id: 'bend-pipe', label: '弯管数据', icon: Document },
       { id: 'wall-thickness-series', label: '壁厚系列', icon: Document },
       { id: 'shortcode', label: 'ShortCode', icon: Document },
       { id: 'spec', label: 'Spec', icon: Document }
+    ]
+  },
+  {
+    id: 'production',
+    label: '生产规则类',
+    icon: Folder,
+    children: [
+      { id: 'bend-pipe', label: '弯管机数据', icon: Document }
     ]
   }
 ])
@@ -304,6 +337,14 @@ const imageError = ref(false)
 // ========== 表单验证规则 ==========
 
 // ========== 通用方法 ==========
+const tableRowClassName = ({ row }) => {
+  const disabled = row?.status === 0 
+    || row?.status === false 
+    || row?.status === '0' 
+    || row?.status === 'false'
+  return disabled ? 'disabled-row' : ''
+}
+
 const handleNodeClick = (node) => {
   if (node.id !== 'basic') {
     // 如果该配置尚未加载，则加载
@@ -357,7 +398,7 @@ const handleDeleteRows = (configId) => {
     if (configId === 'bend-pipe') {
       try {
         const deletePromises = config.selectedRows.map(row => 
-          axios.delete(`/api/DspSpmcDictPipingBend/${row.id}`)
+          axios.delete(`/api/DspSpmcDictPipingBendData/${row.id}`)
         )
         await Promise.all(deletePromises)
         ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
@@ -404,7 +445,7 @@ const handleAddBatchRow = () => {
   
   const newRow = {}
   config.columns.forEach(col => {
-    newRow[col.prop] = ''
+    newRow[col.prop] = col.prop === 'status' ? true : ''
   })
   batchAddData.value.push(newRow)
 }
@@ -473,14 +514,16 @@ const confirmBatchAdd = async () => {
       // 弯管数据：循环调用POST接口
       const promises = batchAddData.value.map(row => {
         // 构造请求体，确保数据格式正确
+        const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
         const payload = {
           ...row,
           // 确保数值类型正确转换
           outSideDiameter: Number(row.outSideDiameter) || 0,
           headerClampLength: Number(row.headerClampLength) || 0,
-          tailClampLength: Number(row.tailClampLength) || 0
+          tailClampLength: Number(row.tailClampLength) || 0,
+          status: toBool(row.status ?? true)
         }
-        return axios.post('/api/DspSpmcDictPipingBend', payload)
+        return axios.post('/api/DspSpmcDictPipingBendData', payload)
       })
       
       await Promise.all(promises)
@@ -566,13 +609,15 @@ const confirmEdit = async () => {
   editSaveLoading.value = true
   try {
     if (config.id === 'bend-pipe') {
+      const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
       const payload = {
         ...editRowData.value,
         outSideDiameter: Number(editRowData.value.outSideDiameter) || 0,
         headerClampLength: Number(editRowData.value.headerClampLength) || 0,
-        tailClampLength: Number(editRowData.value.tailClampLength) || 0
+        tailClampLength: Number(editRowData.value.tailClampLength) || 0,
+        status: toBool(editRowData.value.status)
       }
-      await axios.put('http://localhost:5022/api/DspSpmcDictPipingBend', payload)
+      await axios.put('/api/DspSpmcDictPipingBendData', payload)
       await fetchBendPipeData()
       ElMessage.success('更新成功')
     } else {
@@ -618,29 +663,44 @@ const handleImageError = () => {
 
 const fetchBendPipeData = async () => {
   try {
-    const res = await axios.get('/api/DspSpmcDictPipingBend')
+    const res = await axios.get('/api/DspSpmcDictPipingBendData')
     if (res?.data?.code === 200) {
       const rows = Array.isArray(res.data.data) ? res.data.data : []
+      // 确保每一行都有 status 和 MachineNum 字段，并做归一化
+      const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
+      rows.forEach(row => {
+        if (row.status === undefined) {
+          row.status = true
+        } else {
+          row.status = toBool(row.status)
+        }
+        if (row.MachineNum === undefined) {
+          row.MachineNum = row.machineNum ?? row.machineNumber ?? ''
+        }
+      })
+
       const cfg = configs['bend-pipe'] || {
         id: 'bend-pipe',
-        title: '弯管数据',
+        title: '弯管机数据',
         selectedRows: [],
         columns: [],
         data: []
       }
       cfg.columns = [
+        { prop: 'MachineNum', label: '机器号', editable: true },
         { prop: 'outSideDiameter', label: '外径DN', editable: false },
         { prop: 'outSideDiameterUnit', label: '外径单位', editable: false },
         { prop: 'headerClampLength', label: '前夹长L1', editable: false },
-        { prop: 'tailClampLength', label: '后夹长L2', editable: false }
+        { prop: 'tailClampLength', label: '后夹长L2', editable: false },
+        { prop: 'status', label: '状态', editable: true, type: 'status', hidden: true }
       ]
       cfg.data = rows
       configs['bend-pipe'] = cfg
     } else {
-      ElMessage.error(res?.data?.message || '弯管数据接口返回异常')
+      ElMessage.error(res?.data?.message || '弯管机数据接口返回异常')
     }
   } catch (e) {
-    ElMessage.error(`弯管数据接口请求失败：${e?.message || '网络错误'}`)
+    ElMessage.error(`弯管机数据接口请求失败：${e?.message || '网络错误'}`)
   }
 }
 
@@ -861,5 +921,11 @@ watch(currentNode, (node) => {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+:deep(.el-table .disabled-row) {
+  background-color: #fafafa;
+  color: #c0c4cc;
+  text-decoration: line-through;
 }
 </style>
