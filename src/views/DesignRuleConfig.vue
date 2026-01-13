@@ -152,6 +152,16 @@
                   inline-prompt
                 />
               </div>
+              <template v-else-if="currentConfig?.id === 'wall-thickness-series' && col.prop === 'scheduleThickness'">
+                <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in WALL_THICKNESS_SCHEDULE_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
               <el-input v-else v-model="row[col.prop]" size="small" />
             </template>
           </el-table-column>
@@ -202,6 +212,16 @@
                   inline-prompt
                 />
               </div>
+              <template v-else-if="currentConfig?.id === 'wall-thickness-series' && col.prop === 'scheduleThickness'">
+                <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in WALL_THICKNESS_SCHEDULE_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
               <el-input v-else v-model="editRowData[col.prop]" size="small" />
             </template>
           </el-table-column>
@@ -253,6 +273,56 @@ import {
   View
 } from '@element-plus/icons-vue'
 
+const LOCAL_COLUMNS = {
+  'bend-pipe': [
+    { prop: 'MachineNum', label: '机器号', editable: true },
+    { prop: 'outSideDiameter', label: '外径DN', editable: false },
+    { prop: 'outSideDiameterUnit', label: '外径单位', editable: false },
+    { prop: 'headerClampLength', label: '前夹长L1', editable: false },
+    { prop: 'tailClampLength', label: '后夹长L2', editable: false },
+    { prop: 'status', label: '状态', editable: true, type: 'status', hidden: true }
+  ],
+  'wall-thickness-series': [
+    { prop: 'npd', label: '通径DN', editable: true },
+    { prop: 'ndpunit', label: '通径单位', editable: true },
+    { prop: 'scheduleThickness', label: '壁厚等级', editable: true },
+    { prop: 'endStandard', label: 'EndStandard', editable: true },
+    { prop: 'pipingOutsideDiameter', label: '外径mm', editable: true },
+    { prop: 'wallThickness', label: '壁厚值', editable: true }
+  ],
+  'shortcode': [
+    { prop: 'type', label: 'ShortCodeHierarchyType', editable: true },
+    { prop: 'shortcode', label: 'ShortCode', editable: true }
+  ],
+  'spec': [
+    { prop: 'shortcode', label: 'ShortCode', editable: true },
+    { prop: 'type', label: 'GeometricIndustryStandard', editable: true },
+    { prop: 'type', label: 'CommodityCode', editable: true }
+  ]
+}
+
+const WALL_THICKNESS_SCHEDULE_OPTIONS = [
+  { label: 'SCHSTD', value: '10001' },
+  { label: 'SCH20', value: '10002' },
+  { label: 'SCH30', value: '10003' },
+  { label: 'SCH40', value: '10004' },
+  { label: 'SCH80', value: '10005' },
+  { label: 'SCHXS', value: '10006' },
+  { label: 'SCH100', value: '10007' },
+  { label: 'SCH120', value: '10008' },
+  { label: 'SCH160', value: '10009' },
+  { label: 'SCH5S', value: '10010' },
+  { label: 'SCH10S', value: '10011' },
+  { label: 'SCH20S', value: '10012' },
+  { label: 'SCH40S', value: '10013' },
+  { label: 'SCH80S', value: '10014' },
+  { label: 'SCHXXS', value: '10015' },
+  { label: '1.0Mpa', value: '10016' },
+  { label: '4.0Mpa', value: '10017' },
+  { label: '7.0Mpa', value: '10018' },
+  { label: '14.0Mpa', value: '10019' }
+]
+
 // 树形数据
 const treeData = ref([
   {
@@ -260,7 +330,7 @@ const treeData = ref([
     label: '设计规则类',
     icon: Folder,
     children: [
-      { id: 'wall-thickness-series', label: '壁厚系列', icon: Document },
+      { id: 'wall-thickness-series', label: '壁厚等级', icon: Document },
       { id: 'shortcode', label: 'ShortCode', icon: Document },
       { id: 'spec', label: 'Spec', icon: Document }
     ]
@@ -293,10 +363,10 @@ const initializeConfigs = () => {
         id: configId,
         title: mockData.title || configId,
         selectedRows: [],
-        columns: mockData.columns ? mockData.columns.map(col => ({
+        columns: (LOCAL_COLUMNS[configId] || (mockData.columns || [])).map(col => ({
           ...col,
           editable: col.editable !== undefined ? col.editable : true
-        })) : [],
+        })),
         data: mockData.data || []
       }
     } else {
@@ -306,7 +376,10 @@ const initializeConfigs = () => {
         id: configId,
         title: configId,
         selectedRows: [],
-        columns: [],
+        columns: (LOCAL_COLUMNS[configId] || []).map(col => ({
+          ...col,
+          editable: col.editable !== undefined ? col.editable : true
+        })),
         data: []
       }
     }
@@ -354,10 +427,10 @@ const handleNodeClick = (node) => {
         id: node.id,
         title: mockData.title || node.id,
         selectedRows: [],
-        columns: mockData.columns ? mockData.columns.map(col => ({
+        columns: (LOCAL_COLUMNS[node.id] || (mockData.columns || [])).map(col => ({
           ...col,
           editable: col.editable !== undefined ? col.editable : true
-        })) : [],
+        })),
         data: mockData.data || []
       }
     }
@@ -686,14 +759,7 @@ const fetchBendPipeData = async () => {
         columns: [],
         data: []
       }
-      cfg.columns = [
-        { prop: 'MachineNum', label: '机器号', editable: true },
-        { prop: 'outSideDiameter', label: '外径DN', editable: false },
-        { prop: 'outSideDiameterUnit', label: '外径单位', editable: false },
-        { prop: 'headerClampLength', label: '前夹长L1', editable: false },
-        { prop: 'tailClampLength', label: '后夹长L2', editable: false },
-        { prop: 'status', label: '状态', editable: true, type: 'status', hidden: true }
-      ]
+      cfg.columns = LOCAL_COLUMNS['bend-pipe'] || []
       cfg.data = rows
       configs['bend-pipe'] = cfg
     } else {
@@ -704,15 +770,55 @@ const fetchBendPipeData = async () => {
   }
 }
 
+const fetchWallThicknessData = async () => {
+  try {
+    const res = await axios.get('/api/WallThicknessCodeConverted')
+    const payload = res?.data
+    let rows = []
+    if (Array.isArray(payload)) {
+      rows = payload
+    } else if (Array.isArray(payload?.data)) {
+      rows = payload.data
+    } else if (payload?.code === 200 && Array.isArray(payload?.data)) {
+      rows = payload.data
+    } else {
+      rows = []
+    }
+    const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
+    rows.forEach(r => {
+      if (r.status === undefined) {
+        r.status = true
+      } else {
+        r.status = toBool(r.status)
+      }
+    })
+    const cfg = configs['wall-thickness-series'] || {
+      id: 'wall-thickness-series',
+      title: '壁厚等级',
+      selectedRows: [],
+      columns: [],
+      data: []
+    }
+    cfg.columns = LOCAL_COLUMNS['wall-thickness-series'] || []
+    cfg.data = rows
+    configs['wall-thickness-series'] = cfg
+  } catch (e) {
+    ElMessage.error(`壁厚等级数据接口请求失败：${e?.message || '网络错误'}`)
+  }
+}
+
 // 初始化
 onMounted(() => {
   initializeConfigs()
   fetchBendPipeData()
+  fetchWallThicknessData()
 })
 
 watch(currentNode, (node) => {
   if (node?.id === 'bend-pipe') {
     fetchBendPipeData()
+  } else if (node?.id === 'wall-thickness-series') {
+    fetchWallThicknessData()
   }
 })
 </script>

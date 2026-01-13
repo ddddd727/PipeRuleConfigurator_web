@@ -171,13 +171,6 @@ export const db = {
   // 1. 弯管数据 (bend-pipe)
   'bend-pipe': {
     title: '部件库名称：PlainPipingGenericData',
-    columns: [
-      // { prop: 'id', label: '序号', width: 80 },
-      { prop: 'diameter', label: '外径DN', editable: true },
-      { prop: 'unit', label: '外径单位', editable: true },
-      { prop: 'l1', label: '前夹长L1', editable: true },
-      { prop: 'l2', label: '后夹长L2', editable: true }
-    ],
     'data|5': [{
       'id|+1': 1,
       'diameter|1': ['DN15', 'DN20', 'DN25', 'DN32', 'DN40', 'DN50'],
@@ -190,15 +183,6 @@ export const db = {
   // 2. 壁厚系列 (wall-thickness-series)
   'wall-thickness-series': {
     title: '部件库名称：PlainPipingGenericData',
-    columns: [
-      // { prop: 'id', label: '序号', width: 80 },
-      { prop: 'diameter', label: '通径DN', editable: true },
-      { prop: 'unit', label: '通径单位', editable: true },
-      { prop: 'standard', label: '管材标准EndStandard', editable: true },
-      { prop: 'series', label: '壁厚系列', editable: true },
-      { prop: 'outer', label: '外径', editable: true },
-      { prop: 'value', label: '壁厚值', editable: true }
-    ],
     'data|5': [{
       'id|+1': 1,
       'diameter|1': ['DN15', 'DN20', 'DN25', 'DN32', 'DN40', 'DN50'],
@@ -213,11 +197,6 @@ export const db = {
   // 3. ShortCode (shortcode)
   'shortcode': {
     title: '部件库名称：ShortCodeHierarchyRule',
-    columns: [
-      // { prop: 'id', label: '序号', width: 80 },
-      { prop: 'type', label: 'ShortCodeHierarchyType', editable: true },
-      { prop: 'shortcode', label: 'ShortCode', editable: true }
-    ],
     'data|5': [{
       'id|+1': 1,
       'type|1': ['PIPE', 'VALVE', 'FLANGE', 'FITTING', 'INSTRUMENT', 'EQUIPMENT'],
@@ -228,12 +207,6 @@ export const db = {
   // 4. Spec (spec)
   'spec': {
     title: '部件库名称：PipingCommodityFilter',
-    columns: [
-      // { prop: 'id', label: '序号', width: 80 },
-      { prop: 'shortcode', label: 'ShortCode', editable: true },
-      { prop: 'type', label: 'GeometricIndustryStandard', editable: true },
-      { prop: 'type', label: 'CommodityCode', editable: true }
-    ],
     'data|5': [{
       'id|+1': 1,
       'shortcode|1': ['管道', '阀门', '法兰', '管件', '仪表', '设备']
