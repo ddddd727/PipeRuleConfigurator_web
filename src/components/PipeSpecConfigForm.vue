@@ -105,6 +105,63 @@
         </div>
         <div class="tip-text">请为每个选择的标准文件配置对应的NPD范围</div>
       </el-form-item>
+
+      <!-- 重复通径范围配置 -->
+      <el-form-item label="重复通径范围：" v-if="duplicateRanges.length > 0">
+        <div class="duplicate-ranges-container">
+          <div v-for="duplicate in duplicateRanges" :key="duplicate.rangeKey" class="duplicate-range-item">
+            <div class="duplicate-range-info">
+              <el-tag type="warning" size="small">
+                重叠区域：{{ duplicate.overlapMin }} mm - {{ duplicate.overlapMax }} mm
+              </el-tag>
+              <span class="duplicate-count">（{{ duplicate.standardFiles.length }} 个标准文件）</span>
+            </div>
+            <div class="duplicate-ranges-list">
+              <span class="duplicate-label">涉及的范围：</span>
+              <div class="ranges-list">
+                <el-tag
+                  v-for="(range, idx) in duplicate.ranges"
+                  :key="`${range.standardFile}-${idx}`"
+                  size="small"
+                  type="info"
+                  style="margin-right: 8px; margin-bottom: 4px"
+                >
+                  {{ getStandardFileName(range.standardFile) }}: {{ range.minNpdValue }} mm - {{ range.maxNpdValue }} mm
+                </el-tag>
+              </div>
+            </div>
+            <div class="duplicate-standard-files">
+              <span class="duplicate-label">涉及的标准文件：</span>
+              <el-tag
+                v-for="fileId in duplicate.standardFiles"
+                :key="fileId"
+                size="small"
+                type="info"
+                style="margin-right: 8px; margin-bottom: 4px"
+              >
+                {{ getStandardFileName(fileId) }}
+              </el-tag>
+            </div>
+            <div class="default-standard-selector">
+              <span class="duplicate-label">默认匹配标准：</span>
+              <el-select
+                :model-value="duplicate.defaultStandardFileId"
+                @update:model-value="(val) => updateDuplicateRangeDefault(duplicate.overlapMin, duplicate.overlapMax, val)"
+                placeholder="请选择默认标准文件"
+                style="width: 200px"
+              >
+                <el-option
+                  v-for="fileId in duplicate.standardFiles"
+                  :key="fileId"
+                  :label="getStandardFileName(fileId)"
+                  :value="fileId"
+                />
+              </el-select>
+            </div>
+          </div>
+        </div>
+        <div class="tip-text warning-text">检测到多个标准文件配置了重叠的通径范围，请为每个重叠范围选择默认匹配的标准文件</div>
+      </el-form-item>
     </el-form>
 
     <template #footer>
@@ -152,7 +209,8 @@ const form = ref({
   standardFileConfigurations: [], // 每个元素包含standardFile、minNpdValue和maxNpdValue
   partType: '',
   effectiveDate: '',
-  remarks: ''
+  remarks: '',
+  duplicateRangeDefaults: [] // 存储重复通径范围的默认标准文件选择
 })
 
 // 表单验证规则
@@ -250,6 +308,123 @@ const getStandardFileName = (fileId) => {
   return file ? file.code : ''
 }
 
+// 存储重复范围的默认标准文件选择（key: "minNpdValue-maxNpdValue", value: defaultStandardFileId）
+const duplicateRangeDefaultsMap = ref({})
+
+// 判断两个范围是否有重叠
+const rangesOverlap = (min1, max1, min2, max2) => {
+  return min1 <= max2 && min2 <= max1
+}
+
+// 检测重复的通径范围（包括完全相同的和部分重叠的）
+const duplicateRanges = computed(() => {
+  // 收集所有有效的配置
+  const validConfigs = form.value.standardFileConfigurations.filter(
+    config => config.minNpdValue !== null && config.maxNpdValue !== null
+  )
+  
+  if (validConfigs.length < 2) {
+    return []
+  }
+  
+  // 使用并查集的思想，找出所有相互重叠的范围组
+  const groups = []
+  const processed = new Set()
+  
+  validConfigs.forEach((config, index) => {
+    if (processed.has(index)) return
+    
+    // 找出所有与当前配置重叠的配置
+    const group = [config]
+    const groupIndices = [index]
+    processed.add(index)
+    
+    // 递归查找所有与组内任何配置重叠的配置
+    let foundNew = true
+    while (foundNew) {
+      foundNew = false
+      validConfigs.forEach((otherConfig, otherIndex) => {
+        if (processed.has(otherIndex)) return
+        
+        // 检查是否与组内任何配置重叠
+        const overlapsWithGroup = group.some(groupConfig => 
+          rangesOverlap(
+            groupConfig.minNpdValue, 
+            groupConfig.maxNpdValue,
+            otherConfig.minNpdValue,
+            otherConfig.maxNpdValue
+          )
+        )
+        
+        if (overlapsWithGroup) {
+          group.push(otherConfig)
+          groupIndices.push(otherIndex)
+          processed.add(otherIndex)
+          foundNew = true
+        }
+      })
+    }
+    
+    // 如果组内至少有2个配置，则添加到结果中
+    if (group.length > 1) {
+      // 计算重叠区域（所有范围的交集）
+      const overlapMin = Math.max(...group.map(c => c.minNpdValue))
+      const overlapMax = Math.min(...group.map(c => c.maxNpdValue))
+      
+      // 收集所有涉及的标准文件
+      const standardFiles = [...new Set(group.map(c => c.standardFile))]
+      
+      // 收集所有涉及的范围（用于显示）
+      const ranges = group.map(c => ({
+        minNpdValue: c.minNpdValue,
+        maxNpdValue: c.maxNpdValue,
+        standardFile: c.standardFile
+      }))
+      
+      groups.push({
+        overlapMin,
+        overlapMax,
+        standardFiles,
+        ranges, // 保存所有原始范围信息
+        // 使用重叠区域作为key
+        rangeKey: `${overlapMin}-${overlapMax}`
+      })
+    }
+  })
+  
+  // 为每个重叠组添加默认标准文件ID
+  return groups.map(group => {
+    const rangeKey = group.rangeKey
+    let defaultStandardFileId = duplicateRangeDefaultsMap.value[rangeKey]
+    
+    // 如果没有设置，尝试从form.duplicateRangeDefaults中恢复
+    if (!defaultStandardFileId) {
+      const savedDefault = form.value.duplicateRangeDefaults?.find(
+        d => d.overlapMin === group.overlapMin && d.overlapMax === group.overlapMax
+      )
+      if (savedDefault && savedDefault.defaultStandardFileId) {
+        defaultStandardFileId = savedDefault.defaultStandardFileId
+        duplicateRangeDefaultsMap.value[rangeKey] = defaultStandardFileId
+      } else if (group.standardFiles.length > 0) {
+        // 默认选择第一个标准文件
+        defaultStandardFileId = group.standardFiles[0]
+        duplicateRangeDefaultsMap.value[rangeKey] = defaultStandardFileId
+      }
+    }
+    
+    return {
+      ...group,
+      defaultStandardFileId
+    }
+  })
+})
+
+// 更新重复范围的默认标准文件
+const updateDuplicateRangeDefault = (minNpdValue, maxNpdValue, defaultStandardFileId) => {
+  const rangeKey = `${minNpdValue}-${maxNpdValue}`
+  duplicateRangeDefaultsMap.value[rangeKey] = defaultStandardFileId
+}
+
 
 
 // 提交状态
@@ -271,6 +446,17 @@ const fetchPartTypes = async () => {
     console.error('获取部件类型失败:', error)
   }
 }
+
+// 监听重复范围变化，同步到 form.duplicateRangeDefaults
+watch([duplicateRanges, duplicateRangeDefaultsMap], () => {
+  form.value.duplicateRangeDefaults = duplicateRanges.value.map(range => ({
+    overlapMin: range.overlapMin,
+    overlapMax: range.overlapMax,
+    defaultStandardFileId: range.defaultStandardFileId,
+    ranges: range.ranges, // 保存所有原始范围信息
+    standardFiles: range.standardFiles // 保存涉及的标准文件
+  }))
+}, { deep: true })
 
 // 处理提交
 const handleSubmit = async () => {
@@ -296,6 +482,16 @@ const handleSubmit = async () => {
       return
     }
     
+    // 验证重复通径范围是否都选择了默认标准文件
+    const unselectedDefaults = duplicateRanges.value.filter(
+      range => !range.defaultStandardFileId
+    )
+    
+    if (unselectedDefaults.length > 0) {
+      ElMessage.error('请为所有重复的通径范围选择默认匹配的标准文件')
+      return
+    }
+    
     submitting.value = true
     
     // 准备提交数据 - 简化参数传递
@@ -312,7 +508,16 @@ const handleSubmit = async () => {
           npdRange: [config.minNpdValue, config.maxNpdValue],
           bendRadiusMultiple: config.bendRadiusMultiple
         }
-      })
+      }),
+      // 包含重复通径范围的默认标准配置
+      duplicateRangeDefaults: duplicateRanges.value.map(range => ({
+        overlapMin: range.overlapMin,
+        overlapMax: range.overlapMax,
+        defaultStandardFileId: range.defaultStandardFileId,
+        defaultStandardFileName: getStandardFileName(range.defaultStandardFileId),
+        ranges: range.ranges, // 保存所有原始范围信息
+        standardFiles: range.standardFiles // 保存涉及的标准文件
+      }))
     }
     
     // 真实API调用
@@ -345,6 +550,8 @@ const handleClose = () => {
   // 清空选择的文件和配置
   form.value.standardFileIds = []
   form.value.standardFileConfigurations = []
+  form.value.duplicateRangeDefaults = []
+  duplicateRangeDefaultsMap.value = {}
   dialogVisible.value = false
 }
 
@@ -358,6 +565,8 @@ watch(dialogVisible, (val) => {
       }
       // 确保配置数组为空
       form.value.standardFileConfigurations = []
+      form.value.duplicateRangeDefaults = []
+      duplicateRangeDefaultsMap.value = {}
     })
     // 对话框打开时获取标准文件列表
     fetchStandardFiles()
@@ -481,5 +690,92 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 重复通径范围容器样式 */
+.duplicate-ranges-container {
+  border: 1px solid #f0c78a;
+  border-radius: 4px;
+  padding: 15px;
+  background-color: #fef9e7;
+  margin-bottom: 10px;
+}
+
+/* 重复范围项样式 */
+.duplicate-range-item {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 15px;
+  padding: 12px;
+  background-color: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #f0c78a;
+}
+
+.duplicate-range-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 重复范围信息样式 */
+.duplicate-range-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.duplicate-count {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 涉及的范围列表样式 */
+.duplicate-ranges-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  padding: 8px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.ranges-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 1;
+}
+
+/* 涉及的标准文件列表样式 */
+.duplicate-standard-files {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 8px;
+  background-color: #fafafa;
+  border-radius: 4px;
+}
+
+.duplicate-label {
+  font-size: 13px;
+  color: #606266;
+  margin-right: 8px;
+  font-weight: 500;
+}
+
+/* 默认标准选择器样式 */
+.default-standard-selector {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* 警告提示文字样式 */
+.warning-text {
+  color: #e6a23c;
+  font-weight: 500;
 }
 </style>
