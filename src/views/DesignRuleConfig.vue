@@ -162,6 +162,16 @@
                   />
                 </el-select>
               </template>
+              <template v-else-if="currentConfig?.id === 'wall-thickness-series' && col.prop === 'endStandard'">
+                <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in END_STANDARD_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
               <el-input v-else v-model="row[col.prop]" size="small" />
             </template>
           </el-table-column>
@@ -216,6 +226,16 @@
                 <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
                   <el-option
                     v-for="opt in WALL_THICKNESS_SCHEDULE_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'wall-thickness-series' && col.prop === 'endStandard'">
+                <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in END_STANDARD_OPTIONS"
                     :key="opt.value"
                     :label="opt.label"
                     :value="opt.value"
@@ -288,7 +308,8 @@ const LOCAL_COLUMNS = {
     { prop: 'scheduleThickness', label: '壁厚等级', editable: true },
     { prop: 'endStandard', label: 'EndStandard', editable: true },
     { prop: 'pipingOutsideDiameter', label: '外径mm', editable: true },
-    { prop: 'wallThickness', label: '壁厚值', editable: true }
+    { prop: 'wallThickness', label: '壁厚值', editable: true },
+    { prop: 'status', label: '状态', editable: true, type: 'status', hidden: true }
   ],
   'shortcode': [
     { prop: 'type', label: 'ShortCodeHierarchyType', editable: true },
@@ -322,6 +343,24 @@ const WALL_THICKNESS_SCHEDULE_OPTIONS = [
   { label: '7.0Mpa', value: '10018' },
   { label: '14.0Mpa', value: '10019' }
 ]
+
+const END_STANDARD_OPTIONS = [
+  { label: 'GB/T 14976-2012', value: '10001' },
+  { label: 'GB/T 8163-2018', value: '10002' },
+  { label: 'GB/T 12459-2017', value: '10003' }
+]
+
+const getScheduleCode = (v) => {
+  const s = String(v ?? '')
+  const found = WALL_THICKNESS_SCHEDULE_OPTIONS.find(o => o.value === s || o.label === s)
+  return found ? found.value : s
+}
+
+const getEndStandardCode = (v) => {
+  const s = String(v ?? '')
+  const found = END_STANDARD_OPTIONS.find(o => o.value === s || o.label === s)
+  return found ? found.value : s
+}
 
 // 树形数据
 const treeData = ref([
@@ -485,6 +524,24 @@ const handleDeleteRows = (configId) => {
       return
     }
 
+    // 针对 wall-thickness-series 走后端删除接口
+    if (configId === 'wall-thickness-series') {
+      try {
+        const deletePromises = config.selectedRows.map(row => 
+          axios.delete(`/api/S3dDictWallThickness/${row.id}`)
+        )
+        await Promise.all(deletePromises)
+        ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
+        // 刷新数据
+        await fetchWallThicknessData()
+        config.selectedRows = []
+      } catch (error) {
+        console.error('删除失败:', error)
+        ElMessage.error('删除失败，请重试')
+      }
+      return
+    }
+
     // 其他配置走前端假删除
     const selectedIds = config.selectedRows.map(row => row.id)
     config.data = config.data.filter(row => !selectedIds.includes(row.id))
@@ -548,60 +605,134 @@ const confirmBatchAdd = async () => {
     }
   }
 
-  // 校验重复数据
-  // 1. 检查批量新增列表中是否有重复行
-  const batchRowsStr = batchAddData.value.map(row => {
-    // 提取所有列的值组合成字符串用于比较
-    return config.columns.map(col => String(row[col.prop]).trim()).join('|')
-  })
-  
-  const batchSet = new Set()
-  for (let i = 0; i < batchRowsStr.length; i++) {
-    const str = batchRowsStr[i]
-    if (batchSet.has(str)) {
-      ElMessage.warning(`新增列表中存在重复数据（第 ${i + 1} 行与其他行重复）`)
-      return
-    }
-    batchSet.add(str)
+  // 1. 获取用于去重的关键列（排除 status 和 id）
+  const keyColumns = config.columns.filter(c => c.prop !== 'id' && c.prop !== 'status')
+
+  // 辅助函数：生成行指纹
+  const getRowFingerprint = (row) => {
+    return keyColumns.map(col => {
+      let val = row[col.prop]
+      if (config.id === 'wall-thickness-series') {
+        if (col.prop === 'scheduleThickness') val = getScheduleCode(val)
+        if (col.prop === 'endStandard') val = getEndStandardCode(val)
+      }
+      return String(val ?? '').trim()
+    }).join('|')
   }
 
-  // 2. 检查是否与数据库已有数据重复
-  if (config.data && config.data.length > 0) {
-    const existingRowsStr = config.data.map(row => {
-      return config.columns.map(col => String(row[col.prop]).trim()).join('|')
-    })
-    
-    for (let i = 0; i < batchRowsStr.length; i++) {
-      const str = batchRowsStr[i]
-      if (existingRowsStr.includes(str)) {
-        ElMessage.warning(`第 ${i + 1} 行数据已存在于数据库中，不能重复添加`)
-        return
-      }
+  // 2. 批量数据内部去重
+  const uniqueBatchData = []
+  const batchFingerprints = new Set()
+  let duplicateInBatchCount = 0
+
+  for (const row of batchAddData.value) {
+    const fp = getRowFingerprint(row)
+    if (batchFingerprints.has(fp)) {
+      duplicateInBatchCount++
+    } else {
+      batchFingerprints.add(fp)
+      uniqueBatchData.push(row)
     }
+  }
+
+  if (duplicateInBatchCount > 0) {
+    ElMessage.warning(`检测到批量新增列表中有 ${duplicateInBatchCount} 条重复数据，已自动过滤`)
+  }
+
+  // 3. 与现有数据对比去重
+  const existingFingerprints = new Set(config.data.map(r => getRowFingerprint(r)))
+  const finalRowsToAdd = uniqueBatchData.filter(row => {
+    const fp = getRowFingerprint(row)
+    return !existingFingerprints.has(fp)
+  })
+
+  if (finalRowsToAdd.length === 0) {
+    ElMessage.warning('所有新增数据已存在于数据库中，无需添加')
+    return
+  }
+  
+  if (finalRowsToAdd.length < uniqueBatchData.length) {
+    ElMessage.info(`检测到 ${uniqueBatchData.length - finalRowsToAdd.length} 条数据已存在，将跳过这些数据`)
   }
 
   batchSaveLoading.value = true
   
   try {
     if (config.id === 'bend-pipe') {
-      // 弯管数据：循环调用POST接口
-      const promises = batchAddData.value.map(row => {
-        // 构造请求体，确保数据格式正确
-        const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
-        const payload = {
-          ...row,
-          // 确保数值类型正确转换
-          outSideDiameter: Number(row.outSideDiameter) || 0,
-          headerClampLength: Number(row.headerClampLength) || 0,
-          tailClampLength: Number(row.tailClampLength) || 0,
-          status: toBool(row.status ?? true)
-        }
-        return axios.post('/api/DspSpmcDictPipingBendData', payload)
-      })
+      let successCount = 0
+      let failCount = 0
       
-      await Promise.all(promises)
+      // 按顺序执行新增
+      for (const row of finalRowsToAdd) {
+        try {
+          const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
+          const payload = {
+            ...row,
+            outSideDiameter: Number(row.outSideDiameter) || 0,
+            headerClampLength: Number(row.headerClampLength) || 0,
+            tailClampLength: Number(row.tailClampLength) || 0,
+            status: toBool(row.status ?? true)
+          }
+          await axios.post('/api/DspSpmcDictPipingBendData', payload)
+          successCount++
+        } catch (e) {
+          console.error('新增单行失败:', e)
+          failCount++
+        }
+      }
+      
       await fetchBendPipeData()
-      ElMessage.success(`成功添加 ${batchAddData.value.length} 条数据`)
+      if (successCount > 0) {
+        ElMessage.success(`成功添加 ${successCount} 条数据${failCount > 0 ? `，失败 ${failCount} 条` : ''}`)
+      } else {
+        ElMessage.error('批量新增全部失败，请检查数据或网络')
+      }
+      setTimeout(() => {
+        const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
+                          || document.querySelector('.el-table__body-wrapper')
+        if (tableBody) {
+          tableBody.scrollTop = tableBody.scrollHeight
+        }
+      }, 100)
+    } else if (config.id === 'wall-thickness-series') {
+      let successCount = 0
+      let failCount = 0
+      
+      // 按顺序执行新增
+      for (const row of finalRowsToAdd) {
+        try {
+          const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
+          const payload = {
+            ...row,
+            npd: String(row.npd || ''),
+            ndpunit: String(row.ndpunit || ''),
+            scheduleThicknessCl: getScheduleCode(row.scheduleThickness),
+            endStandardCl: getEndStandardCode(row.endStandard),
+            pipingOutsideDiameter: Number(row.pipingOutsideDiameter) || 0,
+            wallThickness: Number(row.wallThickness) || 0,
+            status: toBool(row.status ?? true)
+          }
+          await axios.post('/api/S3dDictWallThickness', payload)
+          successCount++
+        } catch (e) {
+          console.error('新增单行失败:', e)
+          failCount++
+        }
+      }
+
+      await fetchWallThicknessData()
+      if (successCount > 0) {
+        ElMessage.success(`成功添加 ${successCount} 条数据${failCount > 0 ? `，失败 ${failCount} 条` : ''}`)
+      } else {
+        ElMessage.error('批量新增全部失败，请检查数据或网络')
+      }
+      setTimeout(() => {
+        const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
+                          || document.querySelector('.el-table__body-wrapper')
+        if (tableBody) {
+          tableBody.scrollTop = tableBody.scrollHeight
+        }
+      }, 100)
     } else {
       // 其他配置：前端模拟添加
       let newId = config.data.length > 0 
@@ -644,6 +775,10 @@ const handleRowDblClick = (row) => {
   const config = currentConfig.value
   if (!config) return
   editRowData.value = { ...row }
+  if (config.id === 'wall-thickness-series') {
+    editRowData.value.scheduleThickness = getScheduleCode(editRowData.value.scheduleThickness)
+    editRowData.value.endStandard = getEndStandardCode(editRowData.value.endStandard)
+  }
   editDialogVisible.value = true
 }
 
@@ -692,6 +827,21 @@ const confirmEdit = async () => {
       }
       await axios.put('/api/DspSpmcDictPipingBendData', payload)
       await fetchBendPipeData()
+      ElMessage.success('更新成功')
+    } else if (config.id === 'wall-thickness-series') {
+      const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
+      const payload = {
+        ...editRowData.value,
+        npd: String(editRowData.value.npd || ''),
+        ndpunit: String(editRowData.value.ndpunit || ''),
+        scheduleThicknessCl: getScheduleCode(editRowData.value.scheduleThickness),
+        endStandardCl: getEndStandardCode(editRowData.value.endStandard),
+        pipingOutsideDiameter: Number(editRowData.value.pipingOutsideDiameter) || 0,
+        wallThickness: Number(editRowData.value.wallThickness) || 0,
+        status: toBool(editRowData.value.status)
+      }
+      await axios.put('/api/S3dDictWallThickness', payload)
+      await fetchWallThicknessData()
       ElMessage.success('更新成功')
     } else {
       const idx = config.data.findIndex(r => r.id === editRowData.value.id)
