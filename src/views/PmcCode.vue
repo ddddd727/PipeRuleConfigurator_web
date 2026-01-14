@@ -31,17 +31,26 @@ const pipeLimitData = ref([])
 
 // --- API Methods ---
 
-// 获取规则下拉列表（pipe-limit 改为后端 AB2B3C2 的 RuleName）
+// 获取规则下拉列表（pipe-limit 由后端提供 RuleName）
 const fetchRuleOptions = async (type) => {
   try {
     if (type === 'pipe-limit') {
-    //   const res = await axios.get('/api/rules/ab2b3c2')
-    //   const arr = Array.isArray(res.data) ? res.data : (res.data?.data ?? [])
-    //   const names = [...new Set(arr.map(x => x.ruleName).filter(x => x))]
-    //   pipeLimitRules.value = names.map(n => ({ label: n, value: n }))
-    //   return
-      const res = await axios.get(`/api/pmc/rules/list?type=pipe-limit`)
-      pipeLimitRules.value = res.data?.data ?? []
+      const res = await axios.get(`/api/pmc/rules/pipe-limit`)
+      const names = Array.isArray(res.data?.data) ? res.data.data : []
+      pipeLimitRules.value = names.map(n => ({ label: n, value: n }))
+      return
+    }
+    if (type === 'main-material') {
+      const res = await axios.get(`/api/pmc/rules/main-material`)
+      const names = Array.isArray(res.data?.data) ? res.data.data : []
+      mainMaterialRules.value = names.map(n => ({ label: n, value: n }))
+      return
+    }
+    if (type === 'flange') {
+      const res = await axios.get(`/api/pmc/rules/flange`)
+      const names = Array.isArray(res.data?.data) ? res.data.data : []
+      flangeRules.value = names.map(n => ({ label: n, value: n }))
+      return
     }
     const res = await axios.get(`/api/pmc/rules/list?type=${type}`)
     if (res.data.code === 200) {
@@ -90,13 +99,18 @@ const fetchMainMaterialData = async (ruleCode) => {
     return
   }
   try {
-    const res = await axios.get(`/api/pmc/rules/main-material?ruleCode=${ruleCode}`)
+    const res = await axios.get(`/api/pmc/rules/main-material/${encodeURIComponent(ruleCode)}`)
     console.log('Main Material Response:', res.data)
-    if (res.data.code === 200) {
-      // Mock 返回的数据可能每次变动，这里直接赋值
-      // 注意：Mock.mock() 生成的数据在 response.data.data 里
-      mainMaterialData.value = res.data.data
-    }
+    const list = res.data?.data || []
+    
+    // Map backend DTO to frontend table fields
+    mainMaterialData.value = list.map((d, index) => ({
+      id: index + 1,
+      code: d.materialsCategoryCode,      // MaterialsCategoryCode -> code
+      std: d.pipingStandardCode,          // PipingStandardCode -> std
+      grade: d.materialsGradeCode,        // MaterialsGradeCode -> grade
+      thickness: d.scheduleThicknessCode  // ScheduleThicknessCode -> thickness
+    }))
   } catch (error) {
     console.error(error)
     ElMessage.error('获取主材料规则失败')
@@ -111,18 +125,23 @@ const fetchFlangeData = async (ruleCode) => {
     return
   }
   try {
-    const res = await axios.get(`/api/pmc/rules/flange?ruleCode=${ruleCode}`)
+    const res = await axios.get(`/api/pmc/rules/flange/${encodeURIComponent(ruleCode)}`)
     console.log('Flange Response:', res.data)
-    if (res.data.code === 200) {
-      flangeData.value = res.data.data
-    }
+    const list = res.data?.data || []
+    
+    // Map backend DTO to frontend table fields
+    flangeData.value = list.map((d, index) => ({
+      id: index + 1,
+      std: d.flangeStandardCode,      // FlangeStandardCode -> std
+      press: d.pressureRatingCode     // PressureRatingCode -> press
+    }))
   } catch (error) {
     console.error(error)
     ElMessage.error('获取法兰规则失败')
   }
 }
 
-// 获取管材限定规则内容（改为调用后端 AB2B3C2）
+// 获取管材限定规则内容（后端 VW_S3D_Rule_AB2B3C2_WithCodes）
 const fetchPipeLimitData = async (ruleCode) => {
   console.log('Fetching Pipe Limit Rule (AB2B3C2):', ruleCode)
   if (!ruleCode) {
@@ -130,20 +149,17 @@ const fetchPipeLimitData = async (ruleCode) => {
     return
   }
   try {
-    // const res = await axios.get(`/api/rules/ab2b3c2`)
-    // const arr = Array.isArray(res.data) ? res.data : (res.data?.data ?? [])
-    // const filtered = ruleCode ? arr.filter(x => x.ruleName === ruleCode) : arr
-    // pipeLimitData.value = filtered.map(item => ({
-    //   id: item.id,
-    //   grade: item.pipingClassId,
-    //   std: item.pipingStandardId,
-    //   gradeCode: item.materialsGradeId,
-    //   press: item.pressureRatingId
-    // }))
-    // 使用 Mock 数据接口，选择规则后再显示
-    const res = await axios.get(`/api/pmc/rules/pipe-limit?ruleCode=${ruleCode}`)
-    const arr = res.data?.data ?? []
-    pipeLimitData.value = arr
+    const res = await axios.get(`/api/pmc/rules/pipe-limit/${encodeURIComponent(ruleCode)}`)
+    const list = res.data?.data || []
+    
+    // Process list: map fields and auto-generate ID (1, 2, 3...)
+    pipeLimitData.value = list.map((d, index) => ({
+      id: index + 1, // Auto-increment ID on frontend
+      pipingClassCode: d.pipingClassCode,
+      pipingStandardCode: d.pipingStandardCode,
+      materialsGradeCode: d.materialsGradeCode,
+      pressureRatingCode: d.pressureRatingCode
+    }))
   } catch (error) {
     console.error('Fetch AB2B3C2 failed:', error)
     ElMessage.error('获取管材限定规则失败')
@@ -339,7 +355,7 @@ const handlePipeLimitSelectionChange = (val) => {
 }
 
 // Generate 7-digit PMC Code
-const generatePmcCode = () => {
+const generatePmcCode = async () => {
   // Check if main material and flange rows are selected
   if (selectedMainMaterialRows.value.length === 0 || selectedFlangeRows.value.length === 0) {
     alert('请先在B1B2B3D组合数据和C1C2组合数据表格中选择至少一行数据')
@@ -356,14 +372,10 @@ const generatePmcCode = () => {
   let validCombinations = new Set()
 
   if (usePipeLimit) {
-    // If AB2B3C2 is selected:
-    // 1. Extract unique A values (grade)
-    aValues = [...new Set(selectedPipeLimitRows.value.map(row => row.grade))]
-    
-    // 2. Build set of valid combinations for filtering (A, B2, B3, C2)
+    aValues = selectedPipeLimitRows.value.map(row => row.pipingClassCode)
+
     selectedPipeLimitRows.value.forEach(row => {
-      // Create a unique key for the combination: A|B2|B3|C2
-      const key = `${row.grade}|${row.std}|${row.gradeCode}|${row.press}`
+      const key = `${row.pipingClassCode}|${row.pipingStandardCode}|${row.materialsGradeCode}|${row.pressureRatingCode}`
       validCombinations.add(key)
     })
   } else {
@@ -384,26 +396,25 @@ const generatePmcCode = () => {
         const d = mainMaterial.thickness
 
         // Validation Logic
-        if (usePipeLimit) {
-          // Check if (A, B2, B3, C2) exists in the selected AB2B3C2 rows
+        if (usePipeLimit && a !== '3') {
           const key = `${a}|${b2}|${b3}|${c2}`
           if (!validCombinations.has(key)) {
-            continue // Skip invalid combination
+            continue
           }
         }
 
-        // Generate PMC code
+        // Generate PMC code (7 digits)
         const pmcCode = `${a}${b1}${b2}${b3}${c1}${c2}${d}`
 
         combinations.push({
           id: id++,
-          a: a,
-          b1: b1,
-          b2: b2,
-          b3: b3,
-          c1: c1,
-          c2: c2,
-          d: d,
+          a,
+          b1,
+          b2,
+          b3,
+          c1,
+          c2,
+          d,
           pmc: pmcCode
         })
       }
@@ -415,9 +426,57 @@ const generatePmcCode = () => {
     return
   }
 
-  // Add to resultData
-  resultData.value = [...resultData.value, ...combinations]
-  alert(`成功生成 ${combinations.length} 条PMC编码`)
+  // 去重：以PMC为唯一键
+  const existingCodes = new Set(resultData.value.map(item => item.pmc))
+  const pmcList = []
+  const baseRows = []
+
+  combinations.forEach(item => {
+    if (!existingCodes.has(item.pmc)) {
+      existingCodes.add(item.pmc)
+      pmcList.push(item.pmc)
+      baseRows.push(item)
+    }
+  })
+
+  if (pmcList.length === 0) {
+    alert('所有生成的PMC编码均已存在，未新增数据')
+    return
+  }
+
+  try {
+    const res = await axios.post('/api/pmc/pmccode/generate', {
+      pmcCodes: pmcList
+    })
+
+    const data = Array.isArray(res.data?.data) ? res.data.data : []
+    const descMap = new Map()
+    data.forEach(d => {
+      if (d.pmc) {
+        descMap.set(d.pmc, d)
+      }
+    })
+
+    const newRows = baseRows.map(row => {
+      const desc = descMap.get(row.pmc) || {}
+      return {
+        ...row,
+        a: desc.aDesc || row.a,
+        b1: desc.b1Desc || row.b1,
+        b2: desc.b2Desc || row.b2,
+        b3: desc.b3Desc || row.b3,
+        c1: desc.c1Desc || row.c1,
+        c2: desc.c2Desc || row.c2,
+        d: desc.dDesc || row.d
+      }
+    })
+
+    resultData.value = [...resultData.value, ...newRows]
+    alert(`成功生成 ${newRows.length} 条PMC编码（已自动去重并填充中文描述）`)
+  } catch (error) {
+    console.error('生成PMC编码失败', error)
+    ElMessage.error('生成PMC编码失败')
+  }
 }
 
 // Copy Rule Dialog
@@ -525,10 +584,10 @@ const cancelCopyRule = () => {
               <el-table :data="pipeLimitData" border stripe size="small" height="200" @selection-change="handlePipeLimitSelectionChange">
                 <el-table-column type="selection" width="40" />
                 <el-table-column prop="id" label="ID" width="40" />
-                <el-table-column prop="grade" label="管材等级编码" />
-                <el-table-column prop="std" label="管材标准编码" />
-                <el-table-column prop="gradeCode" label="牌号编码" />
-                <el-table-column prop="press" label="法兰压力等级编码" align="center"/>
+                <el-table-column prop="pipingClassCode" label="管材等级编码 A" />
+                <el-table-column prop="pipingStandardCode" label="管材标准编码 B2" />
+                <el-table-column prop="materialsGradeCode" label="牌号编码 B3" />
+                <el-table-column prop="pressureRatingCode" label="法兰压力等级编码 C2" align="center"/>
               </el-table>
             </div>
           </div>

@@ -15,7 +15,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://m1.apifoxmock.com/m1/7605679-7344432-default",
+        target: "http://localhost:5021",
         changeOrigin: true,
         secure: false,
       },
