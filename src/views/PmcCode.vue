@@ -220,18 +220,77 @@ const optionsC1 = ref(['GB2506', 'GB/T 9119'])
 const optionsC2 = ref(['6bar', '10bar', '16bar', '20bar'])
 const optionsD = ref(['SCH40', 'SCH80', 'SCH160'])
 
-// Save Data (API Placeholder)
-const saveToApi = () => {
-  // Placeholder for saving resultData to backend
-  console.log('Saving resultData to API...', resultData.value)
-  alert('保存成功')
+// 保存PMC编码到后端
+const saveToApi = async () => {
+  if (!selectedShipType.value || !selectedShipNumber.value) {
+    ElMessage.error('请填写船型船号')
+    return
+  }
+
+  const payload = {
+    shipType: selectedShipType.value,
+    shipNo: selectedShipNumber.value,
+    items: resultData.value.map(row => ({
+      pmcCode: row.pmc,
+      pipingClassName: row.a,
+      materialsCategoryName: row.b1,
+      pipingStandardName: row.b2,
+      materialsGradeName: row.b3,
+      flangeStandardName: row.c1,
+      pressureRatingName: row.c2,
+      scheduleThicknessName: row.d
+    }))
+  }
+
+  try {
+    const res = await axios.post('/api/pmc/pmccode/save', payload)
+    if (res?.data?.code === 200) {
+      ElMessage.success(res.data.message || '保存成功')
+    } else {
+      ElMessage.error(res?.data?.message || '保存失败')
+    }
+  } catch (error) {
+    console.error('保存PMC编码失败', error)
+    ElMessage.error('保存PMC编码失败')
+  }
 }
 
-// Refresh Data (API Placeholder)
-const refreshData = () => {
-  // Placeholder for querying data based on shipType/shipNumber
-  console.log(`Refreshing data for ${selectedShipType.value} - ${selectedShipNumber.value}`)
-  alert('刷新成功')
+// Refresh Data
+const refreshData = async () => {
+  if (!selectedShipType.value || !selectedShipNumber.value) {
+    ElMessage.error('请填写船型船号')
+    return
+  }
+
+  try {
+    const res = await axios.get('/api/pmc/pmccode/query', {
+      params: {
+        shipType: selectedShipType.value,
+        shipNo: selectedShipNumber.value
+      }
+    })
+
+    if (res.data?.code === 200) {
+      const list = res.data.data || []
+      resultData.value = list.map((item, index) => ({
+        id: index + 1,
+        pmc: item.pmcCode,
+        a: item.pipingClassName,
+        b1: item.materialsCategoryName,
+        b2: item.pipingStandardName,
+        b3: item.materialsGradeName,
+        c1: item.flangeStandardName,
+        c2: item.pressureRatingName,
+        d: item.scheduleThicknessName
+      }))
+      ElMessage.success(`刷新成功，共 ${list.length} 条数据`)
+    } else {
+      ElMessage.error(res.data?.message || '刷新失败')
+    }
+  } catch (error) {
+    console.error('Refresh failed:', error)
+    ElMessage.error('刷新失败')
+  }
 }
 
 // Add Button Click -> Open Dialog
@@ -241,23 +300,6 @@ const handleAdd = () => {
   formData.value = { a: '', b1: '', b2: '', b3: '', c1: '', c2: '', d: '' }
   editDialogVisible.value = true
 }
-
-// Double Click Row -> Open Edit Dialog
-// const handleRowDblClick = (row) => {
-//   dialogTitle.value = '编辑 PMC 数据'
-//   currentEditingId.value = row.id
-//   // Copy row data to form (excluding pmc and id)
-//   formData.value = {
-//     a: row.a,
-//     b1: row.b1,
-//     b2: row.b2,
-//     b3: row.b3,
-//     c1: row.c1,
-//     c2: row.c2,
-//     d: row.d
-//   }
-//   editDialogVisible.value = true
-// }
 
 // Save Dialog Data
 const saveDialogData = () => {
@@ -623,7 +665,6 @@ const cancelCopyRule = () => {
           style="width: 100%" 
           height="400" 
           @selection-change="handleSelectionChange"
-          @row-dblclick="handleRowDblClick"
         >
           <el-table-column type="selection" width="50" align="center" />
           <el-table-column label="序号" width="60" align="center">
