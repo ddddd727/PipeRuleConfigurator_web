@@ -2,11 +2,19 @@
   <div class="basic-config-container">
     <div class="basic-config-content">
       <!-- 左侧目录树 -->
-      <div class="basic-config-sidebar">
+      <div class="basic-config-sidebar" :class="{ 'collapsed': sidebarCollapsed }">
         <div class="sidebar-header">
-          <span>目录</span>
+          <span v-show="!sidebarCollapsed">目录</span>
+          <el-button 
+            class="collapse-btn" 
+            @click="toggleSidebar"
+            circle
+            size="small"
+          >
+            <el-icon><ArrowLeft v-if="!sidebarCollapsed" /><ArrowRight v-else /></el-icon>
+          </el-button>
         </div>
-        <div class="sidebar-tree">
+        <div class="sidebar-tree" v-show="!sidebarCollapsed">
           <el-tree
             ref="treeRef"
             :data="treeData"
@@ -48,7 +56,7 @@
             </div>
             
             <!-- 操作按钮组 -->
-            <div class="action-buttons">
+            <div class="action-buttons" v-if="currentConfig.id !== 'shortcode-major'">
               <el-button 
                 size="small" 
                 type="primary" 
@@ -293,6 +301,11 @@ import {
   View
 } from '@element-plus/icons-vue'
 
+const sidebarCollapsed = ref(false)
+const toggleSidebar = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
 const LOCAL_COLUMNS = {
   'bend-pipe': [
     { prop: 'MachineNum', label: '机器号', editable: true },
@@ -314,6 +327,10 @@ const LOCAL_COLUMNS = {
   'shortcode': [
     { prop: 'type', label: 'ShortCodeHierarchyType', editable: true },
     { prop: 'shortcode', label: 'ShortCode', editable: true }
+  ],
+  'shortcode-major': [
+    { prop: 'ShortCodeHierarchyTypeShortDescription', label: 'ShortCodeHierarchyTypeShortDescription', editable: false },
+    { prop: 'ShortCodeHierarchyTypeLongDescription', label: 'ShortCodeHierarchyTypeLongDescription', editable: false }
   ],
   'spec': [
     { prop: 'shortcode', label: 'ShortCode', editable: true },
@@ -370,7 +387,8 @@ const treeData = ref([
     icon: Folder,
     children: [
       { id: 'wall-thickness-series', label: '壁厚等级', icon: Document },
-      { id: 'shortcode', label: 'ShortCode', icon: Document },
+      { id: 'shortcode-major', label: 'ShortCode大类', icon: Document },
+      { id: 'shortcode', label: 'ShortCode小类', icon: Document },
       { id: 'spec', label: 'Spec', icon: Document }
     ]
   },
@@ -459,18 +477,39 @@ const tableRowClassName = ({ row }) => {
 
 const handleNodeClick = (node) => {
   if (node.id !== 'basic') {
-    // 如果该配置尚未加载，则加载
-    if (!configs[node.id] && db[node.id]) {
-      const mockData = Mock.mock(db[node.id])
-      configs[node.id] = {
-        id: node.id,
-        title: mockData.title || node.id,
-        selectedRows: [],
-        columns: (LOCAL_COLUMNS[node.id] || (mockData.columns || [])).map(col => ({
-          ...col,
-          editable: col.editable !== undefined ? col.editable : true
-        })),
-        data: mockData.data || []
+    if (!configs[node.id]) {
+      if (node.id === 'shortcode-major') {
+        let source = null
+        if (db['shortcode']) {
+          source = Mock.mock(db['shortcode'])
+        }
+        const baseRows = Array.isArray(source?.data) ? source.data : []
+        configs['shortcode-major'] = {
+          id: 'shortcode-major',
+          title: '部件库名称：ShortCodeHierarchyRule',
+          selectedRows: [],
+          columns: (LOCAL_COLUMNS['shortcode-major'] || []).map(col => ({
+            ...col,
+            editable: col.editable !== undefined ? col.editable : true
+          })),
+          data: baseRows.map((item, index) => ({
+            id: item.id ?? index + 1,
+            ShortCodeHierarchyTypeShortDescription: item.type ?? '',
+            ShortCodeHierarchyTypeLongDescription: item.shortcode ?? ''
+          }))
+        }
+      } else if (db[node.id]) {
+        const mockData = Mock.mock(db[node.id])
+        configs[node.id] = {
+          id: node.id,
+          title: mockData.title || node.id,
+          selectedRows: [],
+          columns: (LOCAL_COLUMNS[node.id] || (mockData.columns || [])).map(col => ({
+            ...col,
+            editable: col.editable !== undefined ? col.editable : true
+          })),
+          data: mockData.data || []
+        }
       }
     }
     
@@ -774,6 +813,7 @@ const editSaveLoading = ref(false)
 const handleRowDblClick = (row) => {
   const config = currentConfig.value
   if (!config) return
+  if (config.id === 'shortcode-major') return
   editRowData.value = { ...row }
   if (config.id === 'wall-thickness-series') {
     editRowData.value.scheduleThickness = getScheduleCode(editRowData.value.scheduleThickness)
@@ -999,12 +1039,24 @@ watch(currentNode, (node) => {
   overflow: hidden;
 }
 
+.basic-config-sidebar.collapsed {
+  width: 60px;
+}
+
 .sidebar-header {
-  padding: 16px;
+  padding: 16px 10px;
   border-bottom: 1px solid #e4e7ed;
   font-weight: 600;
   color: #303133;
   background-color: #fafafa;
+  background-color: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.collapse-btn {
+  margin-left: 8px;
 }
 
 .sidebar-tree {
