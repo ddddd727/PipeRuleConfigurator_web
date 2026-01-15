@@ -80,13 +80,18 @@ const fetchShipInfos = async () => {
   }
 }
 
+let pmcRulesRequestId = 0
+
 // 获取船号的 PMC 规则数据
 const fetchPmcRules = async (shipNumber) => {
+  const requestId = ++pmcRulesRequestId
   treeLoading.value = true
   try {
     const res = await axios.get(`/api/PmcSpec/PmcRules/${shipNumber}`)
     if (res.data.code === 200) {
-      treeData.value = transformToTreeStructure(res.data.data)
+      if (requestId === pmcRulesRequestId) {
+        treeData.value = transformToTreeStructure(res.data.data)
+      }
     } else {
       ElMessage.error(res.data.message || '获取PMC规则数据失败')
     }
@@ -94,7 +99,9 @@ const fetchPmcRules = async (shipNumber) => {
     console.error('获取PMC规则数据错误:', error)
     ElMessage.error('网络错误，获取PMC规则数据失败')
   } finally {
-    treeLoading.value = false
+    if (requestId === pmcRulesRequestId) {
+      treeLoading.value = false
+    }
   }
 }
 
@@ -108,7 +115,7 @@ const transformToTreeStructure = (data) => {
 
   data.forEach(item => {
     const material = item.material
-    const pipeStandard = item.pipeStadard
+    const pipeStandard = item.pipeStandard || item.pipeStadard
     const pmcCode = item.pmcCode
 
     if (!materialMap.has(material)) {
@@ -132,7 +139,7 @@ const transformToTreeStructure = (data) => {
       label: pmcCode,
       shipNumber: item.shipNumber,
       material: item.material,
-      pipeStandard: item.pipeStadard,
+      pipeStandard: pipeStandard || '',
       status: item.status
     })
   })
@@ -271,11 +278,11 @@ const configButtons = ref([
 // 当前选中的按钮ID
 const currentButtonId = ref(null)
 
-// 获取所有NPD值并计算最小和最大值
-const getAllNpdValues = () => {
+// 获取所有NPD值并排序（缓存计算结果）
+const allNpdValues = computed(() => {
   const npdRow = dimensionData.value.find(row => row.name === 'NPD')
   if (!npdRow) return []
-  
+
   const values = []
   // 直接获取所有以col开头的属性，不依赖columnCount
   for (const key in npdRow) {
@@ -287,19 +294,19 @@ const getAllNpdValues = () => {
     }
   }
   return values.sort((a, b) => a - b)
-}
+})
 
 // 获取最小NPD值
-const getMinNpdValue = () => {
-  const values = getAllNpdValues()
+const minNpdValue = computed(() => {
+  const values = allNpdValues.value
   return values.length > 0 ? values[0] : null
-}
+})
 
 // 获取最大NPD值
-const getMaxNpdValue = () => {
-  const values = getAllNpdValues()
+const maxNpdValue = computed(() => {
+  const values = allNpdValues.value
   return values.length > 0 ? values[values.length - 1] : null
-}
+})
 
 // 选择范围变量 - 默认选中所有NPD
 const selectedMin = ref(null)
@@ -334,8 +341,8 @@ onMounted(async () => {
   
   // 数据加载完成后初始化NPD默认选择范围
   if (dimensionData.value.length > 0) {
-    selectedMin.value = getMinNpdValue()
-    selectedMax.value = getMaxNpdValue()
+    selectedMin.value = minNpdValue.value
+    selectedMax.value = maxNpdValue.value
   }
 })
 
@@ -371,25 +378,14 @@ const filteredNpdRanges = computed(() => {
   if (selectedMin.value === null || selectedMax.value === null) {
     return []
   }
-  
-  // 从dimensionData中获取NPD行的数据
-  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
-  if (!npdRow) {
-    return []
-  }
-  
-  // 提取所有NPD值并过滤出选中范围内的值
-  const npdValues = []
-  for (let i = 1; i <= columnCount.value; i++) {
-    const value = parseInt(npdRow[`col${i}`])
-    if (!isNaN(value) && value >= selectedMin.value && value <= selectedMax.value) {
-      npdValues.push(value)
-    }
-  }
-  
+
+  const npdValues = allNpdValues.value.filter(
+    value => value >= selectedMin.value && value <= selectedMax.value
+  )
+
   // 为每个NPD值生成一个单独的范围选项
-  return npdValues.map((value, index) => ({
-    id: `${value}-${Date.now()}`,
+  return npdValues.map(value => ({
+    id: `npd-${value}`,
     minSize: value,
     maxSize: value,
     name: `通径 ${value} mm`
@@ -1050,19 +1046,6 @@ const getStatusLabel = (status) => {
 .reconfig-btn {
   align-self: flex-end;
   margin-top: 8px;
-}
-
-.config-type-label {
-  position: absolute;
-  top: 8px;
-  left: 12px;
-  z-index: 2;
-  font-size: 12px;
-  font-weight: 600;
-  background: rgba(255,255,255,0.85);
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid rgba(0,0,0,0.06);
 }
 
 .config-add-btn {
