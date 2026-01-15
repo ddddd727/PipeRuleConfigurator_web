@@ -11,6 +11,7 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  // 👇 核心配置：添加代理转发
   server: {
     proxy: {
       '/api': {
