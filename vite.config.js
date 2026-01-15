@@ -14,11 +14,10 @@ export default defineConfig({
   // 👇 核心配置：添加代理转发
   server: {
     proxy: {
-      "/api": {
-        target: "https://m1.apifoxmock.com/m1/7605679-7344432-default",
-        changeOrigin: true,
-        secure: false,
-      },
-    },
+      '/api': {
+        target: 'http://localhost:5022',
+        changeOrigin: true
+      }
+    }
   }
 })
