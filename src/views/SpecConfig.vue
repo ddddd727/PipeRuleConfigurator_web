@@ -87,7 +87,7 @@
                  />
                </el-select>
                <el-button type="primary" @click="openSaveRuleModal">新增</el-button>
-               <el-button type="primary" >编辑</el-button>
+               <el-button type="primary" @click="deleteResultData">删除数据</el-button>
               <el-button @click="confirmDeleteRule" type="danger" >删除规则</el-button>
               <el-button type="primary" @click="saveData">保存</el-button>
                      
@@ -190,7 +190,7 @@
           />
         </el-select>
         <el-button type="primary" @click="openSaveRuleModal">新增</el-button>
-        <el-button type="primary" >编辑</el-button>       
+        <el-button type="primary" @click="deleteC1C2ResultData">删除数据</el-button>       
         <el-button @click="confirmDeleteRule" type="danger">删除规则</el-button>
         <el-button type="primary" @click="saveC1C2Data">保存</el-button>          
       </div>
@@ -303,7 +303,7 @@
                  />
                </el-select>
                <el-button type="primary" @click="openSaveRuleModal">新增</el-button>
-               <el-button type="primary" >编辑</el-button>
+               <el-button type="primary" @click="deleteLimitResultData">删除数据</el-button>
               <el-button type="danger" @click="confirmDeleteRule">删除规则</el-button>
               <el-button type="primary" @click="saveLimitData">保存</el-button>
             </div>
@@ -354,6 +354,34 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- Save Confirm Dialog -->
+    <el-dialog v-model="saveConfirmVisible" title="保存确认" width="400px" center>
+      <div style="text-align: center; padding: 20px;">
+        规则“{{ currentRuleNameForDialog }}”共包含 {{ currentCountForDialog }} 条数据，是否保存？
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="saveConfirmVisible = false">取消</el-button>
+          <el-button type="primary" plain @click="handleRenameSaveClick">重命名保存</el-button>
+          <el-button type="primary" @click="handleConfirmSave">确认</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- Rename Save Dialog -->
+    <el-dialog v-model="renameSaveVisible" title="重命名保存" width="400px" center>
+      <div style="display: flex; align-items: center; justify-content: center; padding: 20px 0;">
+        <span style="margin-right: 10px; font-weight: bold;">新规则名:</span>
+        <el-input v-model="newRuleNameForSave" placeholder="请输入新规则名称" style="width: 200px;" />
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="renameSaveVisible = false">取消</el-button>
+          <el-button type="primary" @click="performRenameSave">确认</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -370,6 +398,124 @@ const selectedRuleC1C2 = ref('')
 const ruleOptionsC1C2 = ref([])
 const selectedRuleLimit = ref('')
 const ruleOptionsLimit = ref([])
+
+// Save Dialog State
+const saveConfirmVisible = ref(false)
+const renameSaveVisible = ref(false)
+const newRuleNameForSave = ref('')
+const pendingSaveType = ref('')
+
+const currentRuleNameForDialog = computed(() => {
+  if (pendingSaveType.value === 'b1b2b3d') return selectedRuleB1B2B3D.value
+  if (pendingSaveType.value === 'c1c2') return selectedRuleC1C2.value
+  if (pendingSaveType.value === 'limit') return selectedRuleLimit.value
+  return ''
+})
+
+const currentCountForDialog = computed(() => {
+  if (pendingSaveType.value === 'b1b2b3d') return resultSelection.value.length
+  if (pendingSaveType.value === 'c1c2') return resultC1C2Selection.value.length
+  if (pendingSaveType.value === 'limit') return resultLimitSelection.value.length
+  return 0
+})
+
+// Unified Save Execution
+const executeSave = async (type, ruleName, selectedData) => {
+  try {
+    let url = ''
+    let payload = []
+    
+    if (type === 'b1b2b3d') {
+       url = `/api/S3dRuleB1b2b3d/${ruleName}`
+       payload = selectedData.map(row => ({
+          materialsCategoryCl: row.b1Cl,
+          geometricIndustryStandardCl: row.b2Cl,
+          materialsGradeCl: row.b3Cl,
+          scheduleThicknessCl: row.dCl,
+          ruleName: ruleName
+       }))
+    } else if (type === 'c1c2') {
+       url = `/api/S3dRuleC1c2/${ruleName}`
+       payload = selectedData.map(row => ({
+          geometricIndustryStandardCl: row.c1Cl,
+          pressureRatingCl: row.c2Cl,
+          ruleName: ruleName
+       }))
+    } else if (type === 'limit') {
+       url = `/api/S3dRuleAb2b3c2/${ruleName}`
+       payload = selectedData.map(row => ({
+          pipingClassCl: Number(row.aCl ?? 0) || 0,
+          geometricIndustryStandardCl: Number(row.b2Cl ?? 0) || 0,
+          materialsGradeCl: Number(row.b3Cl ?? 0) || 0,
+          pressureRatingCl: Number(row.c2Cl ?? 0) || 0,
+          ruleName: ruleName
+       }))
+    }
+    
+    const res = await axios.post(url, payload)
+    const ok =
+      res.status === 200 &&
+      (res.data?.code === 200 ||
+        res.data?.code === undefined ||
+        res.data?.success === true)
+        
+    if (ok) {
+      ElMessage.success('保存成功')
+    } else {
+      ElMessage.error(res.data?.message || res.data?.msg || '保存失败')
+    }
+  } catch (error) {
+     console.error(error)
+     ElMessage.error('请求失败: ' + (error.message || '未知错误'))
+  }
+}
+
+const handleConfirmSave = () => {
+  if (pendingSaveType.value === 'b1b2b3d') {
+     executeSave('b1b2b3d', selectedRuleB1B2B3D.value, resultSelection.value)
+  } else if (pendingSaveType.value === 'c1c2') {
+     executeSave('c1c2', selectedRuleC1C2.value, resultC1C2Selection.value)
+  } else if (pendingSaveType.value === 'limit') {
+     executeSave('limit', selectedRuleLimit.value, resultLimitSelection.value)
+  }
+  saveConfirmVisible.value = false
+}
+
+const handleRenameSaveClick = () => {
+  saveConfirmVisible.value = false
+  newRuleNameForSave.value = ''
+  renameSaveVisible.value = true
+}
+
+const performRenameSave = () => {
+  if (!newRuleNameForSave.value.trim()) {
+    ElMessage.warning('请输入新规则名称')
+    return
+  }
+  const newName = newRuleNameForSave.value.trim()
+  
+  if (pendingSaveType.value === 'b1b2b3d') {
+     if (!ruleOptionsB1B2B3D.value.includes(newName)) {
+        ruleOptionsB1B2B3D.value.push(newName)
+     }
+     selectedRuleB1B2B3D.value = newName
+     executeSave('b1b2b3d', newName, resultSelection.value)
+  } else if (pendingSaveType.value === 'c1c2') {
+     if (!ruleOptionsC1C2.value.includes(newName)) {
+        ruleOptionsC1C2.value.push(newName)
+     }
+     selectedRuleC1C2.value = newName
+     executeSave('c1c2', newName, resultC1C2Selection.value)
+  } else if (pendingSaveType.value === 'limit') {
+     if (!ruleOptionsLimit.value.includes(newName)) {
+        ruleOptionsLimit.value.push(newName)
+     }
+     selectedRuleLimit.value = newName
+     executeSave('limit', newName, resultLimitSelection.value)
+  }
+  
+  renameSaveVisible.value = false
+}
 
 // Table Refs
 const b1Selection = ref('')
@@ -615,9 +761,8 @@ const generateData = () => {
   }
 }
 
-const saveData = async () => {
-  const selected = resultSelection.value
-  if (selected.length === 0) {
+const saveData = () => {
+  if (resultSelection.value.length === 0) {
     ElMessage.warning('请选择要保存的行')
     return
   }
@@ -625,30 +770,8 @@ const saveData = async () => {
     ElMessage.warning('请选择规则')
     return
   }
-  
-  try {
-    const payload = selected.map(row => ({
-      materialsCategoryCl: row.b1Cl,
-      geometricIndustryStandardCl: row.b2Cl,
-      materialsGradeCl: row.b3Cl,
-      scheduleThicknessCl: row.dCl,
-      ruleName: selectedRuleB1B2B3D.value
-    }))
-    const res = await axios.post(`/api/S3dRuleB1b2b3d/${selectedRuleB1B2B3D.value}`, payload)
-    const ok =
-      res.status === 200 &&
-      (res.data?.code === 200 ||
-        res.data?.code === undefined ||
-        res.data?.success === true)
-    if (ok) {
-      ElMessage.success('保存成功')
-    } else {
-      ElMessage.error(res.data?.message || res.data?.msg || '保存失败')
-    }
-  } catch (error) {
-    console.error(error)
-    ElMessage.error('请求失败: ' + (error.message || '未知错误'))
-  }
+  pendingSaveType.value = 'b1b2b3d'
+  saveConfirmVisible.value = true
 }
 
 const fetchRuleNames = async (type) => {
@@ -996,9 +1119,8 @@ const generateC1C2Data = () => {
   }
 }
 
-const saveC1C2Data = async () => {
-  const selected = resultC1C2Selection.value
-  if (selected.length === 0) {
+const saveC1C2Data = () => {
+  if (resultC1C2Selection.value.length === 0) {
     ElMessage.warning('请选择要保存的行')
     return
   }
@@ -1006,28 +1128,8 @@ const saveC1C2Data = async () => {
     ElMessage.warning('请选择规则')
     return
   }
-  
-  try {
-    const payload = selected.map(row => ({
-      geometricIndustryStandardCl: row.c1Cl,
-      pressureRatingCl: row.c2Cl,
-      ruleName: selectedRuleC1C2.value
-    }))
-    const res = await axios.post(`/api/S3dRuleC1c2/${selectedRuleC1C2.value}`, payload)
-    const ok =
-      res.status === 200 &&
-      (res.data?.code === 200 ||
-        res.data?.code === undefined ||
-        res.data?.success === true)
-    if (ok) {
-      ElMessage.success('保存成功')
-    } else {
-      ElMessage.error(res.data?.message || res.data?.msg || '保存失败')
-    }
-  } catch (error) {
-    console.error(error)
-    ElMessage.error('请求失败: ' + (error.message || '未知错误'))
-  }
+  pendingSaveType.value = 'c1c2'
+  saveConfirmVisible.value = true
 }
 
 const handleC1Change = (row) => {
@@ -1250,9 +1352,8 @@ const generateLimitData = () => {
   }
 }
 
-const saveLimitData = async () => {
-  const selected = resultLimitSelection.value
-  if (selected.length === 0) {
+const saveLimitData = () => {
+  if (resultLimitSelection.value.length === 0) {
     ElMessage.warning('请选择要保存的行')
     return
   }
@@ -1260,35 +1361,8 @@ const saveLimitData = async () => {
     ElMessage.warning('请选择规则')
     return
   }
-
-  try {
-    const payload = selected.map(row => ({
-      pipingClassCl: Number(row.aCl ?? 0) || 0,
-      geometricIndustryStandardCl: Number(row.b2Cl ?? 0) || 0,
-      materialsGradeCl: Number(row.b3Cl ?? 0) || 0,
-      pressureRatingCl: Number(row.c2Cl ?? 0) || 0,
-      ruleName: selectedRuleLimit.value
-    }))
-    const res = await axios.post(`/api/S3dRuleAb2b3c2/${selectedRuleLimit.value}`, payload)
-    const ok =
-      res.status === 200 &&
-      (res.data?.code === 200 ||
-        res.data?.code === undefined ||
-        res.data?.success === true)
-    if (ok) {
-      ElMessage.success('保存成功')
-    } else {
-      ElMessage.error(res.data?.message || res.data?.msg || '保存失败')
-    }
-  } catch (error) {
-    console.error('saveLimitData error:', error?.response || error)
-    const msg =
-      error?.response?.data?.message ||
-      error?.response?.data?.msg ||
-      error.message ||
-      '未知错误'
-    ElMessage.error('请求失败: ' + msg)
-  }
+  pendingSaveType.value = 'limit'
+  saveConfirmVisible.value = true
 }
 
 const handleAChange = (row) => {
