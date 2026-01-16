@@ -2,6 +2,7 @@
 import { ref, watch, onMounted } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { Plus, Delete, Check } from '@element-plus/icons-vue'
 
 // --- Data & State ---
 
@@ -705,19 +706,17 @@ const cancelCopyRule = () => {
     <!-- Top Section -->
     <div class="section-block">
       <!-- Top Toolbar -->
-      <div class="toolbar">
-        <div class="left-tools">
-          <el-select v-model="selectedShipType" placeholder="船型" style="width: 120px; margin-right: 10px;">
+      <div class="table-header">
+        <div class="title-area">
+          <el-select v-model="selectedShipType" placeholder="船型" style="width: 120px;">
             <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
-          <el-select v-model="selectedShipNumber" placeholder="船号" style="width: 120px; margin-right: 30px;">
+          <el-select v-model="selectedShipNumber" placeholder="船号" style="width: 120px;">
             <el-option v-for="item in shipNumbers" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
-          <el-button type="primary" plain @click="generatePmcCode">生成7位编码</el-button>
         </div>
-        <div class="right-tools">
-          <!-- <el-button type="primary" plain>编辑</el-button>
-          <el-button type="success" plain>保存</el-button> -->
+        <div class="actions">
+          <el-button type="primary" @click="generatePmcCode">生成7位编码</el-button>
         </div>
       </div>
 
@@ -822,19 +821,21 @@ const cancelCopyRule = () => {
     <!-- Bottom Section -->
     <div class="section-block bottom-block">
       <!-- Bottom Toolbar -->
-      <div class="toolbar">
-        <div class="left-tools">
-          <el-select v-model="selectedShipType" placeholder="船型" style="width: 120px; margin-right: 10px;">
+      <div class="table-header">
+        <div class="title-area">
+          <el-select v-model="selectedShipType" placeholder="船型" style="width: 120px;">
             <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
-          <el-select v-model="selectedShipNumber" placeholder="船号" style="width: 120px; margin-right: 30px;">
+          <el-select v-model="selectedShipNumber" placeholder="船号" style="width: 120px;">
             <el-option v-for="item in shipNumbers" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
-          <el-button type="primary" plain @click="refreshData">刷新</el-button>
-          <el-button type="primary" plain @click="handleAdd">增加</el-button>
-          <el-button type="primary" plain @click="handleDelete">删除</el-button>
-          <el-button type="primary" plain @click="saveToApi">保存</el-button>
-          <el-button type="primary" plain @click="openCopyRuleDialog">从其他船号复制规则</el-button>
+        </div>
+        <div class="actions">
+          <el-button @click="refreshData">刷新</el-button>
+          <el-button @click="openCopyRuleDialog">从其他船号复制规则</el-button>
+          <el-button type="primary" icon="Plus" @click="handleAdd">增加</el-button>
+          <el-button type="danger" plain icon="Delete" :disabled="selectedRows.length === 0" @click="handleDelete">删除</el-button>
+          <el-button type="primary" icon="Check" @click="saveToApi">保存</el-button>
         </div>
       </div>
 
@@ -920,7 +921,7 @@ const cancelCopyRule = () => {
   <el-dialog title="从其他船号复制规则" v-model="copyRuleDialogVisible" width="40%" :before-close="cancelCopyRule">
     <el-form label-width="120px" style="max-width: 500px; margin: 0 auto;">
       <el-form-item label="数据源船号">
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; gap: 12px;">
           <el-select v-model="sourceShipType" placeholder="数据源船型" style="width: 120px;">
             <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
@@ -930,7 +931,7 @@ const cancelCopyRule = () => {
         </div>
       </el-form-item>
       <el-form-item label="目标船号">
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; gap: 12px;">
           <el-select v-model="targetShipType" placeholder="目标船型" style="width: 120px;">
             <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
@@ -972,11 +973,23 @@ const cancelCopyRule = () => {
   min-height: 0;
 }
 
-.toolbar {
+.table-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
+}
+
+.title-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .rule-row {
@@ -987,13 +1000,13 @@ const cancelCopyRule = () => {
 .rule-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .rule-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   white-space: nowrap;
 }
 
