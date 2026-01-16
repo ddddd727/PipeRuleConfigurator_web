@@ -325,8 +325,8 @@ const LOCAL_COLUMNS = {
     { prop: 'status', label: '状态', editable: true, type: 'status', hidden: true }
   ],
   'shortcode': [
-    { prop: 'type', label: 'ShortCodeHierarchyType', editable: true },
-    { prop: 'shortcode', label: 'ShortCode', editable: true }
+    { prop: 'shortCodeHierarchyType', label: 'ShortCodeHierarchyType', editable: true },
+    { prop: 'shortCode', label: 'ShortCode', editable: true }
   ],
   'shortcode-major': [
     { prop: 'ShortCodeHierarchyTypeShortDescription', label: 'ShortCodeHierarchyTypeShortDescription', editable: false },
@@ -545,7 +545,6 @@ const handleDeleteRows = (configId) => {
     '删除确认',
     { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
   ).then(async () => {
-    // 针对 bend-pipe 走后端删除接口
     if (configId === 'bend-pipe') {
       try {
         const deletePromises = config.selectedRows.map(row => 
@@ -563,7 +562,6 @@ const handleDeleteRows = (configId) => {
       return
     }
 
-    // 针对 wall-thickness-series 走后端删除接口
     if (configId === 'wall-thickness-series') {
       try {
         const deletePromises = config.selectedRows.map(row => 
@@ -573,6 +571,22 @@ const handleDeleteRows = (configId) => {
         ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
         // 刷新数据
         await fetchWallThicknessData()
+        config.selectedRows = []
+      } catch (error) {
+        console.error('删除失败:', error)
+        ElMessage.error('删除失败，请重试')
+      }
+      return
+    }
+
+    if (configId === 'shortcode') {
+      try {
+        const deletePromises = config.selectedRows.map(row =>
+          axios.delete(`/api/S3dRuleShortCodeHierarchyRule/${row.id}`)
+        )
+        await Promise.all(deletePromises)
+        ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
+        await fetchShortCodeMinorData()
         config.selectedRows = []
       } catch (error) {
         console.error('删除失败:', error)
@@ -772,21 +786,50 @@ const confirmBatchAdd = async () => {
           tableBody.scrollTop = tableBody.scrollHeight
         }
       }, 100)
+    } else if (config.id === 'shortcode') {
+      let successCount = 0
+      let failCount = 0
+
+      for (const row of finalRowsToAdd) {
+        try {
+          const payload = {
+            shortCodeHierarchyType: row.shortCodeHierarchyType,
+            shortCode: row.shortCode
+          }
+          await axios.post('/api/S3dRuleShortCodeHierarchyRule', payload)
+          successCount++
+        } catch (e) {
+          console.error('新增单行失败:', e)
+          failCount++
+        }
+      }
+
+      await fetchShortCodeMinorData()
+      if (successCount > 0) {
+        ElMessage.success(`成功添加 ${successCount} 条数据${failCount > 0 ? `，失败 ${failCount} 条` : ''}`)
+      } else {
+        ElMessage.error('批量新增全部失败，请检查数据或网络')
+      }
+      setTimeout(() => {
+        const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
+                          || document.querySelector('.el-table__body-wrapper')
+        if (tableBody) {
+          tableBody.scrollTop = tableBody.scrollHeight
+        }
+      }, 100)
     } else {
-      // 其他配置：前端模拟添加
       let newId = config.data.length > 0 
         ? Math.max(...config.data.map(item => item.id)) + 1 
         : 1
-        
+
       const newRows = batchAddData.value.map((row, index) => ({
         ...row,
         id: newId + index
       }))
-      
+
       config.data.push(...newRows)
       ElMessage.success(`成功添加 ${batchAddData.value.length} 条数据`)
-      
-      // 自动滚动到底部
+
       setTimeout(() => {
         const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
                           || document.querySelector('.el-table__body-wrapper')
@@ -883,6 +926,13 @@ const confirmEdit = async () => {
       await axios.put('/api/S3dDictWallThickness', payload)
       await fetchWallThicknessData()
       ElMessage.success('更新成功')
+    } else if (config.id === 'shortcode') {
+      const payload = {
+        ...editRowData.value
+      }
+      await axios.put('/api/S3dRuleShortCodeHierarchyRule', payload)
+      await fetchShortCodeMinorData()
+      ElMessage.success('更新成功')
     } else {
       const idx = config.data.findIndex(r => r.id === editRowData.value.id)
       if (idx !== -1) {
@@ -927,36 +977,74 @@ const handleImageError = () => {
 const fetchBendPipeData = async () => {
   try {
     const res = await axios.get('/api/DspSpmcDictPipingBendData')
-    if (res?.data?.code === 200) {
-      const rows = Array.isArray(res.data.data) ? res.data.data : []
-      // 确保每一行都有 status 和 MachineNum 字段，并做归一化
-      const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
-      rows.forEach(row => {
-        if (row.status === undefined) {
-          row.status = true
-        } else {
-          row.status = toBool(row.status)
-        }
-        if (row.MachineNum === undefined) {
-          row.MachineNum = row.machineNum ?? row.machineNumber ?? ''
-        }
-      })
-
-      const cfg = configs['bend-pipe'] || {
-        id: 'bend-pipe',
-        title: '弯管机数据',
-        selectedRows: [],
-        columns: [],
-        data: []
-      }
-      cfg.columns = LOCAL_COLUMNS['bend-pipe'] || []
-      cfg.data = rows
-      configs['bend-pipe'] = cfg
+    const payload = res?.data
+    let rows = []
+    if (Array.isArray(payload)) {
+      rows = payload
+    } else if (Array.isArray(payload?.data)) {
+      rows = payload.data
+    } else if (payload?.code === 200 && Array.isArray(payload?.data)) {
+      rows = payload.data
     } else {
-      ElMessage.error(res?.data?.message || '弯管机数据接口返回异常')
+      rows = []
     }
+    const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
+    rows.forEach(row => {
+      if (row.status === undefined) {
+        row.status = true
+      } else {
+        row.status = toBool(row.status)
+      }
+      if (row.MachineNum === undefined) {
+        row.MachineNum = row.machineNum ?? row.machineNumber ?? ''
+      }
+    })
+    const cfg = configs['bend-pipe'] || {
+      id: 'bend-pipe',
+      title: '弯管机数据',
+      selectedRows: [],
+      columns: [],
+      data: []
+    }
+    cfg.columns = LOCAL_COLUMNS['bend-pipe'] || []
+    cfg.data = rows
+    configs['bend-pipe'] = cfg
   } catch (e) {
     ElMessage.error(`弯管机数据接口请求失败：${e?.message || '网络错误'}`)
+  }
+}
+
+const fetchShortCodeMinorData = async () => {
+  try {
+    const res = await axios.get('/api/S3dRuleShortCodeHierarchyRule')
+    const payload = res?.data
+    let rows = []
+    if (Array.isArray(payload)) {
+      rows = payload
+    } else if (Array.isArray(payload?.data)) {
+      rows = payload.data
+    } else if (payload?.code === 200 && Array.isArray(payload?.data)) {
+      rows = payload.data
+    } else {
+      rows = []
+    }
+    rows = rows.map((r, idx) => ({
+      id: r.id ?? idx + 1,
+      shortCodeHierarchyType: r.shortCodeHierarchyType ?? r.ShortCodeHierarchyType ?? '',
+      shortCode: r.shortCode ?? r.ShortCode ?? ''
+    }))
+    const cfg = configs['shortcode'] || {
+      id: 'shortcode',
+      title: '部件库名称：ShortCodeHierarchyRule',
+      selectedRows: [],
+      columns: [],
+      data: []
+    }
+    cfg.columns = LOCAL_COLUMNS['shortcode'] || []
+    cfg.data = rows
+    configs['shortcode'] = cfg
+  } catch (e) {
+    ElMessage.error(`ShortCode小类接口请求失败：${e?.message || '网络错误'}`)
   }
 }
 
@@ -1002,6 +1090,7 @@ onMounted(() => {
   initializeConfigs()
   fetchBendPipeData()
   fetchWallThicknessData()
+  fetchShortCodeMinorData()
 })
 
 watch(currentNode, (node) => {
@@ -1009,6 +1098,8 @@ watch(currentNode, (node) => {
     fetchBendPipeData()
   } else if (node?.id === 'wall-thickness-series') {
     fetchWallThicknessData()
+  } else if (node?.id === 'shortcode') {
+    fetchShortCodeMinorData()
   }
 })
 </script>
