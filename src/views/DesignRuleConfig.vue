@@ -387,6 +387,14 @@ const LOCAL_COLUMNS = {
   ]
 }
 
+const LOCAL_TITLES = {
+  'bend-pipe': '部件库名称：PlainPipingGenericData',
+  'bend-parameter': '部件库名称：PipingBendParameterCodeConverted',
+  'wall-thickness-series': '部件库名称：PlainPipingGenericData',
+  'shortcode': '部件库名称：ShortCodeHierarchyRule',
+  'spec': '部件库名称：PipingCommodityFilter'
+}
+
 const WALL_THICKNESS_SCHEDULE_OPTIONS = [
   { label: 'SCHSTD', value: '10001' },
   { label: 'SCH20', value: '10002' },
@@ -446,6 +454,26 @@ const getMaterialCode = (v) => {
   return found ? found.value : s
 }
 
+const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
+
+const getRowsFromResponse = (res) => {
+  const payload = res?.data
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  if (payload?.code === 200 && Array.isArray(payload?.data)) return payload.data
+  return []
+}
+
+const scrollTableToBottom = () => {
+  setTimeout(() => {
+    const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
+                      || document.querySelector('.el-table__body-wrapper')
+    if (tableBody) {
+      tableBody.scrollTop = tableBody.scrollHeight
+    }
+  }, 100)
+}
+
 // 树形数据
 const treeData = ref([
   {
@@ -486,7 +514,7 @@ const initializeConfigs = () => {
       
       configs[configId] = {
         id: configId,
-        title: mockData.title || configId,
+        title: LOCAL_TITLES[configId] || mockData.title || configId,
         selectedRows: [],
         columns: (LOCAL_COLUMNS[configId] || (mockData.columns || [])).map(col => ({
           ...col,
@@ -499,7 +527,7 @@ const initializeConfigs = () => {
       console.warn(`配置 ${configId} 未在 db 中找到`)
       configs[configId] = {
         id: configId,
-        title: configId,
+        title: LOCAL_TITLES[configId] || configId,
         selectedRows: [],
         columns: (LOCAL_COLUMNS[configId] || []).map(col => ({
           ...col,
@@ -802,7 +830,6 @@ const confirmBatchAdd = async () => {
       // 按顺序执行新增
       for (const row of finalRowsToAdd) {
         try {
-          const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
           const payload = {
             ...row,
             outSideDiameter: Number(row.outSideDiameter) || 0,
@@ -824,13 +851,7 @@ const confirmBatchAdd = async () => {
       } else {
         ElMessage.error('批量新增全部失败，请检查数据或网络')
       }
-      setTimeout(() => {
-        const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
-                          || document.querySelector('.el-table__body-wrapper')
-        if (tableBody) {
-          tableBody.scrollTop = tableBody.scrollHeight
-        }
-      }, 100)
+      scrollTableToBottom()
     } else if (config.id === 'wall-thickness-series') {
       let successCount = 0
       let failCount = 0
@@ -838,7 +859,6 @@ const confirmBatchAdd = async () => {
       // 按顺序执行新增
       for (const row of finalRowsToAdd) {
         try {
-          const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
           const payload = {
             ...row,
             npd: String(row.npd || ''),
@@ -863,20 +883,13 @@ const confirmBatchAdd = async () => {
       } else {
         ElMessage.error('批量新增全部失败，请检查数据或网络')
       }
-      setTimeout(() => {
-        const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
-                          || document.querySelector('.el-table__body-wrapper')
-        if (tableBody) {
-          tableBody.scrollTop = tableBody.scrollHeight
-        }
-      }, 100)
+      scrollTableToBottom()
     } else if (config.id === 'bend-parameter') {
       let successCount = 0
       let failCount = 0
 
       for (const row of finalRowsToAdd) {
         try {
-          const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
           const payload = {
             ...row,
             materialsCategoryCl: getMaterialCode(row.mainMaterial),
@@ -900,13 +913,7 @@ const confirmBatchAdd = async () => {
       } else {
         ElMessage.error('批量新增全部失败，请检查数据或网络')
       }
-      setTimeout(() => {
-        const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
-                          || document.querySelector('.el-table__body-wrapper')
-        if (tableBody) {
-          tableBody.scrollTop = tableBody.scrollHeight
-        }
-      }, 100)
+      scrollTableToBottom()
     } else if (config.id === 'shortcode') {
       let successCount = 0
       let failCount = 0
@@ -931,13 +938,7 @@ const confirmBatchAdd = async () => {
       } else {
         ElMessage.error('批量新增全部失败，请检查数据或网络')
       }
-      setTimeout(() => {
-        const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
-                          || document.querySelector('.el-table__body-wrapper')
-        if (tableBody) {
-          tableBody.scrollTop = tableBody.scrollHeight
-        }
-      }, 100)
+      scrollTableToBottom()
     } else {
       let newId = config.data.length > 0 
         ? Math.max(...config.data.map(item => item.id)) + 1 
@@ -951,13 +952,7 @@ const confirmBatchAdd = async () => {
       config.data.push(...newRows)
       ElMessage.success(`成功添加 ${batchAddData.value.length} 条数据`)
 
-      setTimeout(() => {
-        const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
-                          || document.querySelector('.el-table__body-wrapper')
-        if (tableBody) {
-          tableBody.scrollTop = tableBody.scrollHeight
-        }
-      }, 100)
+      scrollTableToBottom()
     }
     
     batchAddDialogVisible.value = false
@@ -1021,7 +1016,6 @@ const confirmEdit = async () => {
   editSaveLoading.value = true
   try {
     if (config.id === 'bend-pipe') {
-      const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
       const payload = {
         ...editRowData.value,
         outSideDiameter: Number(editRowData.value.outSideDiameter) || 0,
@@ -1033,7 +1027,6 @@ const confirmEdit = async () => {
       await fetchBendPipeData()
       ElMessage.success('更新成功')
     } else if (config.id === 'wall-thickness-series') {
-      const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
       const payload = {
         ...editRowData.value,
         npd: String(editRowData.value.npd || ''),
@@ -1048,7 +1041,6 @@ const confirmEdit = async () => {
       await fetchWallThicknessData()
       ElMessage.success('更新成功')
     } else if (config.id === 'bend-parameter') {
-      const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
       const payload = {
         ...editRowData.value,
         materialsCategoryCl: getMaterialCode(editRowData.value.mainMaterial),
@@ -1112,18 +1104,7 @@ const handleImageError = () => {
 const fetchBendPipeData = async () => {
   try {
     const res = await axios.get('/api/DspSpmcDictPipingBendData')
-    const payload = res?.data
-    let rows = []
-    if (Array.isArray(payload)) {
-      rows = payload
-    } else if (Array.isArray(payload?.data)) {
-      rows = payload.data
-    } else if (payload?.code === 200 && Array.isArray(payload?.data)) {
-      rows = payload.data
-    } else {
-      rows = []
-    }
-    const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
+    let rows = getRowsFromResponse(res)
     rows.forEach(row => {
       if (row.status === undefined) {
         row.status = true
@@ -1136,7 +1117,7 @@ const fetchBendPipeData = async () => {
     })
     const cfg = configs['bend-pipe'] || {
       id: 'bend-pipe',
-      title: '弯管机数据',
+      title: LOCAL_TITLES['bend-pipe'] || '弯管机数据',
       selectedRows: [],
       columns: [],
       data: []
@@ -1152,17 +1133,7 @@ const fetchBendPipeData = async () => {
 const fetchShortCodeMinorData = async () => {
   try {
     const res = await axios.get('/api/S3dRuleShortCodeHierarchyRule')
-    const payload = res?.data
-    let rows = []
-    if (Array.isArray(payload)) {
-      rows = payload
-    } else if (Array.isArray(payload?.data)) {
-      rows = payload.data
-    } else if (payload?.code === 200 && Array.isArray(payload?.data)) {
-      rows = payload.data
-    } else {
-      rows = []
-    }
+    let rows = getRowsFromResponse(res)
     rows = rows.map((r, idx) => ({
       id: r.id ?? idx + 1,
       shortCodeHierarchyType: r.shortCodeHierarchyType ?? r.ShortCodeHierarchyType ?? '',
@@ -1170,7 +1141,7 @@ const fetchShortCodeMinorData = async () => {
     }))
     const cfg = configs['shortcode'] || {
       id: 'shortcode',
-      title: '部件库名称：ShortCodeHierarchyRule',
+      title: LOCAL_TITLES['shortcode'] || '部件库名称：ShortCodeHierarchyRule',
       selectedRows: [],
       columns: [],
       data: []
@@ -1186,18 +1157,7 @@ const fetchShortCodeMinorData = async () => {
 const fetchBendParameterData = async () => {
   try {
     const res = await axios.get('/api/PipingBendParameterCodeConverted')
-    const payload = res?.data
-    let rows = []
-    if (Array.isArray(payload)) {
-      rows = payload
-    } else if (Array.isArray(payload?.data)) {
-      rows = payload.data
-    } else if (payload?.code === 200 && Array.isArray(payload?.data)) {
-      rows = payload.data
-    } else {
-      rows = []
-    }
-    const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
+    let rows = getRowsFromResponse(res)
     rows = rows.map((r, idx) => {
       const row = {
         id: r.id ?? idx + 1,
@@ -1216,7 +1176,7 @@ const fetchBendParameterData = async () => {
     })
     const cfg = configs['bend-parameter'] || {
       id: 'bend-parameter',
-      title: '弯管参数',
+      title: LOCAL_TITLES['bend-parameter'] || '弯管参数',
       selectedRows: [],
       columns: [],
       data: []
@@ -1232,18 +1192,7 @@ const fetchBendParameterData = async () => {
 const fetchWallThicknessData = async () => {
   try {
     const res = await axios.get('/api/WallThicknessCodeConverted')
-    const payload = res?.data
-    let rows = []
-    if (Array.isArray(payload)) {
-      rows = payload
-    } else if (Array.isArray(payload?.data)) {
-      rows = payload.data
-    } else if (payload?.code === 200 && Array.isArray(payload?.data)) {
-      rows = payload.data
-    } else {
-      rows = []
-    }
-    const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
+    let rows = getRowsFromResponse(res)
     rows.forEach(r => {
       if (r.status === undefined) {
         r.status = true
@@ -1253,7 +1202,7 @@ const fetchWallThicknessData = async () => {
     })
     const cfg = configs['wall-thickness-series'] || {
       id: 'wall-thickness-series',
-      title: '壁厚等级',
+      title: LOCAL_TITLES['wall-thickness-series'] || '壁厚等级',
       selectedRows: [],
       columns: [],
       data: []
