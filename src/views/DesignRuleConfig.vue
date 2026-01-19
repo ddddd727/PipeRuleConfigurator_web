@@ -1261,6 +1261,7 @@ watch(currentNode, (node) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.2s ease;
 }
 
 .basic-config-sidebar.collapsed {
