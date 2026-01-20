@@ -395,62 +395,64 @@ const LOCAL_TITLES = {
   'spec': '部件库名称：PipingCommodityFilter'
 }
 
-const WALL_THICKNESS_SCHEDULE_OPTIONS = [
-  { label: 'SCHSTD', value: '10001' },
-  { label: 'SCH20', value: '10002' },
-  { label: 'SCH30', value: '10003' },
-  { label: 'SCH40', value: '10004' },
-  { label: 'SCH80', value: '10005' },
-  { label: 'SCHXS', value: '10006' },
-  { label: 'SCH100', value: '10007' },
-  { label: 'SCH120', value: '10008' },
-  { label: 'SCH160', value: '10009' },
-  { label: 'SCH5S', value: '10010' },
-  { label: 'SCH10S', value: '10011' },
-  { label: 'SCH20S', value: '10012' },
-  { label: 'SCH40S', value: '10013' },
-  { label: 'SCH80S', value: '10014' },
-  { label: 'SCHXXS', value: '10015' },
-  { label: '1.0Mpa', value: '10016' },
-  { label: '4.0Mpa', value: '10017' },
-  { label: '7.0Mpa', value: '10018' },
-  { label: '14.0Mpa', value: '10019' }
-]
+const WALL_THICKNESS_SCHEDULE_OPTIONS = ref([])
+const END_STANDARD_OPTIONS = ref([])
+const MATERIAL_OPTIONS = ref([])
 
-const END_STANDARD_OPTIONS = [
-  { label: 'GB/T 14976-2012', value: '10001' },
-  { label: 'GB/T 8163-2018', value: '10002' },
-  { label: 'GB/T 12459-2017', value: '10003' }
-]
+const fetchScheduleOptions = async () => {
+  try {
+    const res = await axios.get('/api/S3dCommonCodeListValue/OPScheduleThickness')
+    const rows = getRowsFromResponse(res)
+    WALL_THICKNESS_SCHEDULE_OPTIONS.value = rows.map(item => ({
+      label: item.shortStringValue || item.ShortStringValue || '',
+      value: String(item.codeListNumber || item.CodeListNumber || '')
+    }))
+  } catch (e) {
+    console.error('获取壁厚等级选项失败', e)
+  }
+}
 
-const MATERIAL_OPTIONS = [
-  { label: '碳钢管', value: '10001' },
-  { label: '不锈钢', value: '10002' },
-  { label: '双相不锈钢', value: '10003' },
-  { label: '超级奥氏体不锈钢 SMO254', value: '10004' },
-  { label: '耐高温钢 15CRMOR', value: '10005' },
-  { label: '纯钛管', value: '10006' },
-  { label: '铜管', value: '10007' },
-  { label: 'GRE', value: '10008' },
-  { label: '塑料', value: '10009' },
-  { label: '铜镍', value: '10010' }
-]
+const fetchEndStandardOptions = async () => {
+  try {
+    const res = await axios.get('/api/S3dCommonCodeListValue/OPEndStandard')
+    const rows = getRowsFromResponse(res)
+    END_STANDARD_OPTIONS.value = rows.map(item => ({
+      label: item.shortStringValue || item.ShortStringValue || '',
+      value: String(item.codeListNumber || item.CodeListNumber || '')
+    }))
+  } catch (e) {
+    console.error('获取端部标准选项失败', e)
+  }
+}
+
+const fetchMaterialOptions = async () => {
+  try {
+    const res = await axios.get('/api/S3dCommonCodeListValue/OPmaterialscategory')
+    const rows = getRowsFromResponse(res)
+    MATERIAL_OPTIONS.value = rows.map(item => ({
+      label: item.longStringValue || item.LongStringValue || '',
+      value: String(item.codeListNumber || item.CodeListNumber || '')
+    }))
+  } catch (e) {
+    console.error('获取材料分类选项失败', e)
+  }
+}
 
 const getScheduleCode = (v) => {
   const s = String(v ?? '')
-  const found = WALL_THICKNESS_SCHEDULE_OPTIONS.find(o => o.value === s || o.label === s)
+  const found = WALL_THICKNESS_SCHEDULE_OPTIONS.value.find(o => o.value === s || o.label === s)
   return found ? found.value : s
 }
 
 const getEndStandardCode = (v) => {
   const s = String(v ?? '')
-  const found = END_STANDARD_OPTIONS.find(o => o.value === s || o.label === s)
+  const found = END_STANDARD_OPTIONS.value.find(o => o.value === s || o.label === s)
   return found ? found.value : s
 }
 
 const getMaterialCode = (v) => {
   const s = String(v ?? '')
-  const found = MATERIAL_OPTIONS.find(o => o.value === s || o.label === s)
+  const found = MATERIAL_OPTIONS.value.find(o => o.value === s || o.label === s)
   return found ? found.value : s
 }
 
@@ -725,9 +727,16 @@ const batchAddDialogVisible = ref(false)
 const batchAddData = ref([])
 const batchSaveLoading = ref(false)
 
-const openAddDialog = (configId) => {
+const openAddDialog = async (configId) => {
   const config = configs[configId]
   if (!config) return
+
+  // 刷新选项数据
+  if (configId === 'wall-thickness-series') {
+    await Promise.all([fetchScheduleOptions(), fetchEndStandardOptions()])
+  } else if (configId === 'bend-parameter') {
+    await Promise.all([fetchMaterialOptions(), fetchScheduleOptions()])
+  }
   
   batchAddData.value = []
   handleAddBatchRow() // 默认添加一行
@@ -747,6 +756,25 @@ const handleAddBatchRow = () => {
 
 const handleDeleteBatchRow = (index) => {
   batchAddData.value.splice(index, 1)
+}
+
+const getKeyColumns = (config) => {
+  return config.columns.filter(c => c.prop !== 'id' && c.prop !== 'status')
+}
+
+const generateRowFingerprint = (row, config) => {
+  const keyColumns = getKeyColumns(config)
+  return keyColumns.map(col => {
+    let val = row[col.prop]
+    if (config.id === 'wall-thickness-series') {
+      if (col.prop === 'scheduleThickness') val = getScheduleCode(val)
+      if (col.prop === 'endStandard') val = getEndStandardCode(val)
+    } else if (config.id === 'bend-parameter') {
+      if (col.prop === 'mainMaterial') val = getMaterialCode(val)
+      if (col.prop === 'scheduleThickness') val = getScheduleCode(val)
+    }
+    return String(val ?? '').trim()
+  }).join('|')
 }
 
 const confirmBatchAdd = async () => {
@@ -770,65 +798,37 @@ const confirmBatchAdd = async () => {
     }
   }
 
-  // 1. 获取用于去重的关键列（排除 status 和 id）
-  const keyColumns = config.columns.filter(c => c.prop !== 'id' && c.prop !== 'status')
-
-  // 辅助函数：生成行指纹
-  const getRowFingerprint = (row) => {
-    return keyColumns.map(col => {
-      let val = row[col.prop]
-      if (config.id === 'wall-thickness-series') {
-        if (col.prop === 'scheduleThickness') val = getScheduleCode(val)
-        if (col.prop === 'endStandard') val = getEndStandardCode(val)
-      }
-      return String(val ?? '').trim()
-    }).join('|')
-  }
-
-  // 2. 批量数据内部去重
-  const uniqueBatchData = []
+  // 1. 批量数据内部去重
   const batchFingerprints = new Set()
-  let duplicateInBatchCount = 0
-
   for (const row of batchAddData.value) {
-    const fp = getRowFingerprint(row)
+    const fp = generateRowFingerprint(row, config)
     if (batchFingerprints.has(fp)) {
-      duplicateInBatchCount++
-    } else {
-      batchFingerprints.add(fp)
-      uniqueBatchData.push(row)
+      ElMessage.warning('检测到批量新增列表中有重复数据，请检查')
+      return
     }
+    batchFingerprints.add(fp)
   }
 
-  if (duplicateInBatchCount > 0) {
-    ElMessage.warning(`检测到批量新增列表中有 ${duplicateInBatchCount} 条重复数据，已自动过滤`)
-  }
-
-  // 3. 与现有数据对比去重
-  const existingFingerprints = new Set(config.data.map(r => getRowFingerprint(r)))
-  const finalRowsToAdd = uniqueBatchData.filter(row => {
-    const fp = getRowFingerprint(row)
-    return !existingFingerprints.has(fp)
-  })
-
-  if (finalRowsToAdd.length === 0) {
-    ElMessage.warning('所有新增数据已存在于数据库中，无需添加')
-    return
-  }
-  
-  if (finalRowsToAdd.length < uniqueBatchData.length) {
-    ElMessage.info(`检测到 ${uniqueBatchData.length - finalRowsToAdd.length} 条数据已存在，将跳过这些数据`)
+  // 2. 与现有数据对比去重
+  const existingFingerprints = new Set(config.data.map(r => generateRowFingerprint(r, config)))
+  for (const row of batchAddData.value) {
+    const fp = generateRowFingerprint(row, config)
+    if (existingFingerprints.has(fp)) {
+      ElMessage.warning('检测到新增数据已存在于数据库中，无法添加')
+      return
+    }
   }
 
   batchSaveLoading.value = true
   
   try {
     if (config.id === 'bend-pipe') {
+
       let successCount = 0
       let failCount = 0
       
       // 按顺序执行新增
-      for (const row of finalRowsToAdd) {
+      for (const row of batchAddData.value) {
         try {
           const payload = {
             ...row,
@@ -857,7 +857,7 @@ const confirmBatchAdd = async () => {
       let failCount = 0
       
       // 按顺序执行新增
-      for (const row of finalRowsToAdd) {
+      for (const row of batchAddData.value) {
         try {
           const payload = {
             ...row,
@@ -888,7 +888,7 @@ const confirmBatchAdd = async () => {
       let successCount = 0
       let failCount = 0
 
-      for (const row of finalRowsToAdd) {
+      for (const row of batchAddData.value) {
         try {
           const payload = {
             ...row,
@@ -918,7 +918,7 @@ const confirmBatchAdd = async () => {
       let successCount = 0
       let failCount = 0
 
-      for (const row of finalRowsToAdd) {
+      for (const row of batchAddData.value) {
         try {
           const payload = {
             shortCodeHierarchyType: row.shortCodeHierarchyType,
@@ -969,10 +969,18 @@ const editDialogVisible = ref(false)
 const editRowData = ref(null)
 const editSaveLoading = ref(false)
 
-const handleRowDblClick = (row) => {
+const handleRowDblClick = async (row) => {
   const config = currentConfig.value
   if (!config) return
   if (config.id === 'shortcode-major') return
+
+  // 刷新选项数据
+  if (config.id === 'wall-thickness-series') {
+    await Promise.all([fetchScheduleOptions(), fetchEndStandardOptions()])
+  } else if (config.id === 'bend-parameter') {
+    await Promise.all([fetchMaterialOptions(), fetchScheduleOptions()])
+  }
+
   editRowData.value = { ...row }
   if (config.id === 'wall-thickness-series') {
     editRowData.value.scheduleThickness = getScheduleCode(editRowData.value.scheduleThickness)
@@ -1001,13 +1009,14 @@ const confirmEdit = async () => {
     }
   }
 
+  // 校验数据重复
   if (config.data && config.data.length > 0) {
     const targetId = editRowData.value.id
-    const existingRowsStr = config.data
-      .filter(r => r.id !== targetId)
-      .map(r => config.columns.map(col => String(r[col.prop]).trim()).join('|'))
-    const currentStr = config.columns.map(col => String(editRowData.value[col.prop]).trim()).join('|')
-    if (existingRowsStr.includes(currentStr)) {
+    const existingRows = config.data.filter(r => r.id !== targetId)
+    const existingFingerprints = new Set(existingRows.map(r => generateRowFingerprint(r, config)))
+    const currentFingerprint = generateRowFingerprint(editRowData.value, config)
+    
+    if (existingFingerprints.has(currentFingerprint)) {
       ElMessage.warning('该数据已存在，不能重复添加')
       return
     }
@@ -1222,6 +1231,9 @@ onMounted(() => {
   fetchBendParameterData()
   fetchWallThicknessData()
   fetchShortCodeMinorData()
+  fetchScheduleOptions()
+  fetchEndStandardOptions()
+  fetchMaterialOptions()
 })
 
 watch(currentNode, (node) => {
