@@ -484,7 +484,7 @@ const treeData = ref([
       { id: 'bend-parameter', label: '弯管参数', icon: Document },
       { id: 'wall-thickness-series', label: '壁厚等级', icon: Document },
       { id: 'shortcode-major', label: 'ShortCode大类', icon: Document },
-      { id: 'shortcode', label: 'ShortCode小类', icon: Document },
+      { id: 'shortcode', label: 'ShortCode细类', icon: Document },
       { id: 'spec', label: 'Spec', icon: Document }
     ]
   },
@@ -1150,7 +1150,7 @@ const fetchShortCodeMinorData = async () => {
     cfg.data = rows
     configs['shortcode'] = cfg
   } catch (e) {
-    ElMessage.error(`ShortCode小类接口请求失败：${e?.message || '网络错误'}`)
+    ElMessage.error(`ShortCode细类接口请求失败：${e?.message || '网络错误'}`)
   }
 }
 
