@@ -13,12 +13,6 @@
         <el-button type="primary" plain>
           规格书信息确认
         </el-button>
-        <el-button type="primary" plain>
-          生成PCF表
-        </el-button>
-        <el-button type="primary" plain>
-          生成Part表
-        </el-button>
       </div>
     </div>
 
@@ -26,14 +20,15 @@
     <div class="preview-content">
       <!-- 暂时空白占位，用于展示管系规格书内容 -->
       <div class="preview-placeholder">
-        <p>管系规格书内容预览区域</p>
+        <ExcelPreview :template-id="selectedTemplate" />
       </div>
     </div>
   </el-dialog>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import ExcelPreview from '@/components/excel/ExcelPreview.vue'
 
 const props = defineProps({
   modelValue: {
@@ -43,6 +38,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
+
+const selectedTemplate = ref('piping_spec_v1')
 
 const isVisible = computed({
   get() {

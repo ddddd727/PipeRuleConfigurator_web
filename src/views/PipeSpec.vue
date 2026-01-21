@@ -508,6 +508,42 @@ const handleGenerateSpecification = () => {
   showPreviewDialog.value = true
 }
 
+// 处理保存规格书按钮点击
+const handleSaveSpecification = async () => {
+  // 检查是否有已配置的部件类型
+  const configuredButtons = configButtons.value.filter(btn => btn.type && btn.configResult)
+  
+  if (configuredButtons.length === 0) {
+    ElMessage.warning('请先配置至少一个部件类型')
+    return
+  }
+  
+  try {
+    // 准备保存数据
+    const saveData = {
+      shipType: selectedShipClass.value ? shipClasses.value.find(item => item.id === selectedShipClass.value)?.name : '',
+      shipNumber: selectedShipNumber.value ? shipNumbers.value.find(item => item.id === selectedShipNumber.value)?.name : '',
+      pmcCode: currentNode.value.label || '',
+      configurations: configuredButtons.map(btn => ({
+        partType: btn.type,
+        configResult: btn.configResult
+      }))
+    }
+    
+    // 调用保存接口
+    const res = await axios.post('/api/pipe-spec/save-specification', saveData)
+    
+    if (res.data.code === 200) {
+      ElMessage.success('规格书保存成功！')
+    } else {
+      ElMessage.error(res.data.msg || '规格书保存失败')
+    }
+  } catch (error) {
+    console.error('保存规格书错误:', error)
+    ElMessage.error('网络错误，规格书保存失败')
+  }
+}
+
 // 获取状态标签
 const getStatusLabel = (status) => {
   const statusMap = {
@@ -603,6 +639,7 @@ const getStatusLabel = (status) => {
         <!-- 顶部操作条（已移除 查询/编辑/保存 按钮） -->
         <div class="main-header">
           <div class="filter-section">
+            <el-button type="success" plain @click="handleSaveSpecification">保存规格书</el-button>
             <el-button type="primary" plain @click="handleGenerateSpecification">生成规格书</el-button>
           </div>
         </div>
