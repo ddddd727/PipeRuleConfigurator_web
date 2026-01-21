@@ -237,12 +237,13 @@ watch(selectedPipeLimitRule, (newVal) => {
 
 
 // Bottom Table Data
-const resultData = ref([
-  { id: 1, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '6bar', d: 'SCH40', pmc: '1C1B1AD' },
-  { id: 2, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '6bar', d: 'SCH80', pmc: '1C1B1AE' },
-  { id: 3, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '6bar', d: 'SCH160', pmc: '1C1B1AJ' },
-  { id: 4, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '10bar', d: 'SCH40', pmc: '1C1B1BD' },
-])
+// const resultData = ref([
+//   { id: 1, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '6bar', d: 'SCH40', pmc: '1C1B1AD' },
+//   { id: 2, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '6bar', d: 'SCH80', pmc: '1C1B1AE' },
+//   { id: 3, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '6bar', d: 'SCH160', pmc: '1C1B1AJ' },
+//   { id: 4, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '10bar', d: 'SCH40', pmc: '1C1B1BD' },
+// ])
+const resultData = ref([])
 
 const selectedRows = ref([])
 
@@ -634,7 +635,7 @@ const generatePmcCode = async () => {
     })
 
     resultData.value = [...resultData.value, ...newRows]
-    alert(`成功生成 ${newRows.length} 条PMC编码（已自动去重并填充中文描述）`)
+    alert(`成功生成 ${newRows.length} 条PMC编码（已去重）`)
   } catch (error) {
     console.error('生成PMC编码失败', error)
     ElMessage.error('生成PMC编码失败')
