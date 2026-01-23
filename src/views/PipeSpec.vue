@@ -226,23 +226,138 @@ const handleCellClick = (row, column, cell, event) => {
   }
 }
 
-// 计算单元格背景色
-const getCellBackgroundColor = (row, column) => {
-  if (row.name !== 'NPD') return ''
+// 获取列索引对应的NPD值（用于判断连续范围）
+const getNpdValueByColumnIndex = (columnIndex) => {
+  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
+  if (!npdRow) return null
   
-  const value = parseInt(row[column.property])
+  // columnIndex从1开始（因为第一列是name，从第二列开始是col1, col2...）
+  const colKey = `col${columnIndex}`
+  const value = parseInt(npdRow[colKey])
+  return isNaN(value) ? null : value
+}
+
+// 获取所有列索引到NPD值的映射（按列顺序）
+const columnNpdMap = computed(() => {
+  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
+  if (!npdRow) return new Map()
   
-  if (selectedMin.value !== null && selectedMax.value !== null) {
-    if (value >= selectedMin.value && value <= selectedMax.value) {
-      return '#90EE90' // 浅绿色
-    } else {
-      return '#FFFFE0' // 淡黄色
+  const map = new Map()
+  const sortedNpdValues = [...allNpdValues.value]
+  
+  // 遍历所有列，建立列索引到NPD值的映射
+  for (let i = 1; i <= columnCount.value; i++) {
+    const colKey = `col${i}`
+    const value = parseInt(npdRow[colKey])
+    if (!isNaN(value)) {
+      map.set(i, value)
     }
-  } else if (selectedMin.value !== null && value === selectedMin.value) {
-    return '#90EE90' // 浅绿色
   }
   
-  return '#FFFFE0' // 默认淡黄色
+  return map
+})
+
+// 计算单元格样式（包括背景色和圆角）
+const getCellStyle = (row, column) => {
+  const baseStyle = {
+    cursor: row.name === 'NPD' ? 'pointer' : 'default',
+    display: 'block',
+    width: '100%',
+    height: '100%',
+    padding: '8px 0',
+    textAlign: 'center'
+  }
+  
+  // 只对NPD行应用颜色和圆角
+  if (row.name !== 'NPD') {
+    return baseStyle
+  }
+  
+  const value = parseInt(row[column.property])
+  if (isNaN(value)) {
+    return { ...baseStyle, backgroundColor: '#FFFFE0' }
+  }
+  
+  // 判断是否在选中范围内
+  let isInRange = false
+  let isFirst = false
+  let isLast = false
+  
+  if (selectedMin.value !== null && selectedMax.value !== null) {
+    isInRange = value >= selectedMin.value && value <= selectedMax.value
+  } else if (selectedMin.value !== null) {
+    isInRange = value === selectedMin.value
+  }
+  
+  if (isInRange) {
+    // 判断是否是连续范围的第一个或最后一个单元格
+    const currentColumnIndex = parseInt(column.property.replace('col', ''))
+    
+    // 获取所有在范围内的列索引（按列顺序）
+    const rangeColumns = []
+    columnNpdMap.value.forEach((npdValue, colIndex) => {
+      if (selectedMin.value !== null && selectedMax.value !== null) {
+        if (npdValue >= selectedMin.value && npdValue <= selectedMax.value) {
+          rangeColumns.push({ colIndex, npdValue })
+        }
+      } else if (selectedMin.value !== null) {
+        if (npdValue === selectedMin.value) {
+          rangeColumns.push({ colIndex, npdValue })
+        }
+      }
+    })
+    
+    // 按列索引排序
+    rangeColumns.sort((a, b) => a.colIndex - b.colIndex)
+    
+    // 判断当前列是否是第一个或最后一个
+    if (rangeColumns.length > 0) {
+      const firstCol = rangeColumns[0]
+      const lastCol = rangeColumns[rangeColumns.length - 1]
+      
+      if (currentColumnIndex === firstCol.colIndex) {
+        isFirst = true
+      }
+      if (currentColumnIndex === lastCol.colIndex) {
+        isLast = true
+      }
+    }
+  }
+  
+  // 设置背景色
+  const backgroundColor = isInRange ? '#90EE90' : '#FFFFE0'
+  
+  // 设置圆角和边距（用于实现颜色连续）
+  let borderRadius = '0'
+  let marginRight = '0'
+  let marginLeft = '0'
+  
+  if (isInRange) {
+    // 连续范围内的单元格，移除右边距让颜色连续
+    marginRight = '-1px'
+    
+    if (isFirst) {
+      borderRadius = '4px 0 0 4px' // 左侧圆角
+      marginLeft = '0'
+    }
+    if (isLast && !isFirst) {
+      borderRadius = '0 4px 4px 0' // 右侧圆角
+      marginRight = '0' // 最后一个不需要负边距
+    }
+    if (isFirst && isLast) {
+      borderRadius = '4px' // 单个单元格，四个角都圆角
+      marginRight = '0'
+      marginLeft = '0'
+    }
+  }
+  
+  return {
+    ...baseStyle,
+    backgroundColor,
+    borderRadius,
+    marginRight,
+    marginLeft
+  }
 }
 
 // 管材通道通径、外径、壁厚数据
@@ -636,10 +751,42 @@ const getStatusLabel = (status) => {
 
       <!-- 右侧表单区域 -->
       <div class="pipe-spec-main">
-        <!-- 顶部操作条（已移除 查询/编辑/保存 按钮） -->
+        <!-- 顶部操作条 -->
         <div class="main-header">
-          <div class="filter-section">
+          <!-- 左侧：标题或状态信息 -->
+          <div class="header-left">
+            <div class="header-title">管系规格书配置</div>
+            <div class="header-status" v-if="selectedShipClass && selectedShipNumber">
+              <span class="status-item">
+                <span class="status-label">船型：</span>
+                <span class="status-value">{{ shipClasses.find(item => item.id === selectedShipClass)?.name || '-' }}</span>
+              </span>
+              <span class="status-item">
+                <span class="status-label">船号：</span>
+                <span class="status-value">{{ shipNumbers.find(item => item.id === selectedShipNumber)?.name || '-' }}</span>
+              </span>
+              <span class="status-item" v-if="currentNode.label && currentNode.label.length === 7">
+                <span class="status-label">PMC编码：</span>
+                <span class="status-value">{{ currentNode.label }}</span>
+              </span>
+            </div>
+          </div>
+          <!-- 右侧：搜索框（可选）与所有功能按钮 -->
+          <div class="header-right">
+            <!-- 搜索框（可选，暂时不显示） -->
+            <!-- <el-input
+              v-model="searchKeyword"
+              placeholder="搜索..."
+              style="width: 200px;"
+              clearable
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input> -->
+            <!-- 辅助按钮 -->
             <el-button type="success" plain @click="handleSaveSpecification">保存规格书</el-button>
+            <!-- 主操作 -->
             <el-button type="primary" plain @click="handleGenerateSpecification">生成规格书</el-button>
           </div>
         </div>
@@ -709,15 +856,7 @@ const getStatusLabel = (status) => {
                     <el-table-column v-for="i in columnCount" :key="'col-' + i" :label="i" :prop="'col' + i" width="66">
                       <template #default="{ row, column }">
                         <span 
-                          :style="{ 
-                            backgroundColor: getCellBackgroundColor(row, column),
-                            cursor: row.name === 'NPD' ? 'pointer' : 'default',
-                            display: 'block',
-                            width: '100%',
-                            height: '100%',
-                            padding: '8px 0',
-                            textAlign: 'center'
-                          }"
+                          :style="getCellStyle(row, column)"
                         >
                           {{ row[column.property] || '-' }}
                             </span>
@@ -965,11 +1104,52 @@ const getStatusLabel = (status) => {
   padding: 15px 20px;
   border-bottom: 1px solid #e6e8eb;
   background-color: #fafafa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.filter-section {
+/* 左侧：标题或状态信息 */
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.header-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.header-status {
   display: flex;
   align-items: center;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-label {
+  color: #909399;
+}
+
+.status-value {
+  color: #303133;
+  font-weight: 500;
+}
+
+/* 右侧：搜索框与功能按钮 */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /* 表单容器 */
@@ -999,6 +1179,73 @@ const getStatusLabel = (status) => {
 
 .form-section-pmc{
   margin-bottom: 20px;
+}
+
+/* 通径外径壁厚对照表格样式 - 实现颜色连续跨越和圆角效果 */
+#npd-dataTable :deep(.el-table__body-wrapper) {
+  overflow-x: auto;
+}
+
+/* 表格单元格基础样式 */
+#npd-dataTable :deep(.el-table__body td) {
+  padding: 0 !important;
+  border-right: 1px solid #ebeef5;
+  position: relative;
+  vertical-align: middle;
+}
+
+/* 确保单元格内容容器可定位 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell) {
+  padding: 0 !important;
+  height: 100%;
+  position: relative;
+}
+
+/* 所有span元素基础样式 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span) {
+  display: block;
+  min-height: 40px;
+  line-height: 40px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
+
+/* 对于选中范围内的单元格（有负边距的），使用绝对定位覆盖边框 */
+/* 匹配包含 margin-right: -1px 的样式 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="margin-right: -1px"]),
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="marginRight: -1px"]) {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: -1px; /* 延伸到下一个单元格，覆盖边框 */
+  width: auto !important;
+  height: 100%;
+  z-index: 2;
+  margin-right: 0 !important; /* 移除负边距，改用right定位 */
+}
+
+/* 第一个选中单元格，左侧圆角 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="border-radius: 4px 0 0 4px"]),
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="borderRadius: 4px 0 0 4px"]) {
+  left: 0;
+  right: -1px;
+}
+
+/* 最后一个选中单元格，右侧圆角 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="border-radius: 0 4px 4px 0"]),
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="borderRadius: 0 4px 4px 0"]) {
+  left: 0;
+  right: 0;
+}
+
+/* 单个选中单元格，四个角都圆角 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="border-radius: 4px"]),
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="borderRadius: 4px"]) {
+  left: 0;
+  right: 0;
 }
 
 .form-section h4 {

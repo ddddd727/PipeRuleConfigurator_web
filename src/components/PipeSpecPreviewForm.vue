@@ -78,10 +78,6 @@ const isVisible = computed({
   align-items: center;
 }
 
-.toolbar-buttons .el-button {
-  font-size: 14px;
-}
-
 /* 预览内容区域 */
 .preview-content {
   flex: 1;

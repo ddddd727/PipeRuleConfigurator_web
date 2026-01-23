@@ -777,4 +777,11 @@ onMounted(() => {
   color: #e6a23c;
   font-weight: 500;
 }
+
+/* 对话框底部按钮样式 */
+.dialog-footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
 </style>
