@@ -79,12 +79,13 @@
           <!-- 数据表格 -->
           <div class="table-container">
             <el-table
-              :ref="`${currentConfig.id}TableRef`"
+              ref="mainTableRef"
               :data="currentConfig.data"
               stripe
               style="width: 100%"
               height="100%"
               :row-class-name="tableRowClassName"
+              @row-click="handleRowClick"
               @row-dblclick="(row) => handleRowDblClick(row)"
               @selection-change="(val) => handleSelectionChange(currentConfig.id, val)"
             >
@@ -341,6 +342,13 @@ import {
 const sidebarCollapsed = ref(false)
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
+const mainTableRef = ref(null)
+const handleRowClick = (row) => {
+  if (mainTableRef.value) {
+    mainTableRef.value.toggleRowSelection(row)
+  }
 }
 
 const LOCAL_COLUMNS = {
@@ -1281,6 +1289,7 @@ watch(currentNode, (node) => {
   padding: 16px 10px;
   border-bottom: 1px solid #e4e7ed;
   font-weight: 600;
+  font-size: 18px;
   color: #303133;
   background-color: #fafafa;
   background-color: #fafafa;
@@ -1334,7 +1343,7 @@ watch(currentNode, (node) => {
 }
 
 .main-header {
-  padding: 16px 20px;
+  padding: 12px 20px;
   border-bottom: 1px solid #e4e7ed;
   display: flex;
   justify-content: space-between;
