@@ -58,24 +58,21 @@
             <!-- 操作按钮组 -->
             <div class="action-buttons" v-if="currentConfig.id !== 'shortcode-major'">
               <el-button 
-                size="small" 
                 type="primary" 
+                icon="Plus"
                 @click="openAddDialog(currentConfig.id)"
               >
-                <el-icon><Plus /></el-icon>
                 新增
               </el-button>
 
               <el-button 
-                size="small" 
                 type="danger" 
+                icon="Delete"
                 @click="handleDeleteRows(currentConfig.id)"
                 :disabled="currentConfig.selectedRows.length === 0"
               >
-                <el-icon><Delete /></el-icon>
                 删除 ({{ currentConfig.selectedRows.length }})
               </el-button>
-
             </div>
           </div>
 
@@ -1348,7 +1345,7 @@ watch(currentNode, (node) => {
 
 .title-section h3 {
   margin: 0 0 4px 0;
-  font-size: 16px;
+  font-size: 18px;
   color: #303133;
 }
 
@@ -1380,8 +1377,8 @@ watch(currentNode, (node) => {
 
 .action-buttons {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }
 
 .table-container {
