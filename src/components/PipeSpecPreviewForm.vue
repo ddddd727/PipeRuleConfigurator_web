@@ -39,7 +39,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
-const selectedTemplate = ref('piping_spec_v1')
+const selectedTemplate = ref('PipeSpecExample')
 
 const isVisible = computed({
   get() {

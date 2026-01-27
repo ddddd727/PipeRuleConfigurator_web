@@ -28,8 +28,9 @@
               v-for="(cell, colIndex) in row"
               :key="colIndex"
               :colspan="cell.colspan || 1"
+              :rowspan="cell.rowspan || 1"
               :style="getCellStyle(cell.style)"
-              class="preview-cell"
+              :class="['preview-cell', { 'empty-cell': cell.row === -1 }]"
             >
               {{ cell.value ?? '' }}
             </td>
@@ -49,11 +50,13 @@ interface PreviewCellData {
   col: number
   value: string | null
   colspan?: number
+  rowspan?: number
   style?: {
     bgColor?: string
-    textAlign?: 'left' | 'center' | 'right'
+    textAlign?: 'left' | 'center' | 'right' | 'general'
     fontWeight?: 'normal' | 'bold'
   }
+  hidden?: boolean
 }
 
 const props = defineProps<{
@@ -74,57 +77,85 @@ const templateTitle = ref<string>('')
 const renderedRows = computed(() => {
   if (!rawData.value) return []
 
-  const { rowCount, colCount, cells, mergedCells } = rawData.value.grid
-    ? rawData.value
-    : { rowCount: 0, colCount: 0, cells: [], mergedCells: [] }
+  const data = rawData.value
+  const { rowCount, columnCount } = data.grid || { rowCount: 0, columnCount: 0 }
+  const cells = data.cells || []
+  const mergedCells = data.mergedCells || []
 
   // 初始化二维数组
   const grid: (PreviewCellData | null)[][] = Array(rowCount)
     .fill(null)
-    .map(() => Array(colCount).fill(null))
+    .map(() => Array(columnCount).fill(null))
 
-  // 标记被合并覆盖的单元格
-  const skip = new Set<string>()
-  for (const merge of mergedCells || []) {
-    for (let r = merge.startRow; r <= merge.endRow; r++) {
-      for (let c = merge.startCol; c <= merge.endCol; c++) {
-        if (!(r === merge.startRow && c === merge.startCol)) {
-          skip.add(`${r},${c}`)
+  // 1. 处理合并单元格
+  for (const merge of mergedCells) {
+    const { startRow, endRow, startColumn, endColumn } = merge
+    const rowspan = endRow - startRow + 1
+    const colspan = endColumn - startColumn + 1
+
+    // 标记被覆盖的区域为 hidden
+    for (let r = startRow; r <= endRow; r++) {
+      for (let c = startColumn; c <= endColumn; c++) {
+        if (r < rowCount && c < columnCount) {
+          grid[r][c] = {
+            row: r,
+            col: c,
+            value: null,
+            hidden: true
+          }
         }
       }
     }
-    // 主单元格
-    grid[merge.startRow][merge.startCol] = {
-      row: merge.startRow,
-      col: merge.startCol,
-      value: merge.value,
-      colspan: merge.endCol - merge.startCol + 1,
-      style: merge.style
-    }
-  }
 
-  // 填充普通单元格
-  for (const cell of cells || []) {
-    const key = `${cell.row},${cell.col}`
-    if (!skip.has(key) && !grid[cell.row]?.[cell.col]) {
-      grid[cell.row][cell.col] = {
-        row: cell.row,
-        col: cell.col,
-        value: cell.value,
-        style: cell.style
+    // 设置主单元格
+    if (startRow < rowCount && startColumn < columnCount) {
+      grid[startRow][startColumn] = {
+        row: startRow,
+        col: startColumn,
+        value: merge.value,
+        colspan,
+        rowspan,
+        style: merge.style,
+        hidden: false
       }
     }
   }
 
-  // 转为行渲染结构
-  return grid.map(row => row.filter(c => c !== null))
+  // 2. 填充普通单元格
+  for (const cell of cells) {
+    if (cell.row < rowCount && cell.column < columnCount) {
+      // 只有当该位置未被合并单元格占用时才填充
+      if (!grid[cell.row][cell.column]) {
+        grid[cell.row][cell.column] = {
+          row: cell.row,
+          col: cell.column,
+          value: cell.value,
+          style: cell.style
+        }
+      }
+    }
+  }
+
+  // 3. 生成渲染行，过滤掉 hidden 单元格
+  return grid.map(row => {
+    return row.map((cell, colIndex) => {
+      if (cell) return cell
+      // 空单元格占位
+      return {
+        row: -1,
+        col: colIndex,
+        value: '',
+        style: undefined
+      }
+    }).filter(cell => !cell.hidden)
+  })
 })
 
 const getCellStyle = (style?: PreviewCellData['style']) => {
   if (!style) return {}
   return {
     backgroundColor: style.bgColor || 'transparent',
-    textAlign: style.textAlign || 'left',
+    textAlign: style.textAlign === 'general' ? 'left' : (style.textAlign || 'left'),
     fontWeight: style.fontWeight || 'normal'
   }
 }
@@ -133,13 +164,18 @@ const fetchData = async () => {
   loading.value = true
   error.value = null
   try {
-    const response = await axios.get(`/api/v1/template-previews/${props.templateId}`, {
+    const response = await axios.get(`/api/template-preview/${props.templateId}`, {
       params: props.params
     })
-    rawData.value = response.data
-    templateTitle.value = response.data.title || ''
+    // 处理响应格式：{ code, message, data }
+    if (response.data.code === 200) {
+      rawData.value = response.data.data
+      templateTitle.value = response.data.data?.title || ''
+    } else {
+      error.value = response.data.message || '加载失败'
+    }
   } catch (err: any) {
-    error.value = err.response?.data?.error?.message || '加载失败'
+    error.value = err.response?.data?.message || err.message || '加载失败'
   } finally {
     loading.value = false
   }
@@ -148,20 +184,22 @@ const fetchData = async () => {
 const handleExport = async () => {
   try {
     const response = await axios.post(
-      `/api/v1/template-previews/${props.templateId}/export`,
+      `/api/template-preview/${props.templateId}/export`,
       props.params || {},
       { responseType: 'blob' }
     )
     const url = window.URL.createObjectURL(new Blob([response.data]))
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', `${props.templateId}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    const fileName = rawData.value?.title || props.templateId
+    link.setAttribute('download', `${fileName}_${new Date().toISOString().slice(0, 10)}.xlsx`)
     document.body.appendChild(link)
     link.click()
     link.remove()
+    window.URL.revokeObjectURL(url)
     emit('export')
   } catch (err: any) {
-    alert('导出失败：' + (err.response?.data?.error?.message || '未知错误'))
+    alert('导出失败：' + (err.response?.data?.message || err.message || '未知错误'))
   }
 }
 
@@ -240,6 +278,11 @@ watch(() => props.params, () => fetchData(), { deep: true })
   white-space: normal;
   word-break: break-word;
   vertical-align: middle;
+  min-width: 50px;
+}
+
+.preview-cell.empty-cell {
+  background-color: #fafafa;
 }
 .loading, .error {
   text-align: center;

@@ -173,6 +173,11 @@ const fetchPmcCodeDetails = async (code) => {
         pressureClass: data.pressureRating || '',
         wallThickness: data.wallThickness || ''
       }
+      
+      // 当获取到 Pipe 和 Wall Thickness 后，自动获取尺寸数据
+      if (formData.value.pipe && formData.value.wallThickness) {
+        await fetchDimensionData(formData.value.pipe, formData.value.wallThickness)
+      }
     } else {
       ElMessage.error(res.data.message || '获取编码详情失败')
     }
@@ -199,6 +204,10 @@ const handleNodeClick = (data) => {
       pressureClass: '',
       wallThickness: ''
     }
+    // 清空尺寸数据
+    dimensionData.value = []
+    selectedMin.value = null
+    selectedMax.value = null
   }
 }
 
@@ -365,18 +374,68 @@ const dimensionData = ref([])
 const dimensionLoading = ref(false)
 
 // 获取管材规格数据
-const fetchDimensionData = async () => {
+const fetchDimensionData = async (endStandard, schedule) => {
+  // 如果没有提供必要的参数，不执行请求
+  if (!endStandard || !schedule) {
+    dimensionData.value = []
+    return
+  }
+
   dimensionLoading.value = true
   try {
-    const res = await axios.get('/api/pipe-spec/dimension')
-    if (res.data.code === 200) {
-      dimensionData.value = res.data.data
+    const res = await axios.get('/api/PmcSpec/NPDInfo', {
+      params: {
+        endStandard: endStandard,
+        Schedule: schedule
+      }
+    })
+    if (res.data.code === 0) {
+      // 将新格式转换为旧格式
+      const apiData = res.data.data
+      const transformedData = []
+      
+      // 转换 NPD 数据
+      if (apiData.npd && apiData.npd.length > 0) {
+        const npdRow = { name: 'NPD' }
+        apiData.npd.forEach((value, index) => {
+          npdRow[`col${index + 1}`] = value
+        })
+        transformedData.push(npdRow)
+      }
+      
+      // 转换外径 (OD) 数据
+      if (apiData.outsideDiameter && apiData.outsideDiameter.length > 0) {
+        const odRow = { name: 'OD' }
+        apiData.outsideDiameter.forEach((value, index) => {
+          odRow[`col${index + 1}`] = value
+        })
+        transformedData.push(odRow)
+      }
+      
+      // 转换壁厚 (Thickness) 数据
+      if (apiData.wallThickness && apiData.wallThickness.length > 0) {
+        const thicknessRow = { name: 'Thickness' }
+        apiData.wallThickness.forEach((value, index) => {
+          thicknessRow[`col${index + 1}`] = value
+        })
+        transformedData.push(thicknessRow)
+      }
+      
+      dimensionData.value = transformedData
+      
+      // 数据加载完成后初始化NPD默认选择范围
+      if (dimensionData.value.length > 0) {
+        selectedMin.value = minNpdValue.value
+        selectedMax.value = maxNpdValue.value
+      }
     } else {
-      ElMessage.error(res.data.msg || '获取管材规格数据失败')
+      ElMessage.error(res.data.message || '获取管材规格数据失败')
+      dimensionData.value = []
     }
   } catch (error) {
     console.error('获取管材规格数据错误:', error)
     ElMessage.error('网络错误，获取管材规格数据失败')
+    dimensionData.value = []
   } finally {
     dimensionLoading.value = false
   }
@@ -447,18 +506,11 @@ watch(selectedShipNumber, async (newVal) => {
 
 // 在组件挂载后初始化数据
 onMounted(async () => {
-  // 并行获取所有数据（树形数据在船号选择时加载）
+  // 并行获取所有数据（树形数据在船号选择时加载，尺寸数据需要 Pipe 和 Wall Thickness 参数，在获取编码详情后加载）
   await Promise.all([
     fetchMaterialsData(),
-    fetchDimensionData(),
     fetchShipInfos()
   ])
-  
-  // 数据加载完成后初始化NPD默认选择范围
-  if (dimensionData.value.length > 0) {
-    selectedMin.value = minNpdValue.value
-    selectedMax.value = maxNpdValue.value
-  }
 })
 
 const showDialog = ref(false)
