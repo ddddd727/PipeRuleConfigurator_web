@@ -15,7 +15,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:5021',
+        target: 'http://localhost:5022',
         changeOrigin: true,
         secure: false, // 如果是https接口，需要配置这个参数
       }

@@ -2,18 +2,18 @@
   <div class="spec-config-container">
     <el-tabs v-model="activeTab" type="border-card" class="main-tabs">
       <el-tab-pane label="B1B2B3D" name="b1b2b3d">
-        <div class="split-layout">
+        <div class="split-layout layout-b1b2b3d">
           <!-- LEFT PANE -->
           <div class="left-pane" >
-           <div class="pane-toolbar" style="display: flex; justify-content: flex-end;">
-              <el-button type="primary"  style="margin-left: 10px;" @click="generateData">生成组合数据</el-button>
+           <div class="pane-toolbar" style="justify-content: flex-end;">
+              <el-button type="primary" icon="Plus" @click="generateData">生成组合数据</el-button>
             </div>
             <div class="pane-content scrollable-x">
                <!-- B1 -->
-              <div class="panel-wrapper" style="width: 184px;">
+              <div class="panel-wrapper" style="flex: 1; min-width: 0;">
                 <div class="panel">
                   <div class="panel-header">B1-主材料</div>
-                  <el-table :data="b1Data" border size="small" height="100%" highlight-current-row @current-change="handleB1Change">
+                  <el-table :data="b1Data" border size="small" height="100%" @current-change="handleB1Change">
                      <el-table-column width="32" align="center">
                     <template #default="scope">
                       <el-radio v-model="b1Selection" :label="scope.row.cl" class="no-label-radio">&nbsp;</el-radio>
@@ -26,10 +26,10 @@
             </div>
 
             <!-- B2 -->
-            <div class="panel-wrapper" style="width: 160px;">
+            <div class="panel-wrapper" style="flex: 1; min-width: 0;">
               <div class="panel">
                 <div class="panel-header">B2-管材标准</div>
-                <el-table :data="b2Data" border size="small" height="100%" highlight-current-row @current-change="handleB2Change">
+                <el-table :data="b2Data" border size="small" height="100%" @current-change="handleB2Change">
                       <el-table-column width="32" align="center">
                     <template #default="scope">
                       <el-radio v-model="b2Selection" :label="scope.row.cl" class="no-label-radio">&nbsp;</el-radio>
@@ -42,10 +42,10 @@
             </div>
 
             <!-- B3 -->
-            <div class="panel-wrapper" style="width: 146px;">
+            <div class="panel-wrapper" style="flex: 1; min-width: 0;">
               <div class="panel">
                 <div class="panel-header">B3-牌号</div>
-                <el-table :data="b3Data" border size="small" height="100%" highlight-current-row @current-change="handleB3Change">
+                <el-table :data="b3Data" border size="small" height="100%" @current-change="handleB3Change">
                          <el-table-column width="32" align="center">
                     <template #default="scope">
                       <el-radio v-model="b3Selection" :label="scope.row.cl" class="no-label-radio">&nbsp;</el-radio>
@@ -58,7 +58,7 @@
             </div>
 
             <!-- D -->
-            <div class="panel-wrapper" style="width: 160px;">
+            <div class="panel-wrapper" style="flex: 1; min-width: 0;">
               <div class="panel">
                 <div class="panel-header">D-壁厚等级</div>
                 <el-table :data="dData" border size="small" height="100%" @selection-change="handleDChange" ref="dTableRef" @row-click="handleDRowClick">
@@ -76,9 +76,9 @@
 
           <!-- RIGHT PANE -->
           <div class="right-pane">
-            <div class="pane-toolbar">             
-               <span class="label" style="margin-left: 5px;">规则: </span>
-              <el-select  v-model="selectedRuleB1B2B3D" placeholder="请选择" style="width: 120px; margin-right: 10px;" @visible-change="handleRuleDropdownVisibleChangeB1B2B3D" @change="handleRuleChangeB1B2B3D">
+            <div class="pane-toolbar" style="justify-content: flex-end;">             
+               <span class="label">规则</span>
+              <el-select  v-model="selectedRuleB1B2B3D" placeholder="请选择" style="width: 120px;" @visible-change="handleRuleDropdownVisibleChangeB1B2B3D" @change="handleRuleChangeB1B2B3D">
                  <el-option
                    v-for="rule in ruleOptionsB1B2B3D"
                    :key="rule"
@@ -86,10 +86,10 @@
                    :value="rule"
                  />
                </el-select>
-               <el-button type="primary" @click="openSaveRuleModal">新增</el-button>
-               <el-button type="primary" @click="deleteResultData">删除数据</el-button>
-              <el-button @click="confirmDeleteRule" type="danger" >删除规则</el-button>
-              <el-button type="primary" @click="saveData">保存</el-button>
+               <el-button type="primary"  icon="Plus"  @click="openSaveRuleModal">新增</el-button>
+               <el-button type="danger" icon="Delete" :disabled="resultSelection.length === 0" @click="deleteResultData">删除数据</el-button>
+              <el-button @click="confirmDeleteRule" :disabled="!selectedRuleB1B2B3D" type="danger" icon="Delete" >删除规则</el-button>
+              <el-button type="primary" @click="saveData"  icon="Check" >保存</el-button>
                      
             </div> 
             <div class="pane-content">
@@ -122,15 +122,15 @@
       </el-tab-pane>
 
 <el-tab-pane label="C1C2" name="c1c2">
-  <div class="split-layout">
+  <div class="split-layout layout-c1c2">
     <!-- 左侧面板：C1和C2选择区域 -->
      <div class="left-pane">
-      <div class="pane-toolbar" style="display: flex; justify-content: flex-end;">
-        <el-button @click="generateC1C2Data">生成组合数据</el-button>
+      <div class="pane-toolbar" style="justify-content: flex-end;">
+        <el-button type="primary" icon="Plus" @click="generateC1C2Data">生成组合数据</el-button>
       </div>
       <div class="pane-content scrollable-x">
         <!-- C1选择表格 -->
-        <div class="panel-wrapper" style="width: 360px;">
+        <div class="panel-wrapper" style="flex: 1; min-width: 0;">
           <div class="panel">
             <div class="panel-header">C1-法兰标准</div>
             <el-table 
@@ -138,7 +138,6 @@
               border 
               size="small" 
               height="100%" 
-              highlight-current-row 
               @current-change="handleC1Change"
             >
               <el-table-column width="32" align="center">
@@ -153,7 +152,7 @@
         </div>
 
         <!-- C2选择表格 -->
-        <div class="panel-wrapper" style="width: 310px;">
+        <div class="panel-wrapper" style="flex: 1; min-width: 0;">
           <div class="panel">
             <div class="panel-header">C2-法兰压力等级</div>
             <el-table 
@@ -179,9 +178,9 @@
     
     <!-- 右侧面板：C1C2组合数据显示和操作区域 -->
     <div class="right-pane">
-      <div class="pane-toolbar">
-        <span class="label" style="margin-left: 10px;">规则: </span>
-        <el-select v-model="selectedRuleC1C2" placeholder="请选择" style="width: 120px; margin-right: 10px;" @visible-change="handleRuleDropdownVisibleChangeC1C2" @change="handleRuleChangeC1C2">
+      <div class="pane-toolbar" style="justify-content: flex-end;">
+        <span class="label">规则</span>
+        <el-select v-model="selectedRuleC1C2" placeholder="请选择" style="width: 120px;" @visible-change="handleRuleDropdownVisibleChangeC1C2" @change="handleRuleChangeC1C2">
           <el-option
             v-for="rule in ruleOptionsC1C2"
             :key="rule"
@@ -189,10 +188,10 @@
             :value="rule"
           />
         </el-select>
-        <el-button type="primary" @click="openSaveRuleModal">新增</el-button>
-        <el-button type="primary" @click="deleteC1C2ResultData">删除数据</el-button>       
-        <el-button @click="confirmDeleteRule" type="danger">删除规则</el-button>
-        <el-button type="primary" @click="saveC1C2Data">保存</el-button>          
+        <el-button type="primary" icon="Plus" @click="openSaveRuleModal">新增</el-button>
+        <el-button type="danger" icon="Delete" :disabled="resultC1C2Selection.length === 0" @click="deleteC1C2ResultData">删除数据</el-button>       
+        <el-button @click="confirmDeleteRule" :disabled="!selectedRuleC1C2" type="danger" icon="Delete">删除规则</el-button>
+        <el-button type="primary" icon="Check" @click="saveC1C2Data">保存</el-button>          
       </div>
       
       <div class="pane-content">
@@ -227,17 +226,17 @@
 </el-tab-pane>
 
       <el-tab-pane label="管材I/II级限定" name="limit">
-        <div class="split-layout">
+        <div class="split-layout layout-limit">
            <div class="left-pane">
-          <div class="pane-toolbar" style="display: flex; justify-content: flex-end;">
-              <el-button @click="generateLimitData">生成组合数据</el-button>
+          <div class="pane-toolbar" style="justify-content: flex-end;">
+              <el-button type="primary" icon="Plus" @click="generateLimitData">生成组合数据</el-button>
             </div>
             <div class="pane-content scrollable-x">
              <!-- A -->
-            <div class="panel-wrapper" style="width: 150px;">
+            <div class="panel-wrapper" style="flex: 1; min-width: 0;">
               <div class="panel">
                 <div class="panel-header">A-管材等级</div>
-                <el-table :data="aData" border size="small" height="100%" highlight-current-row @current-change="handleAChange">
+                <el-table :data="aData" border size="small" height="100%" @current-change="handleAChange">
                         <el-table-column width="32" align="center">
                     <template #default="scope">
                       <el-radio v-model="limitASelection" :label="scope.row.code" class="no-label-radio">&nbsp;</el-radio>
@@ -250,10 +249,10 @@
             </div>
 
             <!-- B2 -->
-            <div class="panel-wrapper" style="width: 160px;">
+            <div class="panel-wrapper" style="flex: 1; min-width: 0;">
               <div class="panel">
                 <div class="panel-header">B2-管材标准</div>
-                <el-table :data="b2Data" border size="small" height="100%" highlight-current-row @current-change="handleLimitB2Change">
+                <el-table :data="b2Data" border size="small" height="100%" @current-change="handleLimitB2Change">
                          <el-table-column width="32" align="center">
                     <template #default="scope">
                       <el-radio v-model="limitB2Selection" :label="scope.row.cl" class="no-label-radio">&nbsp;</el-radio>
@@ -266,7 +265,7 @@
             </div>
 
             <!-- B3 -->
-            <div class="panel-wrapper" style="width: 160px;">
+            <div class="panel-wrapper" style="flex: 1; min-width: 0;">
               <div class="panel">
                 <div class="panel-header">B3-牌号</div>
                 <el-table :data="b3Data" border size="small" height="100%" @selection-change="handleLimitB3Change" ref="limitB3TableRef" @row-click="handleLimitB3RowClick">
@@ -278,7 +277,7 @@
             </div>
 
             <!-- C2 -->
-            <div class="panel-wrapper" style="width: 180px;">
+            <div class="panel-wrapper" style="flex: 1; min-width: 0;">
               <div class="panel">
                 <div class="panel-header">C2-法兰压力等级</div>
                 <el-table :data="c2Data" border size="small" height="100%" @selection-change="handleLimitC2Change" ref="limitC2TableRef" @row-click="handleLimitC2RowClick">
@@ -292,9 +291,9 @@
            </div>
            <div class="vertical-divider"></div>
            <div class="right-pane">
-             <div class="pane-toolbar">
-             <span class="label" style="margin-left: 10px;">规则: </span>
-              <el-select v-model="selectedRuleLimit" placeholder="请选择" style="width: 120px; margin-right: 10px;" @visible-change="handleRuleDropdownVisibleChangeLimit" @change="handleRuleChangeLimit">
+             <div class="pane-toolbar" style="justify-content: flex-end;">
+             <span class="label">规则</span>
+              <el-select v-model="selectedRuleLimit" placeholder="请选择" style="width: 120px;" @visible-change="handleRuleDropdownVisibleChangeLimit" @change="handleRuleChangeLimit">
                  <el-option
                    v-for="rule in ruleOptionsLimit"
                    :key="rule"
@@ -302,10 +301,10 @@
                    :value="rule"
                  />
                </el-select>
-               <el-button type="primary" @click="openSaveRuleModal">新增</el-button>
-               <el-button type="primary" @click="deleteLimitResultData">删除数据</el-button>
-              <el-button type="danger" @click="confirmDeleteRule">删除规则</el-button>
-              <el-button type="primary" @click="saveLimitData">保存</el-button>
+               <el-button type="primary" icon="Plus" @click="openSaveRuleModal">新增</el-button>
+               <el-button type="danger" icon="Delete" :disabled="resultLimitSelection.length === 0" @click="deleteLimitResultData">删除数据</el-button>
+              <el-button type="danger" icon="Delete" :disabled="!selectedRuleLimit" @click="confirmDeleteRule">删除规则</el-button>
+              <el-button type="primary" icon="Check" @click="saveLimitData">保存</el-button>
             </div>
             <div class="pane-content">
                <div class="panel full-height" style="width: 100%;">
@@ -530,7 +529,7 @@ const limitC2TableRef = ref(null)
 
 const fetchB1Data = async () => {
   try {
-    const res = await axios.get('/api/VwMaterialsCategoryPipingStandard/materials-categories')
+    const res = await axios.get('/api/S3dCodeMaterialsCategoryPipingStandard/materials-categories')
     // 尝试适配不同的响应结构
     const list = res.data.result || res.data.data || res.data
     if (Array.isArray(list)) {
@@ -552,6 +551,7 @@ const fetchB1Data = async () => {
         dData.value = []
         dSelection.value = []
         await fetchB2Data(defaultB1.cl)
+        await fetchDData(defaultB1.cl)
       }
     }
   } catch (error) {
@@ -575,7 +575,7 @@ const fetchB2Data = async (materialsCategoryCl) => {
   b2Selection.value = ''
   
   try {
-    const res = await axios.get(`/api/VwMaterialsCategoryPipingStandard/piping-standards/${materialsCategoryCl}`)
+    const res = await axios.get(`/api/S3dCodeMaterialsCategoryPipingStandard/piping-standards/${materialsCategoryCl}`)
     const list = res.data.result || res.data.data || res.data
     
     if (Array.isArray(list)) {
@@ -603,7 +603,7 @@ const fetchLimitB2Data = async () => {
   c2Data.value = []
   limitC2Selection.value = []
   try {
-    const res = await axios.get('/api/VwPipingStandardMaterialsGrade/piping-standards')
+    const res = await axios.get('/api/S3dCodePipingStandardMaterialsGrade/piping-standards')
     const list = res.data.result || res.data.data || res.data
     if (Array.isArray(list)) {
       console.log('Limit B2 Raw List:', list)
@@ -629,7 +629,7 @@ const fetchLimitC2Data = async (geometricIndustryStandardCl) => {
   c2Data.value = []
   limitC2Selection.value = []
   try {
-    const res = await axios.get(`/api/VwPipingStandardPressureRating/pressure-ratings/${geometricIndustryStandardCl}`)
+    const res = await axios.get(`/api/S3dCodePipingStandardPressureRating/pressure-ratings/${geometricIndustryStandardCl}`)
     const list = res.data.result || res.data.data || res.data
     if (Array.isArray(list)) {
       console.log('Limit C2 Raw List:', list)
@@ -655,7 +655,7 @@ const fetchB3Data = async (geometricIndustryStandardCl) => {
   b3Selection.value = ''
   
   try {
-    const res = await axios.get(`/api/VwPipingStandardMaterialsGrade/materials-grades/${geometricIndustryStandardCl}`)
+    const res = await axios.get(`/api/S3dCodePipingStandardMaterialsGrade/materials-grades/${geometricIndustryStandardCl}`)
     const list = res.data.result || res.data.data || res.data
     if (Array.isArray(list)) {
       console.log('B3 Raw List:', list)
@@ -675,14 +675,14 @@ const fetchB3Data = async (geometricIndustryStandardCl) => {
 const dSelection = ref([])
 const dData = ref([])
 
-const fetchDData = async (geometricIndustryStandardCl) => {
-  if (!geometricIndustryStandardCl) return
+const fetchDData = async (MaterialsCategoryCl) => {
+  if (!MaterialsCategoryCl) return
   
   dData.value = []
   dSelection.value = []
   
   try {
-    const res = await axios.get(`/api/VwPipingStandardScheduleThickness/schedule-thicknesses/${geometricIndustryStandardCl}`)
+    const res = await axios.get(`/api/S3dCodeMaterialsCategoryScheduleThickness/schedule-thicknesses/${MaterialsCategoryCl}`)
     const list = res.data.result || res.data.data || res.data
     if (Array.isArray(list)) {
       console.log('D Raw List:', list)
@@ -910,8 +910,10 @@ const handleRuleChangeLimit = async (ruleName) => {
 const handleB1Change = (row) => {
   if (row) {
     b1Selection.value = row.cl
-    // 触发 B2 数据加载
+    dData.value = []
+    dSelection.value = []
     fetchB2Data(row.cl)
+    fetchDData(row.cl)
   }
 }
 
@@ -939,7 +941,6 @@ const handleB2Change = (row) => {
    if(row) {
      b2Selection.value = row.cl
      fetchB3Data(row.cl)
-     fetchDData(row.cl)
    }
 }
 
@@ -1021,7 +1022,7 @@ const c1Data = ref([])
 
 const fetchC1Data = async () => {
   try {
-    const res = await axios.get('/api/VwFlangeStandPressureRating/flange-standards')
+    const res = await axios.get('/api/S3dCodeFlangeStandPressureRating/flange-standards')
     const list = res.data.result || res.data.data || res.data
     if (Array.isArray(list)) {
       console.log('C1 Raw List:', list)
@@ -1048,7 +1049,7 @@ const fetchC2Data = async (geometricIndustryStandardCl) => {
   c2Selection.value = []
   
   try {
-    const res = await axios.get(`/api/VwFlangeStandPressureRating/pressure-ratings/${geometricIndustryStandardCl}`)
+    const res = await axios.get(`/api/S3dCodeFlangeStandPressureRating/pressure-ratings/${geometricIndustryStandardCl}`)
     const list = res.data.result || res.data.data || res.data
     if (Array.isArray(list)) {
       console.log('C2 Raw List:', list)
@@ -1713,5 +1714,50 @@ const confirmDeleteRule = () => {
   display: inline-flex;
   justify-content: center;
   align-items: center;
+}
+
+/* Custom layout for B1B2B3D tab */
+.layout-b1b2b3d .left-pane {
+  width: 50%;
+  flex: 0 0 50%;
+}
+
+.layout-b1b2b3d .right-pane {
+  width: 50%;
+  flex: 0 0 50%;
+  min-width: 0;
+}
+
+/* Custom layout for C1C2 tab */
+.layout-c1c2 .left-pane {
+  width: 50%;
+  flex: 0 0 50%;
+}
+
+.layout-c1c2 .right-pane {
+  width: 50%;
+  flex: 0 0 50%;
+  min-width: 0;
+}
+
+/* Custom layout for Limit tab */
+.layout-limit .left-pane {
+  width: 50%;
+  flex: 0 0 50%;
+}
+
+.layout-limit .right-pane {
+  width: 50%;
+  flex: 0 0 50%;
+  min-width: 0;
+}
+
+.pane-toolbar {
+  padding: 5px;
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #dcdfe6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 </style>
