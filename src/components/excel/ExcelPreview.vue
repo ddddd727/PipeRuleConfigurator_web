@@ -181,10 +181,10 @@ const fetchData = async () => {
   }
 }
 
-const handleExport = async () => {
+const handleExport = async () => {15022
   try {
     const response = await axios.post(
-      `/api/template-preview/${props.templateId}/export`,
+      `/api/template-preview/export/${props.templateId}`,
       props.params || {},
       { responseType: 'blob' }
     )
