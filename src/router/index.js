@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-// 1. 引入所有独立的路由模块
+import MainLayout from '@/layout/MainLayout.vue'
+import StandardSequence from '@/views/StandardSequence.vue'
+
 import dictRouter from './modules/dict'
 import designRouter from './modules/design'
 import specRouter from './modules/spec'
@@ -13,17 +15,32 @@ export const constantRoutes = [
   { path: '/', redirect: '/dict/attribute/std-series' },
 
 
-  // ===================================
-  // 按照截图顺序排列 7 个一级菜单
-  // ===================================
-  dictRouter,     // 1. 字典定义
-  designRouter,   // 2. 设计规则类
-  specRouter,     // 3. Spec配置
-  pmcRouter,      // 4. PMC编码
-  pipeRouter,     // 5. 管材规格书配置
-  libraryRouter,  // 6. 基础库
-  propertyRouter,  // 7. 属性管理模块
-  // 404 页面
+  dictRouter,
+  designRouter,
+  specRouter,
+  pmcRouter,
+  pipeRouter,
+  libraryRouter,
+  propertyRouter,
+  {
+    path: '/standard-sequence',
+    component: MainLayout,
+    meta: {
+      title: '标准序列',
+      icon: 'List'
+    },
+    redirect: '/standard-sequence/index',
+    children: [
+      {
+        path: 'index',
+        name: 'StandardSequence',
+        component: StandardSequence,
+        meta: {
+          title: '标准序列'
+        }
+      }
+    ]
+  },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 
