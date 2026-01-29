@@ -958,14 +958,23 @@ const handleDRowClick = (row, column) => {
   dTableRef.value.toggleRowSelection(row)
 }
 
-const handleResultRowClick = (row, column) => {
+const handleResultRowClick = async (row, column) => {
   if (!row) return
 
   const b1 = b1Data.value.find(i => i.code === row.b1Code)
-  if (b1) b1Selection.value = b1.cl
+  if (b1) {
+    b1Selection.value = b1.cl
+    await Promise.all([
+      fetchB2Data(b1.cl),
+      fetchDData(b1.cl)
+    ])
+  }
 
   const b2 = b2Data.value.find(i => i.code === row.b2Code)
-  if (b2) b2Selection.value = b2.cl
+  if (b2) {
+    b2Selection.value = b2.cl
+    await fetchB3Data(b2.cl)
+  }
 
   const b3 = b3Data.value.find(i => i.code === row.b3Code)
   if (b3) b3Selection.value = b3.cl
@@ -1150,11 +1159,14 @@ const handleC2RowClick = (row, column) => {
   c2TableRef.value.toggleRowSelection(row)
 }
 
-const handleResultC1C2RowClick = (row, column) => {
+const handleResultC1C2RowClick = async (row, column) => {
   if (!row) return
 
   const c1 = c1Data.value.find(i => i.code === row.c1Code)
-  if (c1) c1Selection.value = c1.cl
+  if (c1) {
+    c1Selection.value = c1.cl
+    await fetchC2Data(c1.cl)
+  }
   
   if (c2TableRef.value) {
     c2TableRef.value.clearSelection()
@@ -1406,13 +1418,19 @@ const handleLimitC2RowClick = (row, column) => {
   limitC2TableRef.value.toggleRowSelection(row)
 }
 
-const handleResultLimitRowClick = (row, column) => {
+const handleResultLimitRowClick = async (row, column) => {
   if (!row) return
 
   limitASelection.value = row.aCode
   
   const b2 = b2Data.value.find(i => i.code === row.b2Code)
-  if (b2) limitB2Selection.value = b2.cl
+  if (b2) {
+    limitB2Selection.value = b2.cl
+    await Promise.all([
+      fetchB3Data(b2.cl),
+      fetchLimitC2Data(b2.cl)
+    ])
+  }
   
   if (limitB3TableRef.value) {
     limitB3TableRef.value.clearSelection()
