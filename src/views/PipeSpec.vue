@@ -215,7 +215,16 @@ const handleNodeClick = (data) => {
 const handleCellClick = (row, column, cell, event) => {
   if (row.name !== 'NPD') return
   
-  const value = parseInt(row[column.property])
+  // 获取当前列索引，如果超出实际数据范围，不允许选中
+  const currentColumnIndex = parseInt(column.property.replace('col', ''))
+  if (currentColumnIndex > actualColumnCount.value) {
+    return // 不允许选中超出实际数据范围的单元格
+  }
+  
+  const cellValue = row[column.property]
+  if (cellValue === undefined || cellValue === null || isNaN(parseInt(cellValue))) return
+  const value = parseInt(cellValue)
+  if (isNaN(value)) return 
   
   // 第一次点击设置最小值，第二次点击设置最大值
   if (selectedMin.value === null) {
@@ -266,6 +275,26 @@ const columnNpdMap = computed(() => {
   return map
 })
 
+// 计算属性：实际数据列数（基于NPD行的实际数据）
+const actualColumnCount = computed(() => {
+  if (!dimensionData.value || dimensionData.value.length === 0) {
+    return 0
+  }
+  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
+  if (!npdRow) return 0
+  
+  // 计算实际有多少列以'col'开头的有效数据（值不为undefined、null且能转换为数字）
+  let count = 0
+  for (let i = 1; i <= columnCount.value; i++) {
+    const colKey = `col${i}`
+    const value = npdRow[colKey]
+    if (value !== undefined && value !== null && !isNaN(parseInt(value))) {
+      count++
+    }
+  }
+  return count
+})
+
 // 计算单元格样式（包括背景色和圆角）
 const getCellStyle = (row, column) => {
   const baseStyle = {
@@ -275,6 +304,15 @@ const getCellStyle = (row, column) => {
     height: '100%',
     padding: '8px 0',
     textAlign: 'center'
+  }
+  
+  // 获取当前列索引
+  const currentColumnIndex = parseInt(column.property.replace('col', ''))
+  const isBeyondActualData = currentColumnIndex > actualColumnCount.value
+  
+  // 如果超出实际数据范围，标记为灰色且不可点击
+  if (isBeyondActualData) {
+    return { ...baseStyle, backgroundColor: '#f5f5f5', cursor: 'not-allowed' }
   }
   
   // 只对NPD行应用颜色和圆角
@@ -389,7 +427,7 @@ const fetchDimensionData = async (endStandard, schedule) => {
         Schedule: schedule
       }
     })
-    if (res.data.code === 0) {
+    if (res.data.code === 200) {
       // 将新格式转换为旧格式
       const apiData = res.data.data
       const transformedData = []
@@ -663,6 +701,12 @@ const getConfiguredButtonByPartType = (partType) => {
 
 // 处理配置按钮点击
 const handleConfigClick = (buttonId) => {
+  // 检查是否选择了有效的PMC编码（7位编码）
+  if (!currentNode.value.label || currentNode.value.label.length !== 7) {
+    ElMessage.warning('请先在左侧PMC编码列表中选择对应的PMC编码')
+    return
+  }
+  
   currentButtonId.value = buttonId
   showDialog.value = true
 }

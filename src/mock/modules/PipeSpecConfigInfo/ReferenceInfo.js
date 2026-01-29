@@ -42,20 +42,87 @@ Mock.mock(/\/api\/pipe-spec\/dimension/, 'get', () => {
   return { code: 200, msg: 'success', data: generateColumnData() }
 })
 
-// 标准文件列表
-Mock.mock(/\/api\/pipe-spec\/standard-files/, 'get', () => ({
-  code: 200,
-  msg: 'success',
-  data: Mock.mock({
-    'list|9-15': [
-      {
-        'id|+1': 1,
-        name: '@ctitle(6, 12)',
-        code: /GB\/T \d{4}-\d{4}/
-      }
+// 标准文件列表（支持 partType 参数）
+Mock.mock(/\/api\/pipe-spec\/standard-files/, 'get', (options) => {
+  // 解析查询参数 partType
+  let partType = null
+  if (options.url && options.url.includes('partType=')) {
+    const match = options.url.match(/partType=([^&]+)/)
+    partType = match ? decodeURIComponent(match[1]) : null
+  }
+  
+  // 根据不同的部件类型返回不同的标准文件
+  const standardFilesByType = {
+    'Pipe': [
+      { id: 1, code: 'GB/T 8163-2018' },
+      { id: 2, code: 'GB/T 5312-2009' },
+      { id: 3, code: 'ASTM A106' },
+      { id: 4, code: 'ASTM A53' },
+      { id: 5, code: 'GB/T 14976-2012' }
+    ],
+    'Bend': [
+      { id: 10, code: 'GB/T 12459-2017' },
+      { id: 11, code: 'ASME B16.9' },
+      { id: 12, code: 'GB/T 13401-2017' }
+    ],
+    'Elbow': [
+      { id: 20, code: 'GB/T 12459-2017' },
+      { id: 21, code: 'ASME B16.9' },
+      { id: 22, code: 'GB/T 13401-2017' }
+    ],
+    'Flange': [
+      { id: 30, code: 'GB/T 9119-2010' },
+      { id: 31, code: 'ASME B16.5' },
+      { id: 32, code: 'HG/T 20615-2009' }
+    ],
+    'Tee': [
+      { id: 40, code: 'GB/T 12459-2017' },
+      { id: 41, code: 'ASME B16.9' }
+    ],
+    'Red': [
+      { id: 50, code: 'GB/T 12459-2017' },
+      { id: 51, code: 'ASME B16.9' }
+    ],
+    'Sleeve': [
+      { id: 60, code: 'GB/T 12459-2017' }
+    ],
+    'Bosses': [
+      { id: 70, code: 'GB/T 12459-2017' }
+    ],
+    'Saddles': [
+      { id: 80, code: 'GB/T 12459-2017' }
+    ],
+    'Caps': [
+      { id: 90, code: 'GB/T 12459-2017' },
+      { id: 91, code: 'ASME B16.9' }
+    ],
+    'Overpass': [
+      { id: 100, code: 'GB/T 12459-2017' }
+    ],
+    'Blind Flange': [
+      { id: 110, code: 'GB/T 9119-2010' },
+      { id: 111, code: 'ASME B16.5' }
     ]
-  }).list
-}))
+  }
+  
+  // 如果指定了部件类型，返回对应的标准文件，否则返回通用列表
+  const files = partType && standardFilesByType[partType] 
+    ? standardFilesByType[partType]
+    : Mock.mock({
+        'list|9-15': [
+          {
+            'id|+1': 1,
+            code: /GB\/T \d{4}-\d{4}/
+          }
+        ]
+      }).list
+  
+  return {
+    code: 200,
+    msg: 'success',
+    data: files
+  }
+})
 
 // 保存配置
 Mock.mock(/\/api\/pipe-spec\/configure/, 'post', () => ({
@@ -100,73 +167,73 @@ Mock.mock(/\/api\/pipe-spec\/fitting-config/, 'get', (options) => {
 })
 
 // 船型与船号信息（PipeSpec.vue 使用 /api/PmcSpec/ShipInfos）
-Mock.mock(/\/api\/PmcSpec\/ShipInfos/, 'get', () => ({
-  code: 200,
-  message: '获取船型船号信息成功',
-  data: [
-    { shipNumber: 'H1508', shipType: '邮轮' },
-    { shipNumber: 'H1509', shipType: '邮轮' },
-    { shipNumber: 'H1403', shipType: '民船' },
-    { shipNumber: 'H1404', shipType: '民船' },
-    { shipNumber: 'H1301', shipType: '货船' },
-    { shipNumber: 'H1603', shipType: '民船' }
-  ],
-  timestamp: '0001-01-01T00:00:00',
-  traceId: '40000004-0009-fd00-b63f-84710c7967bb'
-}))
+// Mock.mock(/\/api\/PmcSpec\/ShipInfos/, 'get', () => ({
+//   code: 200,
+//   message: '获取船型船号信息成功',
+//   data: [
+//     { shipNumber: 'H1508', shipType: '邮轮' },
+//     { shipNumber: 'H1509', shipType: '邮轮' },
+//     { shipNumber: 'H1403', shipType: '民船' },
+//     { shipNumber: 'H1404', shipType: '民船' },
+//     { shipNumber: 'H1301', shipType: '货船' },
+//     { shipNumber: 'H1603', shipType: '民船' }
+//   ],
+//   timestamp: '0001-01-01T00:00:00',
+//   traceId: '40000004-0009-fd00-b63f-84710c7967bb'
+// }))
 
 // PMC 规则树（根据船号返回）
-Mock.mock(/\/api\/PmcSpec\/PmcRules\//, 'get', (options) => {
-  const urlParts = options.url.split('/')
-  const shipNumber = urlParts[urlParts.length - 1]
+// Mock.mock(/\/api\/PmcSpec\/PmcRules\//, 'get', (options) => {
+//   const urlParts = options.url.split('/')
+//   const shipNumber = urlParts[urlParts.length - 1]
 
-  // 返回扁平数组，字段与 PipeSpec.vue 中 transformToTreeStructure 期望一致
-  // status 枚举值：'pending'（待配置-蓝色）、'review'（待审核-黄色）、'approved'（已审核-绿色）
-  const data = [
-    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AD', shipNumber, status: 'pending' },
-    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AE', shipNumber, status: 'review' },
-    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AJ', shipNumber, status: 'approved' },
-    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AD', shipNumber, status: 'pending' },
-    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AE', shipNumber, status: 'review' },
-    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AJ', shipNumber, status: 'approved' },
-    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AD', shipNumber, status: 'pending' },
-    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AE', shipNumber, status: 'review' },
-    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AJ', shipNumber, status: 'approved' }
-  ]
+//   // 返回扁平数组，字段与 PipeSpec.vue 中 transformToTreeStructure 期望一致
+//   // status 枚举值：'pending'（待配置-蓝色）、'review'（待审核-黄色）、'approved'（已审核-绿色）
+//   const data = [
+//     { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AD', shipNumber, status: 'pending' },
+//     { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AE', shipNumber, status: 'review' },
+//     { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AJ', shipNumber, status: 'approved' },
+//     { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AD', shipNumber, status: 'pending' },
+//     { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AE', shipNumber, status: 'review' },
+//     { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AJ', shipNumber, status: 'approved' },
+//     { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AD', shipNumber, status: 'pending' },
+//     { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AE', shipNumber, status: 'review' },
+//     { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AJ', shipNumber, status: 'approved' }
+//   ]
 
-  return {
-    code: 200,
-    msg: 'success',
-    data
-  }
-})
+//   return {
+//     code: 200,
+//     msg: 'success',
+//     data
+//   }
+// })
 
 // PMC 编码详情
-Mock.mock(/\/api\/PmcSpec\/Analyze\//, 'get', (options) => {
-  const urlParts = options.url.split('/')
-  const code = urlParts[urlParts.length - 1]
-  return {
-    code: 200,
-    msg: 'success',
-    data: {
-      code,
-      service: Mock.mock('@ctitle(6,12)'),
-      pipingMaterialClass: Mock.mock('@ctitle(4,8)'),
-      pipeStandard: Mock.mock('@ctitle(6,12)'),
-      materialGrade: Mock.mock('@ctitle(4,8)'),
-      pressureRating: Mock.mock('@ctitle(2,6)'),
-      wallThickness: Mock.mock('@float(1,50,1,2)') + ' mm'
-    }
-  }
-})
+// Mock.mock(/\/api\/PmcSpec\/Analyze\//, 'get', (options) => {
+//   const urlParts = options.url.split('/')
+//   const code = urlParts[urlParts.length - 1]
+//   return {
+//     code: 200,
+//     msg: 'success',
+//     data: {
+//       code,
+//       service: Mock.mock('@ctitle(6,12)'),
+//       pipingMaterialClass: Mock.mock('@ctitle(4,8)'),
+//       pipeStandard: Mock.mock('@ctitle(6,12)'),
+//       materialGrade: Mock.mock('@ctitle(4,8)'),
+//       pressureRating: Mock.mock('@ctitle(2,6)'),
+//       wallThickness: Mock.mock('@float(1,50,1,2)') + ' mm'
+//     }
+//   }
+// })
 
-// 部件类型列表（用于配置对话框）
-Mock.mock(/\/api\/pipe-spec\/part-types/, 'get', () => ({
-  code: 200,
-  msg: 'success',
-  data: ['Pipe', 'Bend',
-    'Elbow', 'Red', 'Tee',
-    'Sleeve', 'Bosses', 'Saddles',
-    'Caps', 'Overpass',
-    'Flange', 'Blind Flange']
-}))
+// // 部件类型列表（用于配置对话框）
+// Mock.mock(/\/api\/pipe-spec\/part-types/, 'get', () => ({
+//   code: 200,
+//   msg: 'success',
+//   data: ['Pipe', 'Bend',
+//     'Elbow', 'Red', 'Tee',
+//     'Sleeve', 'Bosses', 'Saddles',
+//     'Caps', 'Overpass',
+//     'Flange', 'Blind Flange']
+// }))

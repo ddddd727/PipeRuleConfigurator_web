@@ -9,7 +9,7 @@
       <div style="display:flex; align-items:center; gap:12px;">
         <span>{{ buttonLabel ? buttonLabel + ' - ' : '' }}标准文件选择与配置</span>
         <el-select v-model="form.partType" placeholder="部件类型" size="small" style="width:160px">
-          <el-option v-for="pt in partTypes" :key="pt" :label="pt" :value="pt" />
+          <el-option v-for="pt in partTypes" :key="pt.componentTypeName" :label="pt.componentTypeName" :value="pt.componentTypeName" />
         </el-select>
       </div>
     </template>
@@ -429,14 +429,15 @@ const partTypes = ref([])
 
 const fetchPartTypes = async () => {
   try {
-    const res = await axios.get('/api/pipe-spec/part-types')
-    // 兼容不同 mock 返回字段（code/data 或 msg/data）
-    if (res && res.data) {
-      const payload = res.data
-      partTypes.value = payload.data || []
+    const res = await axios.get('/api/PmcSpec/ComponentTypes')
+    if (res && res.data && res.data.code === 200) {
+      partTypes.value = res.data.data || []
+    } else {
+      ElMessage.error(res.data?.message || '获取部件类型失败')
     }
   } catch (error) {
     console.error('获取部件类型失败:', error)
+    ElMessage.error('网络错误，获取部件类型失败')
   }
 }
 
