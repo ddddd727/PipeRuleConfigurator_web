@@ -1128,7 +1128,7 @@ const clearAllStoredConfigs = () => {
 
 /* 左侧树形结构 */
 .pipe-spec-sidebar {
-  width: 240px;
+  width: 280px;
   border-right: 1px solid #e6e8eb;
   display: flex;
   flex-direction: column;
@@ -1472,6 +1472,24 @@ const clearAllStoredConfigs = () => {
 .spec-form .el-input[style*="width"],
 .spec-form .el-select[style*="width"] {
   width: auto;
+}
+
+/* 修复 el-form-item 内容区域宽度问题 */
+.spec-form :deep(.el-form-item__content) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 确保表单控件占满内容区域 */
+.spec-form :deep(.el-form-item__content .el-input),
+.spec-form :deep(.el-form-item__content .el-select) {
+  width: 100%;
+}
+
+/* 表格/自定义容器也占满宽度 */
+.spec-form :deep(.el-form-item__content > div) {
+  width: 100%;
 }
 
 /* 配置按钮区域样式，避免已配置内容遮挡其他控件 */
