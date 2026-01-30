@@ -18,8 +18,7 @@
       :model="form"
       :rules="rules"
       label-width="120px"
-      label-position="right"
-    >
+      label-position="right">
       <!-- 标准文件选择 -->
       <el-form-item label="标准文件：">
         <el-select
@@ -33,6 +32,7 @@
           :teleported="false"
           @change="handleStandardFileChange"
           :loading="standardFilesLoading"
+          :disabled="!form.partType"
         >
           <el-option
             v-for="file in standardFilesList"
@@ -41,11 +41,12 @@
             :value="file.id"
           />
         </el-select>
-        <div class="tip-text">可多选，已选择 {{ form.standardFileIds.length }} 个文件</div>
+        <div class="tip-text" v-if="!form.partType">请先选择部件类型，再选择标准文件</div>
+        <div class="tip-text" v-else>可多选，已选择 {{ form.standardFileIds.length }} 个文件</div>
       </el-form-item>
 
       <!-- 标准文件与NPD范围对应关系配置 -->
-      <el-form-item label="NPD范围配置：" v-if="form.standardFileConfigurations.length > 0">
+      <el-form-item label="NPD范围配置：" v-if="form.partType && form.standardFileConfigurations.length > 0">
         <div class="configuration-container">
           <div v-for="config in form.standardFileConfigurations" :key="config.standardFile" class="config-item">
             <div class="config-file-info">
@@ -93,7 +94,7 @@
                   />
                 </el-select>
               </div>
-              <div class="bend-radius-multiple" v-if="buttonLabel === 'Bend'">
+              <div class="bend-radius-multiple" v-if="form.partType === 'Bend'">
                 <el-input
                   v-model="config.bendRadiusMultiple"
                   placeholder="弯管半径倍数"
@@ -101,10 +102,67 @@
                 />
               </div>
             </div>
-            <div class="bend-radius-hint" v-if="buttonLabel === 'Bend'">填写的值为弯管半径的倍数</div>
+            <div class="bend-radius-hint" v-if="form.partType === 'Bend'">填写的值为弯管半径的倍数</div>
           </div>
         </div>
         <div class="tip-text">请为每个选择的标准文件配置对应的NPD范围</div>
+      </el-form-item>
+
+      <!-- 重复通径范围配置 -->
+      <el-form-item label="重复通径范围：" v-if="form.partType && duplicateRanges.length > 0">
+        <div class="duplicate-ranges-container">
+          <div v-for="duplicate in duplicateRanges" :key="duplicate.rangeKey" class="duplicate-range-item">
+            <div class="duplicate-range-info">
+              <el-tag type="warning" size="small">
+                重叠区域：{{ duplicate.overlapMin }} mm - {{ duplicate.overlapMax }} mm
+              </el-tag>
+              <span class="duplicate-count">（{{ duplicate.standardFiles.length }} 个标准文件）</span>
+            </div>
+            <div class="duplicate-ranges-list">
+              <span class="duplicate-label">涉及的范围：</span>
+              <div class="ranges-list">
+                <el-tag
+                  v-for="(range, idx) in duplicate.ranges"
+                  :key="`${range.standardFile}-${idx}`"
+                  size="small"
+                  type="info"
+                  style="margin-right: 8px; margin-bottom: 4px"
+                >
+                  {{ getStandardFileName(range.standardFile) }}: {{ range.minNpdValue }} mm - {{ range.maxNpdValue }} mm
+                </el-tag>
+              </div>
+            </div>
+            <div class="duplicate-standard-files">
+              <span class="duplicate-label">涉及的标准文件：</span>
+              <el-tag
+                v-for="fileId in duplicate.standardFiles"
+                :key="fileId"
+                size="small"
+                type="info"
+                style="margin-right: 8px; margin-bottom: 4px"
+              >
+                {{ getStandardFileName(fileId) }}
+              </el-tag>
+            </div>
+            <div class="default-standard-selector">
+              <span class="duplicate-label">默认匹配标准：</span>
+              <el-select
+                :model-value="duplicate.defaultStandardFileId"
+                @update:model-value="(val) => updateDuplicateRangeDefault(duplicate.rangeKey, val)"
+                placeholder="请选择默认标准文件"
+                style="width: 200px"
+              >
+                <el-option
+                  v-for="fileId in duplicate.standardFiles"
+                  :key="fileId"
+                  :label="getStandardFileName(fileId)"
+                  :value="fileId"
+                />
+              </el-select>
+            </div>
+          </div>
+        </div>
+        <div class="tip-text warning-text">检测到多个标准文件配置了重叠的通径范围，请为每个重叠范围选择默认匹配的标准文件</div>
       </el-form-item>
     </el-form>
 
@@ -152,15 +210,11 @@ const form = ref({
   standardFileIds: [], // 选择的标准文件ID数组
   standardFileConfigurations: [], // 每个元素包含standardFile、minNpdValue和maxNpdValue
   partType: '',
-  effectiveDate: '',
-  remarks: ''
+  duplicateRangeDefaults: [] // 存储重复通径范围的默认标准文件选择
 })
 
 // 表单验证规则
 const rules = {
-  effectiveDate: [
-    { required: true, message: '请选择生效日期', trigger: 'change' }
-  ],
   standardFileIds: [
     { required: true, message: '请选择标准文件', trigger: 'change' }
   ]
@@ -172,9 +226,15 @@ const standardFilesLoading = ref(false)
 
 // 获取标准文件列表
 const fetchStandardFiles = async () => {
+  if (!form.value.partType) {
+    standardFilesList.value = []
+    return
+  }
   standardFilesLoading.value = true
   try {
-    const res = await axios.get('/api/pipe-spec/standard-files')
+    const res = await axios.get('/api/pipe-spec/standard-files', {
+      params: { partType: form.value.partType }
+    })
     if (res.data.code === 200) {
       standardFilesList.value = res.data.data
     } else {
@@ -188,23 +248,17 @@ const fetchStandardFiles = async () => {
   }
 }
 
-// 过滤后的通径范围（显示所有可用的NPD范围）
-const filteredPathRanges = computed(() => props.pathRanges)
-
-// 获取所有可用的NPD值（从filteredPathRanges中提取并去重）
+// 获取所有可用的NPD值（从pathRanges中提取并去重）
 const npdValues = computed(() => {
-  const values = []
-  filteredPathRanges.value.forEach(range => {
-    // 提取所有NPD值
-    if (!values.includes(range.minSize)) {
-      values.push(range.minSize)
-    }
-    if (range.maxSize !== range.minSize && !values.includes(range.maxSize)) {
-      values.push(range.maxSize)
+  const valueSet = new Set()
+  props.pathRanges.forEach(range => {
+    valueSet.add(range.minSize)
+    if (range.maxSize !== range.minSize) {
+      valueSet.add(range.maxSize)
     }
   })
   // 按升序排序
-  return values.sort((a, b) => a - b)
+  return Array.from(valueSet).sort((a, b) => a - b)
 })
 
 // 获取最小和最大NPD值
@@ -220,6 +274,11 @@ const maxNpdValue = computed(() => {
 
 // 处理标准文件选择变化
 const handleStandardFileChange = (value) => {
+  if (!form.value.partType) {
+    form.value.standardFileIds = []
+    form.value.standardFileConfigurations = []
+    return
+  }
   // 更新选择的文件ID数组
   form.value.standardFileIds = value
   
@@ -245,10 +304,118 @@ const handleStandardFileChange = (value) => {
   form.value.standardFileConfigurations = newConfigurations
 }
 
+// 标准文件ID -> 名称映射，减少重复查找
+const standardFilesMap = computed(() => {
+  const map = new Map()
+  standardFilesList.value.forEach(file => {
+    map.set(file.id, file.code)
+  })
+  return map
+})
+
 // 获取标准文件名称
 const getStandardFileName = (fileId) => {
-  const file = standardFilesList.value.find(f => f.id === fileId)
-  return file ? file.code : ''
+  return standardFilesMap.value.get(fileId) || ''
+}
+
+// 存储重复范围的默认标准文件选择（key: "minNpdValue-maxNpdValue", value: defaultStandardFileId）
+const duplicateRangeDefaultsMap = ref({})
+
+// 检查一个范围是否覆盖了某个区间
+const rangeCovers = (rangeMin, rangeMax, intervalMin, intervalMax) => {
+  // 范围覆盖区间，当且仅当：rangeMin <= intervalMin && rangeMax >= intervalMax
+  return rangeMin <= intervalMin && rangeMax >= intervalMax
+}
+
+// 检测重复的通径范围（找出所有有多个标准覆盖的子区间）
+const duplicateRanges = computed(() => {
+  // 收集所有有效的配置
+  const validConfigs = form.value.standardFileConfigurations.filter(
+    config => config.minNpdValue !== null && config.maxNpdValue !== null
+  )
+  
+  if (validConfigs.length < 2) {
+    return []
+  }
+  
+  // 找出所有范围的端点（最小值和最大值）
+  const endpoints = new Set()
+  validConfigs.forEach(config => {
+    endpoints.add(config.minNpdValue)
+    endpoints.add(config.maxNpdValue)
+  })
+  
+  // 将端点排序
+  const sortedEndpoints = Array.from(endpoints).sort((a, b) => a - b)
+  
+  // 找出所有有多个标准覆盖的区间
+  const duplicateIntervals = []
+  
+  // 遍历每两个相邻端点之间的区间
+  for (let i = 0; i < sortedEndpoints.length - 1; i++) {
+    const intervalMin = sortedEndpoints[i]
+    const intervalMax = sortedEndpoints[i + 1]
+    
+    // 检查哪些标准文件覆盖了这个区间
+    const coveringStandards = validConfigs.filter(config => 
+      rangeCovers(config.minNpdValue, config.maxNpdValue, intervalMin, intervalMax)
+    )
+    
+    // 只保留有2个或以上标准文件覆盖的区间
+    if (coveringStandards.length >= 2) {
+      // 收集涉及的标准文件ID
+      const standardFiles = [...new Set(coveringStandards.map(c => c.standardFile))]
+      
+      // 收集涉及的范围（用于显示）
+      const ranges = coveringStandards.map(c => ({
+        minNpdValue: c.minNpdValue,
+        maxNpdValue: c.maxNpdValue,
+        standardFile: c.standardFile
+      }))
+      
+      // 生成唯一标识
+      const rangeKey = `${intervalMin}-${intervalMax}-${[...standardFiles].sort().join(',')}`
+      
+      duplicateIntervals.push({
+        overlapMin: intervalMin,
+        overlapMax: intervalMax,
+        standardFiles,
+        ranges,
+        rangeKey
+      })
+    }
+  }
+  
+  // 为每个重叠区间添加默认标准文件ID
+  return duplicateIntervals.map(interval => {
+    const rangeKey = interval.rangeKey
+    let defaultStandardFileId = duplicateRangeDefaultsMap.value[rangeKey]
+    
+    // 如果没有设置，尝试从form.duplicateRangeDefaults中恢复
+    if (!defaultStandardFileId) {
+      const savedDefault = form.value.duplicateRangeDefaults?.find(
+        d => d.rangeKey === interval.rangeKey
+      )
+      if (savedDefault && savedDefault.defaultStandardFileId) {
+        defaultStandardFileId = savedDefault.defaultStandardFileId
+        duplicateRangeDefaultsMap.value[rangeKey] = defaultStandardFileId
+      } else if (interval.standardFiles.length > 0) {
+        // 默认选择第一个标准文件
+        defaultStandardFileId = interval.standardFiles[0]
+        duplicateRangeDefaultsMap.value[rangeKey] = defaultStandardFileId
+      }
+    }
+    
+    return {
+      ...interval,
+      defaultStandardFileId
+    }
+  })
+})
+
+// 更新重复范围的默认标准文件
+const updateDuplicateRangeDefault = (rangeKey, defaultStandardFileId) => {
+  duplicateRangeDefaultsMap.value[rangeKey] = defaultStandardFileId
 }
 
 
@@ -273,11 +440,43 @@ const fetchPartTypes = async () => {
   }
 }
 
+// 监听重复范围变化，同步到 form.duplicateRangeDefaults
+watch([duplicateRanges, duplicateRangeDefaultsMap], () => {
+  form.value.duplicateRangeDefaults = duplicateRanges.value.map(range => ({
+    overlapMin: range.overlapMin,
+    overlapMax: range.overlapMax,
+    defaultStandardFileId: range.defaultStandardFileId,
+    ranges: range.ranges, // 保存所有原始范围信息
+    standardFiles: range.standardFiles, // 保存涉及的标准文件
+    rangeKey: range.rangeKey // 保存唯一标识
+  }))
+}, { deep: true })
+
+// 监听部件类型变化，重置标准文件配置并重新获取标准文件列表
+watch(() => form.value.partType, (newPartType, oldPartType) => {
+  if (newPartType === oldPartType) return
+  form.value.standardFileIds = []
+  form.value.standardFileConfigurations = []
+  form.value.duplicateRangeDefaults = []
+  duplicateRangeDefaultsMap.value = {}
+  if (newPartType) {
+    fetchStandardFiles()
+  } else {
+    standardFilesList.value = []
+  }
+})
+
 // 处理提交
 const handleSubmit = async () => {
   if (!formRef.value) return
   
   try {
+    // 首先验证部件类型是否已选择
+    if (!form.value.partType) {
+      ElMessage.error('请选择部件类型')
+      return
+    }
+    
     // 表单基本验证
     await formRef.value.validate()
     
@@ -288,6 +487,16 @@ const handleSubmit = async () => {
     
     if (invalidConfigs.length > 0) {
       ElMessage.error('请为所有选择的标准文件配置有效的NPD范围（最小值不能大于最大值）')
+      return
+    }
+    
+    // 验证重复通径范围是否都选择了默认标准文件
+    const unselectedDefaults = duplicateRanges.value.filter(
+      range => !range.defaultStandardFileId
+    )
+    
+    if (unselectedDefaults.length > 0) {
+      ElMessage.error('请为所有重复的通径范围选择默认匹配的标准文件')
       return
     }
     
@@ -307,7 +516,17 @@ const handleSubmit = async () => {
           npdRange: [config.minNpdValue, config.maxNpdValue],
           bendRadiusMultiple: config.bendRadiusMultiple
         }
-      })
+      }),
+      // 包含重复通径范围的默认标准配置
+      duplicateRangeDefaults: duplicateRanges.value.map(range => ({
+        overlapMin: range.overlapMin,
+        overlapMax: range.overlapMax,
+        defaultStandardFileId: range.defaultStandardFileId,
+        defaultStandardFileName: getStandardFileName(range.defaultStandardFileId),
+        ranges: range.ranges, // 保存所有原始范围信息
+        standardFiles: range.standardFiles, // 保存涉及的标准文件
+        rangeKey: range.rangeKey // 保存唯一标识
+      }))
     }
     
     // 真实API调用
@@ -340,6 +559,8 @@ const handleClose = () => {
   // 清空选择的文件和配置
   form.value.standardFileIds = []
   form.value.standardFileConfigurations = []
+  form.value.duplicateRangeDefaults = []
+  duplicateRangeDefaultsMap.value = {}
   dialogVisible.value = false
 }
 
@@ -353,16 +574,15 @@ watch(dialogVisible, (val) => {
       }
       // 确保配置数组为空
       form.value.standardFileConfigurations = []
+      form.value.duplicateRangeDefaults = []
+      duplicateRangeDefaultsMap.value = {}
     })
-    // 对话框打开时获取标准文件列表
-    fetchStandardFiles()
     fetchPartTypes()
   }
 })
 
 // 组件挂载时获取标准文件列表
 onMounted(() => {
-  fetchStandardFiles()
   fetchPartTypes()
 })
 </script>
@@ -432,13 +652,6 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-/* 配置分隔符样式 */
-.config-separator {
-  margin: 0 10px;
-  color: #c0c4cc;
-  font-weight: bold;
-}
-
 /* NPD范围选择器容器 */
 .npd-range-selectors {
   display: flex;
@@ -476,5 +689,99 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 重复通径范围容器样式 */
+.duplicate-ranges-container {
+  border: 1px solid #f0c78a;
+  border-radius: 4px;
+  padding: 15px;
+  background-color: #fef9e7;
+  margin-bottom: 10px;
+}
+
+/* 重复范围项样式 */
+.duplicate-range-item {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 15px;
+  padding: 12px;
+  background-color: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #f0c78a;
+}
+
+.duplicate-range-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 重复范围信息样式 */
+.duplicate-range-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.duplicate-count {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 涉及的范围列表样式 */
+.duplicate-ranges-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  padding: 8px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.ranges-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 1;
+}
+
+/* 涉及的标准文件列表样式 */
+.duplicate-standard-files {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 8px;
+  background-color: #fafafa;
+  border-radius: 4px;
+}
+
+.duplicate-label {
+  font-size: 13px;
+  color: #606266;
+  margin-right: 8px;
+  font-weight: 500;
+}
+
+/* 默认标准选择器样式 */
+.default-standard-selector {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* 警告提示文字样式 */
+.warning-text {
+  color: #e6a23c;
+  font-weight: 500;
+}
+
+/* 对话框底部按钮样式 */
+.dialog-footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 </style>
