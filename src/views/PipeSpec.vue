@@ -1,9 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, Setting, Plus, Ship } from '@element-plus/icons-vue'
 import PipeSpecConfigForm from '@/components/PipeSpecConfigForm.vue'    // 导入 PipeSpecConfigForm 组件，用于配置按钮的弹窗实现
+import PipeSpecPreviewForm from '@/components/PipeSpecPreviewForm.vue'  // 导入规格书预览窗口组件
 
 // 树形数据
 const treeData = ref([])
@@ -79,13 +80,18 @@ const fetchShipInfos = async () => {
   }
 }
 
+let pmcRulesRequestId = 0
+
 // 获取船号的 PMC 规则数据
 const fetchPmcRules = async (shipNumber) => {
+  const requestId = ++pmcRulesRequestId
   treeLoading.value = true
   try {
     const res = await axios.get(`/api/PmcSpec/PmcRules/${shipNumber}`)
     if (res.data.code === 200) {
-      treeData.value = transformToTreeStructure(res.data.data)
+      if (requestId === pmcRulesRequestId) {
+        treeData.value = transformToTreeStructure(res.data.data)
+      }
     } else {
       ElMessage.error(res.data.message || '获取PMC规则数据失败')
     }
@@ -93,7 +99,9 @@ const fetchPmcRules = async (shipNumber) => {
     console.error('获取PMC规则数据错误:', error)
     ElMessage.error('网络错误，获取PMC规则数据失败')
   } finally {
-    treeLoading.value = false
+    if (requestId === pmcRulesRequestId) {
+      treeLoading.value = false
+    }
   }
 }
 
@@ -107,7 +115,7 @@ const transformToTreeStructure = (data) => {
 
   data.forEach(item => {
     const material = item.material
-    const pipeStandard = item.pipeStadard
+    const pipeStandard = item.pipeStandard || item.pipeStadard
     const pmcCode = item.pmcCode
 
     if (!materialMap.has(material)) {
@@ -131,7 +139,7 @@ const transformToTreeStructure = (data) => {
       label: pmcCode,
       shipNumber: item.shipNumber,
       material: item.material,
-      pipeStandard: item.pipeStadard,
+      pipeStandard: pipeStandard || '',
       status: item.status
     })
   })
@@ -165,6 +173,11 @@ const fetchPmcCodeDetails = async (code) => {
         pressureClass: data.pressureRating || '',
         wallThickness: data.wallThickness || ''
       }
+      
+      // 当获取到 Pipe 和 Wall Thickness 后，自动获取尺寸数据
+      if (formData.value.pipe && formData.value.wallThickness) {
+        await fetchDimensionData(formData.value.pipe, formData.value.wallThickness)
+      }
     } else {
       ElMessage.error(res.data.message || '获取编码详情失败')
     }
@@ -191,6 +204,10 @@ const handleNodeClick = (data) => {
       pressureClass: '',
       wallThickness: ''
     }
+    // 清空尺寸数据
+    dimensionData.value = []
+    selectedMin.value = null
+    selectedMax.value = null
   }
 }
 
@@ -218,23 +235,138 @@ const handleCellClick = (row, column, cell, event) => {
   }
 }
 
-// 计算单元格背景色
-const getCellBackgroundColor = (row, column) => {
-  if (row.name !== 'NPD') return ''
+// 获取列索引对应的NPD值（用于判断连续范围）
+const getNpdValueByColumnIndex = (columnIndex) => {
+  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
+  if (!npdRow) return null
   
-  const value = parseInt(row[column.property])
+  // columnIndex从1开始（因为第一列是name，从第二列开始是col1, col2...）
+  const colKey = `col${columnIndex}`
+  const value = parseInt(npdRow[colKey])
+  return isNaN(value) ? null : value
+}
+
+// 获取所有列索引到NPD值的映射（按列顺序）
+const columnNpdMap = computed(() => {
+  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
+  if (!npdRow) return new Map()
   
-  if (selectedMin.value !== null && selectedMax.value !== null) {
-    if (value >= selectedMin.value && value <= selectedMax.value) {
-      return '#90EE90' // 浅绿色
-    } else {
-      return '#FFFFE0' // 淡黄色
+  const map = new Map()
+  const sortedNpdValues = [...allNpdValues.value]
+  
+  // 遍历所有列，建立列索引到NPD值的映射
+  for (let i = 1; i <= columnCount.value; i++) {
+    const colKey = `col${i}`
+    const value = parseInt(npdRow[colKey])
+    if (!isNaN(value)) {
+      map.set(i, value)
     }
-  } else if (selectedMin.value !== null && value === selectedMin.value) {
-    return '#90EE90' // 浅绿色
   }
   
-  return '#FFFFE0' // 默认淡黄色
+  return map
+})
+
+// 计算单元格样式（包括背景色和圆角）
+const getCellStyle = (row, column) => {
+  const baseStyle = {
+    cursor: row.name === 'NPD' ? 'pointer' : 'default',
+    display: 'block',
+    width: '100%',
+    height: '100%',
+    padding: '8px 0',
+    textAlign: 'center'
+  }
+  
+  // 只对NPD行应用颜色和圆角
+  if (row.name !== 'NPD') {
+    return baseStyle
+  }
+  
+  const value = parseInt(row[column.property])
+  if (isNaN(value)) {
+    return { ...baseStyle, backgroundColor: '#FFFFE0' }
+  }
+  
+  // 判断是否在选中范围内
+  let isInRange = false
+  let isFirst = false
+  let isLast = false
+  
+  if (selectedMin.value !== null && selectedMax.value !== null) {
+    isInRange = value >= selectedMin.value && value <= selectedMax.value
+  } else if (selectedMin.value !== null) {
+    isInRange = value === selectedMin.value
+  }
+  
+  if (isInRange) {
+    // 判断是否是连续范围的第一个或最后一个单元格
+    const currentColumnIndex = parseInt(column.property.replace('col', ''))
+    
+    // 获取所有在范围内的列索引（按列顺序）
+    const rangeColumns = []
+    columnNpdMap.value.forEach((npdValue, colIndex) => {
+      if (selectedMin.value !== null && selectedMax.value !== null) {
+        if (npdValue >= selectedMin.value && npdValue <= selectedMax.value) {
+          rangeColumns.push({ colIndex, npdValue })
+        }
+      } else if (selectedMin.value !== null) {
+        if (npdValue === selectedMin.value) {
+          rangeColumns.push({ colIndex, npdValue })
+        }
+      }
+    })
+    
+    // 按列索引排序
+    rangeColumns.sort((a, b) => a.colIndex - b.colIndex)
+    
+    // 判断当前列是否是第一个或最后一个
+    if (rangeColumns.length > 0) {
+      const firstCol = rangeColumns[0]
+      const lastCol = rangeColumns[rangeColumns.length - 1]
+      
+      if (currentColumnIndex === firstCol.colIndex) {
+        isFirst = true
+      }
+      if (currentColumnIndex === lastCol.colIndex) {
+        isLast = true
+      }
+    }
+  }
+  
+  // 设置背景色
+  const backgroundColor = isInRange ? '#90EE90' : '#FFFFE0'
+  
+  // 设置圆角和边距（用于实现颜色连续）
+  let borderRadius = '0'
+  let marginRight = '0'
+  let marginLeft = '0'
+  
+  if (isInRange) {
+    // 连续范围内的单元格，移除右边距让颜色连续
+    marginRight = '-1px'
+    
+    if (isFirst) {
+      borderRadius = '4px 0 0 4px' // 左侧圆角
+      marginLeft = '0'
+    }
+    if (isLast && !isFirst) {
+      borderRadius = '0 4px 4px 0' // 右侧圆角
+      marginRight = '0' // 最后一个不需要负边距
+    }
+    if (isFirst && isLast) {
+      borderRadius = '4px' // 单个单元格，四个角都圆角
+      marginRight = '0'
+      marginLeft = '0'
+    }
+  }
+  
+  return {
+    ...baseStyle,
+    backgroundColor,
+    borderRadius,
+    marginRight,
+    marginLeft
+  }
 }
 
 // 管材通道通径、外径、壁厚数据
@@ -242,18 +374,68 @@ const dimensionData = ref([])
 const dimensionLoading = ref(false)
 
 // 获取管材规格数据
-const fetchDimensionData = async () => {
+const fetchDimensionData = async (endStandard, schedule) => {
+  // 如果没有提供必要的参数，不执行请求
+  if (!endStandard || !schedule) {
+    dimensionData.value = []
+    return
+  }
+
   dimensionLoading.value = true
   try {
-    const res = await axios.get('/api/pipe-spec/dimension')
-    if (res.data.code === 200) {
-      dimensionData.value = res.data.data
+    const res = await axios.get('/api/PmcSpec/NPDInfo', {
+      params: {
+        endStandard: endStandard,
+        Schedule: schedule
+      }
+    })
+    if (res.data.code === 0) {
+      // 将新格式转换为旧格式
+      const apiData = res.data.data
+      const transformedData = []
+      
+      // 转换 NPD 数据
+      if (apiData.npd && apiData.npd.length > 0) {
+        const npdRow = { name: 'NPD' }
+        apiData.npd.forEach((value, index) => {
+          npdRow[`col${index + 1}`] = value
+        })
+        transformedData.push(npdRow)
+      }
+      
+      // 转换外径 (OD) 数据
+      if (apiData.outsideDiameter && apiData.outsideDiameter.length > 0) {
+        const odRow = { name: 'OD' }
+        apiData.outsideDiameter.forEach((value, index) => {
+          odRow[`col${index + 1}`] = value
+        })
+        transformedData.push(odRow)
+      }
+      
+      // 转换壁厚 (Thickness) 数据
+      if (apiData.wallThickness && apiData.wallThickness.length > 0) {
+        const thicknessRow = { name: 'Thickness' }
+        apiData.wallThickness.forEach((value, index) => {
+          thicknessRow[`col${index + 1}`] = value
+        })
+        transformedData.push(thicknessRow)
+      }
+      
+      dimensionData.value = transformedData
+      
+      // 数据加载完成后初始化NPD默认选择范围
+      if (dimensionData.value.length > 0) {
+        selectedMin.value = minNpdValue.value
+        selectedMax.value = maxNpdValue.value
+      }
     } else {
-      ElMessage.error(res.data.msg || '获取管材规格数据失败')
+      ElMessage.error(res.data.message || '获取管材规格数据失败')
+      dimensionData.value = []
     }
   } catch (error) {
     console.error('获取管材规格数据错误:', error)
     ElMessage.error('网络错误，获取管材规格数据失败')
+    dimensionData.value = []
   } finally {
     dimensionLoading.value = false
   }
@@ -270,11 +452,11 @@ const configButtons = ref([
 // 当前选中的按钮ID
 const currentButtonId = ref(null)
 
-// 获取所有NPD值并计算最小和最大值
-const getAllNpdValues = () => {
+// 获取所有NPD值并排序（缓存计算结果）
+const allNpdValues = computed(() => {
   const npdRow = dimensionData.value.find(row => row.name === 'NPD')
   if (!npdRow) return []
-  
+
   const values = []
   // 直接获取所有以col开头的属性，不依赖columnCount
   for (const key in npdRow) {
@@ -286,19 +468,19 @@ const getAllNpdValues = () => {
     }
   }
   return values.sort((a, b) => a - b)
-}
+})
 
 // 获取最小NPD值
-const getMinNpdValue = () => {
-  const values = getAllNpdValues()
+const minNpdValue = computed(() => {
+  const values = allNpdValues.value
   return values.length > 0 ? values[0] : null
-}
+})
 
 // 获取最大NPD值
-const getMaxNpdValue = () => {
-  const values = getAllNpdValues()
+const maxNpdValue = computed(() => {
+  const values = allNpdValues.value
   return values.length > 0 ? values[values.length - 1] : null
-}
+})
 
 // 选择范围变量 - 默认选中所有NPD
 const selectedMin = ref(null)
@@ -324,18 +506,11 @@ watch(selectedShipNumber, async (newVal) => {
 
 // 在组件挂载后初始化数据
 onMounted(async () => {
-  // 并行获取所有数据（树形数据在船号选择时加载）
+  // 并行获取所有数据（树形数据在船号选择时加载，尺寸数据需要 Pipe 和 Wall Thickness 参数，在获取编码详情后加载）
   await Promise.all([
     fetchMaterialsData(),
-    fetchDimensionData(),
     fetchShipInfos()
   ])
-  
-  // 数据加载完成后初始化NPD默认选择范围
-  if (dimensionData.value.length > 0) {
-    selectedMin.value = getMinNpdValue()
-    selectedMax.value = getMaxNpdValue()
-  }
 })
 
 const showDialog = ref(false)
@@ -370,25 +545,14 @@ const filteredNpdRanges = computed(() => {
   if (selectedMin.value === null || selectedMax.value === null) {
     return []
   }
-  
-  // 从dimensionData中获取NPD行的数据
-  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
-  if (!npdRow) {
-    return []
-  }
-  
-  // 提取所有NPD值并过滤出选中范围内的值
-  const npdValues = []
-  for (let i = 1; i <= columnCount.value; i++) {
-    const value = parseInt(npdRow[`col${i}`])
-    if (!isNaN(value) && value >= selectedMin.value && value <= selectedMax.value) {
-      npdValues.push(value)
-    }
-  }
-  
+
+  const npdValues = allNpdValues.value.filter(
+    value => value >= selectedMin.value && value <= selectedMax.value
+  )
+
   // 为每个NPD值生成一个单独的范围选项
-  return npdValues.map((value, index) => ({
-    id: `${value}-${Date.now()}`,
+  return npdValues.map(value => ({
+    id: `npd-${value}`,
     minSize: value,
     maxSize: value,
     name: `通径 ${value} mm`
@@ -411,6 +575,51 @@ const columnCount = computed(() => {
 
 // 处理配置确认
 const handleConfirm = (data) => {
+  // 检查部件类型是否已配置（排除当前正在编辑的按钮）
+  const existingButton = configButtons.value.find(btn => {
+    return btn.type === data.partType && 
+           btn.configResult && 
+           btn.id !== currentButtonId.value
+  })
+  
+  if (existingButton) {
+    // 部件类型已配置，询问用户是否重新配置
+    ElMessageBox.confirm(
+      `部件类型 "${data.partType}" 已经配置过了，是否重新配置该部件类型？`,
+      '提示',
+      {
+        confirmButtonText: '重新配置',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    ).then(() => {
+      // 用户确认重新配置，清空之前的配置并更新
+      const existingButtonIndex = configButtons.value.findIndex(btn => btn.id === existingButton.id)
+      if (existingButtonIndex !== -1) {
+        // 更新已存在的配置按钮
+        updateConfigButton(data, existingButton.id)
+        // 清空当前按钮
+        const currentButtonIndex = configButtons.value.findIndex(btn => btn.id === currentButtonId.value)
+        if (currentButtonIndex !== -1 && currentButtonId.value !== existingButton.id) {
+          configButtons.value[currentButtonIndex].type = ''
+          configButtons.value[currentButtonIndex].configResult = ''
+        }
+        // 关闭对话框
+        showDialog.value = false
+        ElMessage.success('重新配置成功，已更新该部件类型的配置')
+      }
+    }).catch(() => {
+      // 用户取消，不做任何操作
+      ElMessage.info('已取消操作')
+    })
+  } else {
+    // 部件类型未配置过，直接保存配置
+    updateConfigButton(data, currentButtonId.value)
+  }
+}
+
+// 更新配置按钮的辅助方法
+const updateConfigButton = (data, buttonId) => {
   // 将配置数据转换为指定格式的字符串
   const configStr = data.configurations.map(item => {
     // 基础配置信息
@@ -424,9 +633,9 @@ const handleConfirm = (data) => {
     return configLine
   }).join('\n')
   
-  // 根据当前选中的按钮ID更新配置结果
-  if (currentButtonId.value) {
-    const buttonIndex = configButtons.value.findIndex(btn => btn.id === currentButtonId.value)
+  // 根据按钮ID更新配置结果
+  if (buttonId) {
+    const buttonIndex = configButtons.value.findIndex(btn => btn.id === buttonId)
     if (buttonIndex !== -1) {
       configButtons.value[buttonIndex].type = data.partType
       configButtons.value[buttonIndex].configResult = configStr
@@ -441,10 +650,75 @@ const handleConfirm = (data) => {
   }
 }
 
+// 检查部件类型是否已配置
+const isPartTypeConfigured = (partType) => {
+  if (!partType) return false
+  return configButtons.value.some(btn => btn.type === partType && btn.configResult)
+}
+
+// 获取已配置的部件类型对应的按钮
+const getConfiguredButtonByPartType = (partType) => {
+  return configButtons.value.find(btn => btn.type === partType && btn.configResult)
+}
+
 // 处理配置按钮点击
 const handleConfigClick = (buttonId) => {
   currentButtonId.value = buttonId
   showDialog.value = true
+}
+
+// 规格书预览窗口显示状态
+const showPreviewDialog = ref(false)
+
+// 处理生成规格书按钮点击
+const handleGenerateSpecification = () => {
+  showPreviewDialog.value = true
+}
+
+// 处理保存规格书按钮点击
+const handleSaveSpecification = async () => {
+  // 检查是否有已配置的部件类型
+  const configuredButtons = configButtons.value.filter(btn => btn.type && btn.configResult)
+  
+  if (configuredButtons.length === 0) {
+    ElMessage.warning('请先配置至少一个部件类型')
+    return
+  }
+  
+  try {
+    // 准备保存数据
+    const saveData = {
+      shipType: selectedShipClass.value ? shipClasses.value.find(item => item.id === selectedShipClass.value)?.name : '',
+      shipNumber: selectedShipNumber.value ? shipNumbers.value.find(item => item.id === selectedShipNumber.value)?.name : '',
+      pmcCode: currentNode.value.label || '',
+      configurations: configuredButtons.map(btn => ({
+        partType: btn.type,
+        configResult: btn.configResult
+      }))
+    }
+    
+    // 调用保存接口
+    const res = await axios.post('/api/pipe-spec/save-specification', saveData)
+    
+    if (res.data.code === 200) {
+      ElMessage.success('规格书保存成功！')
+    } else {
+      ElMessage.error(res.data.msg || '规格书保存失败')
+    }
+  } catch (error) {
+    console.error('保存规格书错误:', error)
+    ElMessage.error('网络错误，规格书保存失败')
+  }
+}
+
+// 获取状态标签
+const getStatusLabel = (status) => {
+  const statusMap = {
+    'pending': '待配置',
+    'review': '待审核',
+    'approved': '已审核'
+  }
+  return statusMap[status] || status
 }
 </script>
 
@@ -493,15 +767,34 @@ const handleConfigClick = (buttonId) => {
             <el-icon><ArrowLeft v-if="!sidebarCollapsed" /><ArrowRight v-else /></el-icon>
           </el-button>
         </div>
+        <!-- 状态颜色图例 -->
+        <div class="status-legend" v-show="!sidebarCollapsed">
+          <div class="legend-item">
+            <span class="legend-dot pending"></span>
+            <span class="legend-text">待配置</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot review"></span>
+            <span class="legend-text">待审核</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot approved"></span>
+            <span class="legend-text">已审核</span>
+          </div>
+        </div>
         <div class="sidebar-tree" v-show="!sidebarCollapsed">
           <el-tree
             :data="treeData"
             :highlight-current="true"
             @node-click="handleNodeClick"
             v-loading="treeLoading">
-            <template #default="{ node }">
+            <template #default="{ node, data }">
               <div class="custom-tree-node">
                 <span class="tree-label">{{ node.label }}</span>
+                <!-- 只有编码节点（第四级）才显示状态指示器 -->
+                <span v-if="data?.status" class="status-indicator" :class="`status-${data.status}`" :title="getStatusLabel(data.status)">
+                  {{ getStatusLabel(data.status) }}
+                </span>
               </div>
             </template>
           </el-tree>
@@ -510,10 +803,43 @@ const handleConfigClick = (buttonId) => {
 
       <!-- 右侧表单区域 -->
       <div class="pipe-spec-main">
-        <!-- 顶部操作条（已移除 查询/编辑/保存 按钮） -->
+        <!-- 顶部操作条 -->
         <div class="main-header">
-          <div class="filter-section">
-            <el-button type="primary" plain>生成规格书</el-button>
+          <!-- 左侧：标题或状态信息 -->
+          <div class="header-left">
+            <div class="header-title">管系规格书配置</div>
+            <div class="header-status" v-if="selectedShipClass && selectedShipNumber">
+              <span class="status-item">
+                <span class="status-label">船型：</span>
+                <span class="status-value">{{ shipClasses.find(item => item.id === selectedShipClass)?.name || '-' }}</span>
+              </span>
+              <span class="status-item">
+                <span class="status-label">船号：</span>
+                <span class="status-value">{{ shipNumbers.find(item => item.id === selectedShipNumber)?.name || '-' }}</span>
+              </span>
+              <span class="status-item" v-if="currentNode.label && currentNode.label.length === 7">
+                <span class="status-label">PMC编码：</span>
+                <span class="status-value">{{ currentNode.label }}</span>
+              </span>
+            </div>
+          </div>
+          <!-- 右侧：搜索框（可选）与所有功能按钮 -->
+          <div class="header-right">
+            <!-- 搜索框（可选，暂时不显示） -->
+            <!-- <el-input
+              v-model="searchKeyword"
+              placeholder="搜索..."
+              style="width: 200px;"
+              clearable
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input> -->
+            <!-- 辅助按钮 -->
+            <el-button type="success" plain @click="handleSaveSpecification">保存规格书</el-button>
+            <!-- 主操作 -->
+            <el-button type="primary" plain @click="handleGenerateSpecification">生成规格书</el-button>
           </div>
         </div>
 
@@ -582,15 +908,7 @@ const handleConfigClick = (buttonId) => {
                     <el-table-column v-for="i in columnCount" :key="'col-' + i" :label="i" :prop="'col' + i" width="66">
                       <template #default="{ row, column }">
                         <span 
-                          :style="{ 
-                            backgroundColor: getCellBackgroundColor(row, column),
-                            cursor: row.name === 'NPD' ? 'pointer' : 'default',
-                            display: 'block',
-                            width: '100%',
-                            height: '100%',
-                            padding: '8px 0',
-                            textAlign: 'center'
-                          }"
+                          :style="getCellStyle(row, column)"
                         >
                           {{ row[column.property] || '-' }}
                             </span>
@@ -651,6 +969,9 @@ const handleConfigClick = (buttonId) => {
       :buttonLabel="currentButtonLabel"
       :materials="materials"
       @confirm="handleConfirm"
+    />
+    <PipeSpecPreviewForm
+      v-model:modelValue="showPreviewDialog"
     />
   </div>
 </template>
@@ -754,6 +1075,74 @@ const handleConfigClick = (buttonId) => {
   font-size: 14px;
 }
 
+/* 状态颜色图例 */
+.status-legend {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  padding: 12px 15px;
+  background-color: #f9fafc;
+  border-bottom: 1px solid #e6e8eb;
+  font-size: 12px;
+  align-items: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-dot.pending {
+  background-color: #409eff;
+}
+
+.legend-dot.review {
+  background-color: #e6a23c;
+}
+
+.legend-dot.approved {
+  background-color: #67c23a;
+}
+
+.legend-text {
+  color: #606266;
+}
+
+/* 树节点状态指示器 */
+.status-indicator {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-pending {
+  background-color: #e6f7ff;
+  color: #0050b3;
+}
+
+.status-review {
+  background-color: #fff7e6;
+  color: #ad6800;
+}
+
+.status-approved {
+  background-color: #f6ffed;
+  color: #274a17;
+}
+
 /* 右侧表单区域 */
 .pipe-spec-main {
   flex: 1;
@@ -767,11 +1156,52 @@ const handleConfigClick = (buttonId) => {
   padding: 15px 20px;
   border-bottom: 1px solid #e6e8eb;
   background-color: #fafafa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.filter-section {
+/* 左侧：标题或状态信息 */
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.header-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.header-status {
   display: flex;
   align-items: center;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-label {
+  color: #909399;
+}
+
+.status-value {
+  color: #303133;
+  font-weight: 500;
+}
+
+/* 右侧：搜索框与功能按钮 */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /* 表单容器 */
@@ -801,6 +1231,73 @@ const handleConfigClick = (buttonId) => {
 
 .form-section-pmc{
   margin-bottom: 20px;
+}
+
+/* 通径外径壁厚对照表格样式 - 实现颜色连续跨越和圆角效果 */
+#npd-dataTable :deep(.el-table__body-wrapper) {
+  overflow-x: auto;
+}
+
+/* 表格单元格基础样式 */
+#npd-dataTable :deep(.el-table__body td) {
+  padding: 0 !important;
+  border-right: 1px solid #ebeef5;
+  position: relative;
+  vertical-align: middle;
+}
+
+/* 确保单元格内容容器可定位 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell) {
+  padding: 0 !important;
+  height: 100%;
+  position: relative;
+}
+
+/* 所有span元素基础样式 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span) {
+  display: block;
+  min-height: 40px;
+  line-height: 40px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
+
+/* 对于选中范围内的单元格（有负边距的），使用绝对定位覆盖边框 */
+/* 匹配包含 margin-right: -1px 的样式 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="margin-right: -1px"]),
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="marginRight: -1px"]) {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: -1px; /* 延伸到下一个单元格，覆盖边框 */
+  width: auto !important;
+  height: 100%;
+  z-index: 2;
+  margin-right: 0 !important; /* 移除负边距，改用right定位 */
+}
+
+/* 第一个选中单元格，左侧圆角 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="border-radius: 4px 0 0 4px"]),
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="borderRadius: 4px 0 0 4px"]) {
+  left: 0;
+  right: -1px;
+}
+
+/* 最后一个选中单元格，右侧圆角 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="border-radius: 0 4px 4px 0"]),
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="borderRadius: 0 4px 4px 0"]) {
+  left: 0;
+  right: 0;
+}
+
+/* 单个选中单元格，四个角都圆角 */
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="border-radius: 4px"]),
+#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="borderRadius: 4px"]) {
+  left: 0;
+  right: 0;
 }
 
 .form-section h4 {
@@ -885,19 +1382,6 @@ const handleConfigClick = (buttonId) => {
 .reconfig-btn {
   align-self: flex-end;
   margin-top: 8px;
-}
-
-.config-type-label {
-  position: absolute;
-  top: 8px;
-  left: 12px;
-  z-index: 2;
-  font-size: 12px;
-  font-weight: 600;
-  background: rgba(255,255,255,0.85);
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid rgba(0,0,0,0.06);
 }
 
 .config-add-btn {
