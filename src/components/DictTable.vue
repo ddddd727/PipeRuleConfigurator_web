@@ -276,7 +276,7 @@ const handleSave = async () => {
       @selection-change="handleSelectionChange"
     >
       <el-table-column v-if="isEdit" type="selection" width="50" align="center" fixed />
-      <el-table-column type="index" label="#" width="50" align="center" fixed />
+    
 
       <template v-for="(col, index) in tableConfig.columns" :key="col.prop + index">
         <el-table-column

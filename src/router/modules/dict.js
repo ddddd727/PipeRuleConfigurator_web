@@ -73,13 +73,7 @@ export default {
           meta: { title: 'D-壁厚等级', icon: 'CopyDocument' }, 
           props: { dictId: 'schedule' } // ✅ 匹配后端: schedule
         },
-        { 
-          path: 'end-prep', // 🆕 新增后端条目
-          name: 'EndPrep',
-          component: DictTable, 
-          meta: { title: 'E-端面处理', icon: 'Scissor' }, 
-          props: { dictId: 'end-prep' } // ✅ 匹配后端: end-prep
-        }
+        
       ]
     },
 
