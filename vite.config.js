@@ -14,8 +14,8 @@ export default defineConfig({
   // 👇 核心配置：添加代理转发
   server: {
     proxy: {
-      '/api': {
-        target: 'http://localhost:5022',
+      "/api": {
+        target: "http://localhost:5022",
         changeOrigin: true,
         secure: false, // 如果是https接口，需要配置这个参数
       }

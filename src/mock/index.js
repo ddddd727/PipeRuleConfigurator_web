@@ -276,45 +276,12 @@ Mock.mock(/\/api\/pmc\/ship-numbers/, 'get', (options) => {
   }
 })
 
-// 2. 主材料规则内容 (B1, B2, B3, D)
-Mock.mock(/\/api\/pmc\/rules\/main-material/, 'get', (options) => {
-  return Mock.mock({
-    code: 200,
-    'data|5-10': [{
-      'id|+1': 1,
-      'code|1': ['A', 'B', 'C', 'D'],
-      'std|1': ['1', '2', '3', '4'],
-      'grade|1': ['1', '2', '3', '4'],
-      'thickness|1': ['1', '2', '3', '4']
-    }]
-  })
-})
+// 2. 主材料规则内容 (B1, B2, B3, D) - 已迁移至后端
+// Mock.mock(/\/api\/pmc\/rules\/main-material/, 'get', (options) => { ... })
 
-// 3. 法兰规则内容 (C1, C2)
-Mock.mock(/\/api\/pmc\/rules\/flange/, 'get', (options) => {
-  return Mock.mock({
-    code: 200,
-    'data|3-6': [{
-      'id|+1': 1,
-      'std|1': ['A', 'B', 'C', 'D'],
-      'press|1': ['1', '2', '3', '4']
-    }]
-  })
-})
+// 3. 法兰规则内容 (C1, C2) - 已迁移至后端
+// Mock.mock(/\/api\/pmc\/rules\/flange/, 'get', (options) => { ... })
 
-// 4. 管材一二级限定规则 (A, B2, B3, C2)
-Mock.mock(/\/api\/pmc\/rules\/pipe-limit/, 'get', (options) => {
-  return Mock.mock({
-    code: 200,
-    'data|4-8': [{
-      'id|+1': 1,
-      'grade|1': ['A', 'B', 'C', 'D'],
-      'std|1': ['1', '2', '3', '4'],
-      'gradeCode|1': ['1', '2', '3', '4'],
-      'press|1': ['1', '2', '3', '4']
-    }]
-  })
-})
 
 // 5. 获取规则下拉列表 (主材料、法兰、管材限定)
 Mock.mock(/\/api\/pmc\/rules\/list/, 'get', (options) => {
