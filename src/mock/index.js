@@ -1,7 +1,7 @@
 import Mock from 'mockjs'
 // 导入管道规格配置相关的Mock数据
 // 已禁用 PipeSpec 相关的 mock，使用真实 API
-// import './modules/PipeSpecConfigInfo/ReferenceInfo.js'
+import './modules/PipeSpecConfigInfo/ReferenceInfo.js'
 
 Mock.setup({
   timeout: '200-600'
