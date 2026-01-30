@@ -2,11 +2,19 @@
   <div class="basic-config-container">
     <div class="basic-config-content">
       <!-- 左侧目录树 -->
-      <div class="basic-config-sidebar">
+      <div class="basic-config-sidebar" :class="{ 'collapsed': sidebarCollapsed }">
         <div class="sidebar-header">
-          <span>目录</span>
+          <span v-show="!sidebarCollapsed">目录</span>
+          <el-button 
+            class="collapse-btn" 
+            @click="toggleSidebar"
+            circle
+            size="small"
+          >
+            <el-icon><ArrowLeft v-if="!sidebarCollapsed" /><ArrowRight v-else /></el-icon>
+          </el-button>
         </div>
-        <div class="sidebar-tree">
+        <div class="sidebar-tree" v-show="!sidebarCollapsed">
           <el-tree
             ref="treeRef"
             :data="treeData"
@@ -48,48 +56,50 @@
             </div>
             
             <!-- 操作按钮组 -->
-            <div class="action-buttons">
+            <div class="action-buttons" v-if="currentConfig.id !== 'shortcode-major'">
               <el-button 
-                size="small" 
                 type="primary" 
+                icon="Plus"
                 @click="openAddDialog(currentConfig.id)"
               >
-                <el-icon><Plus /></el-icon>
                 新增
               </el-button>
 
               <el-button 
-                size="small" 
                 type="danger" 
+                icon="Delete"
                 @click="handleDeleteRows(currentConfig.id)"
                 :disabled="currentConfig.selectedRows.length === 0"
               >
-                <el-icon><Delete /></el-icon>
                 删除 ({{ currentConfig.selectedRows.length }})
               </el-button>
-
             </div>
           </div>
 
           <!-- 数据表格 -->
           <div class="table-container">
             <el-table
-              :ref="`${currentConfig.id}TableRef`"
+              ref="mainTableRef"
               :data="currentConfig.data"
               stripe
               style="width: 100%"
               height="100%"
+              :row-class-name="tableRowClassName"
+              @row-click="handleRowClick"
               @row-dblclick="(row) => handleRowDblClick(row)"
               @selection-change="(val) => handleSelectionChange(currentConfig.id, val)"
             >
               <el-table-column type="selection" width="55" />
-              <el-table-column type="index" label="序号" width="80" align="center" />
+              <el-table-column type="index" label="序号" width="60" align="center" />
               
               <template v-for="col in currentConfig.columns" :key="col.prop">
                 <el-table-column
+                  v-if="!col.hidden"
                   :prop="col.prop"
                   :label="col.label"
                   :width="col.width || 'auto'"
+                  min-width="120"
+                  align="center"
                 >
                   <template #default="{ row, $index }">
                     {{ row[col.prop] }}
@@ -116,7 +126,7 @@
     <el-dialog
       v-model="batchAddDialogVisible"
       :title="`批量新增 - ${currentConfig?.title || ''}`"
-      width="80%"
+      width="60%"
       :close-on-click-modal="false"
       destroy-on-close
     >
@@ -126,7 +136,7 @@
         </el-button>
       </div>
       
-      <el-table :data="batchAddData" border stripe height="400">
+      <el-table :data="batchAddData" border stripe height="auto">
         
         <template v-if="currentConfig">
           <el-table-column 
@@ -134,9 +144,61 @@
             :key="col.prop" 
             :label="col.label"
             :prop="col.prop"
+            header-align="center"
+            align="center"
           >
             <template #default="{ row }">
-              <el-input v-model="row[col.prop]" size="small" />
+              <div v-if="col.prop === 'status'" style="display: flex; align-items: center; justify-content: center;">
+                <el-switch
+                  v-model="row[col.prop]"
+                  :active-value="true"
+                  :inactive-value="false"
+                  active-text="启用"
+                  inactive-text="禁用"
+                  inline-prompt
+                />
+              </div>
+              <template v-else-if="currentConfig?.id === 'wall-thickness-series' && col.prop === 'scheduleThickness'">
+                <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in WALL_THICKNESS_SCHEDULE_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'wall-thickness-series' && col.prop === 'endStandard'">
+                <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in END_STANDARD_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'mainMaterial'">
+                <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in MATERIAL_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'scheduleThickness'">
+                <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in WALL_THICKNESS_SCHEDULE_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
+              <el-input v-else v-model="row[col.prop]" size="small" />
             </template>
           </el-table-column>
         </template>
@@ -174,9 +236,59 @@
     >
       <el-table :data="[editRowData]" border stripe height="auto" v-if="editRowData && currentConfig">
         <template v-for="col in currentConfig.columns" :key="col.prop">
-          <el-table-column :label="col.label" :prop="col.prop">
+          <el-table-column :label="col.label" :prop="col.prop" align="center">
             <template #default>
-              <el-input v-model="editRowData[col.prop]" size="small" />
+              <div v-if="col.prop === 'status'" style="display: flex; align-items: center; justify-content: center;">
+                <el-switch
+                  v-model="editRowData[col.prop]"
+                  :active-value="true"
+                  :inactive-value="false"
+                  active-text="启用"
+                  inactive-text="禁用"
+                  inline-prompt
+                />
+              </div>
+              <template v-else-if="currentConfig?.id === 'wall-thickness-series' && col.prop === 'scheduleThickness'">
+                <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in WALL_THICKNESS_SCHEDULE_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'wall-thickness-series' && col.prop === 'endStandard'">
+                <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in END_STANDARD_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'mainMaterial'">
+                <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in MATERIAL_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.label"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'scheduleThickness'">
+                <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in WALL_THICKNESS_SCHEDULE_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.label"
+                  />
+                </el-select>
+              </template>
+              <el-input v-else v-model="editRowData[col.prop]" size="small" />
             </template>
           </el-table-column>
         </template>
@@ -227,6 +339,148 @@ import {
   View
 } from '@element-plus/icons-vue'
 
+const sidebarCollapsed = ref(false)
+const toggleSidebar = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
+const mainTableRef = ref(null)
+const handleRowClick = (row) => {
+  if (mainTableRef.value) {
+    mainTableRef.value.toggleRowSelection(row)
+  }
+}
+
+const LOCAL_COLUMNS = {
+  'bend-pipe': [
+    { prop: 'MachineNum', label: '机器号', editable: true },
+    { prop: 'outSideDiameter', label: '外径', editable: false },
+    { prop: 'outSideDiameterUnit', label: '外径单位', editable: false },
+    { prop: 'headerClampLength', label: '前夹长L1', editable: false },
+    { prop: 'tailClampLength', label: '后夹长L2', editable: false },
+    { prop: 'status', label: '状态', editable: true, type: 'status', hidden: true }
+  ],
+  'bend-parameter': [
+    { prop: 'mainMaterial', label: '主材料', editable: true },
+    { prop: 'npd', label: '通径DN', editable: true },
+    { prop: 'ndpunit', label: '通径单位', editable: true },
+    { prop: 'scheduleThickness', label: '壁厚等级', editable: true },
+    { prop: 'bendRadius', label: '弯曲半径', editable: true },
+    { prop: 'status', label: '状态', editable: true, type: 'status', hidden: true }
+  ],
+  'wall-thickness-series': [
+    { prop: 'npd', label: '通径DN', editable: true },
+    { prop: 'ndpunit', label: '通径单位', editable: true },
+    { prop: 'scheduleThickness', label: '壁厚等级', editable: true },
+    { prop: 'endStandard', label: 'EndStandard', editable: true },
+    { prop: 'pipingOutsideDiameter', label: '外径mm', editable: true },
+    { prop: 'wallThickness', label: '壁厚值', editable: true },
+    { prop: 'status', label: '状态', editable: true, type: 'status', hidden: true }
+  ],
+  'shortcode': [
+    { prop: 'shortCodeHierarchyType', label: 'ShortCodeHierarchyType', editable: true },
+    { prop: 'shortCode', label: 'ShortCode', editable: true }
+  ],
+  'shortcode-major': [
+    { prop: 'ShortCodeHierarchyTypeShortDescription', label: 'ShortCodeHierarchyTypeShortDescription', editable: false },
+    { prop: 'ShortCodeHierarchyTypeLongDescription', label: 'ShortCodeHierarchyTypeLongDescription', editable: false }
+  ],
+  'spec': [
+    { prop: 'shortcode', label: 'ShortCode', editable: true },
+    { prop: 'type', label: 'GeometricIndustryStandard', editable: true },
+    { prop: 'type', label: 'CommodityCode', editable: true }
+  ]
+}
+
+const LOCAL_TITLES = {
+  'bend-pipe': '部件库名称：PlainPipingGenericData',
+  'bend-parameter': '部件库名称：PipingBendParameterCodeConverted',
+  'wall-thickness-series': '部件库名称：PlainPipingGenericData',
+  'shortcode': '部件库名称：ShortCodeHierarchyRule',
+  'spec': '部件库名称：PipingCommodityFilter'
+}
+
+const WALL_THICKNESS_SCHEDULE_OPTIONS = ref([])
+const END_STANDARD_OPTIONS = ref([])
+const MATERIAL_OPTIONS = ref([])
+
+const fetchScheduleOptions = async () => {
+  try {
+    const res = await axios.get('/api/S3dCommonCodeListValue/OPScheduleThickness')
+    const rows = getRowsFromResponse(res)
+    WALL_THICKNESS_SCHEDULE_OPTIONS.value = rows.map(item => ({
+      label: item.shortStringValue || item.ShortStringValue || '',
+      value: String(item.codeListNumber || item.CodeListNumber || '')
+    }))
+  } catch (e) {
+    console.error('获取壁厚等级选项失败', e)
+  }
+}
+
+const fetchEndStandardOptions = async () => {
+  try {
+    const res = await axios.get('/api/S3dCommonCodeListValue/OPEndStandard')
+    const rows = getRowsFromResponse(res)
+    END_STANDARD_OPTIONS.value = rows.map(item => ({
+      label: item.shortStringValue || item.ShortStringValue || '',
+      value: String(item.codeListNumber || item.CodeListNumber || '')
+    }))
+  } catch (e) {
+    console.error('获取端部标准选项失败', e)
+  }
+}
+
+const fetchMaterialOptions = async () => {
+  try {
+    const res = await axios.get('/api/S3dCommonCodeListValue/OPmaterialscategory')
+    const rows = getRowsFromResponse(res)
+    MATERIAL_OPTIONS.value = rows.map(item => ({
+      label: item.longStringValue || item.LongStringValue || '',
+      value: String(item.codeListNumber || item.CodeListNumber || '')
+    }))
+  } catch (e) {
+    console.error('获取材料分类选项失败', e)
+  }
+}
+
+const getScheduleCode = (v) => {
+  const s = String(v ?? '')
+  const found = WALL_THICKNESS_SCHEDULE_OPTIONS.value.find(o => o.value === s || o.label === s)
+  return found ? found.value : s
+}
+
+const getEndStandardCode = (v) => {
+  const s = String(v ?? '')
+  const found = END_STANDARD_OPTIONS.value.find(o => o.value === s || o.label === s)
+  return found ? found.value : s
+}
+
+const getMaterialCode = (v) => {
+  const s = String(v ?? '')
+  const found = MATERIAL_OPTIONS.value.find(o => o.value === s || o.label === s)
+  return found ? found.value : s
+}
+
+const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
+
+const getRowsFromResponse = (res) => {
+  const payload = res?.data
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  if (payload?.code === 200 && Array.isArray(payload?.data)) return payload.data
+  return []
+}
+
+const scrollTableToBottom = () => {
+  setTimeout(() => {
+    const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
+                      || document.querySelector('.el-table__body-wrapper')
+    if (tableBody) {
+      tableBody.scrollTop = tableBody.scrollHeight
+    }
+  }, 100)
+}
+
 // 树形数据
 const treeData = ref([
   {
@@ -234,10 +488,19 @@ const treeData = ref([
     label: '设计规则类',
     icon: Folder,
     children: [
-      { id: 'bend-pipe', label: '弯管数据', icon: Document },
-      { id: 'wall-thickness-series', label: '壁厚系列', icon: Document },
-      { id: 'shortcode', label: 'ShortCode', icon: Document },
+      { id: 'bend-parameter', label: '弯管参数', icon: Document },
+      { id: 'wall-thickness-series', label: '壁厚等级', icon: Document },
+      { id: 'shortcode-major', label: 'ShortCode大类', icon: Document },
+      { id: 'shortcode', label: 'ShortCode细类', icon: Document },
       { id: 'spec', label: 'Spec', icon: Document }
+    ]
+  },
+  {
+    id: 'production',
+    label: '生产规则类',
+    icon: Folder,
+    children: [
+      { id: 'bend-pipe', label: '弯管机数据', icon: Document }
     ]
   }
 ])
@@ -250,7 +513,7 @@ const configs = reactive({})
 
 // 初始化所有配置
 const initializeConfigs = () => {
-  const configIds = ['bend-pipe', 'wall-thickness-series', 'shortcode','spec']
+  const configIds = ['bend-pipe', 'bend-parameter', 'wall-thickness-series', 'shortcode','spec']
   
   configIds.forEach(configId => {
     if (db[configId]) {
@@ -258,12 +521,12 @@ const initializeConfigs = () => {
       
       configs[configId] = {
         id: configId,
-        title: mockData.title || configId,
+        title: LOCAL_TITLES[configId] || mockData.title || configId,
         selectedRows: [],
-        columns: mockData.columns ? mockData.columns.map(col => ({
+        columns: (LOCAL_COLUMNS[configId] || (mockData.columns || [])).map(col => ({
           ...col,
           editable: col.editable !== undefined ? col.editable : true
-        })) : [],
+        })),
         data: mockData.data || []
       }
     } else {
@@ -271,9 +534,12 @@ const initializeConfigs = () => {
       console.warn(`配置 ${configId} 未在 db 中找到`)
       configs[configId] = {
         id: configId,
-        title: configId,
+        title: LOCAL_TITLES[configId] || configId,
         selectedRows: [],
-        columns: [],
+        columns: (LOCAL_COLUMNS[configId] || []).map(col => ({
+          ...col,
+          editable: col.editable !== undefined ? col.editable : true
+        })),
         data: []
       }
     }
@@ -304,20 +570,49 @@ const imageError = ref(false)
 // ========== 表单验证规则 ==========
 
 // ========== 通用方法 ==========
+const tableRowClassName = ({ row }) => {
+  const disabled = row?.status === 0 
+    || row?.status === false 
+    || row?.status === '0' 
+    || row?.status === 'false'
+  return disabled ? 'disabled-row' : ''
+}
+
 const handleNodeClick = (node) => {
   if (node.id !== 'basic') {
-    // 如果该配置尚未加载，则加载
-    if (!configs[node.id] && db[node.id]) {
-      const mockData = Mock.mock(db[node.id])
-      configs[node.id] = {
-        id: node.id,
-        title: mockData.title || node.id,
-        selectedRows: [],
-        columns: mockData.columns ? mockData.columns.map(col => ({
-          ...col,
-          editable: col.editable !== undefined ? col.editable : true
-        })) : [],
-        data: mockData.data || []
+    if (!configs[node.id]) {
+      if (node.id === 'shortcode-major') {
+        let source = null
+        if (db['shortcode']) {
+          source = Mock.mock(db['shortcode'])
+        }
+        const baseRows = Array.isArray(source?.data) ? source.data : []
+        configs['shortcode-major'] = {
+          id: 'shortcode-major',
+          title: '部件库名称：ShortCodeHierarchyRule',
+          selectedRows: [],
+          columns: (LOCAL_COLUMNS['shortcode-major'] || []).map(col => ({
+            ...col,
+            editable: col.editable !== undefined ? col.editable : true
+          })),
+          data: baseRows.map((item, index) => ({
+            id: item.id ?? index + 1,
+            ShortCodeHierarchyTypeShortDescription: item.type ?? '',
+            ShortCodeHierarchyTypeLongDescription: item.shortcode ?? ''
+          }))
+        }
+      } else if (db[node.id]) {
+        const mockData = Mock.mock(db[node.id])
+        configs[node.id] = {
+          id: node.id,
+          title: mockData.title || node.id,
+          selectedRows: [],
+          columns: (LOCAL_COLUMNS[node.id] || (mockData.columns || [])).map(col => ({
+            ...col,
+            editable: col.editable !== undefined ? col.editable : true
+          })),
+          data: mockData.data || []
+        }
       }
     }
     
@@ -353,16 +648,64 @@ const handleDeleteRows = (configId) => {
     '删除确认',
     { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
   ).then(async () => {
-    // 针对 bend-pipe 走后端删除接口
     if (configId === 'bend-pipe') {
       try {
         const deletePromises = config.selectedRows.map(row => 
-          axios.delete(`/api/DspSpmcDictPipingBend/${row.id}`)
+          axios.delete(`/api/DspSpmcDictPipingBendData/${row.id}`)
         )
         await Promise.all(deletePromises)
         ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
         // 刷新数据
         await fetchBendPipeData()
+        config.selectedRows = []
+      } catch (error) {
+        console.error('删除失败:', error)
+        ElMessage.error('删除失败，请重试')
+      }
+      return
+    }
+
+    if (configId === 'wall-thickness-series') {
+      try {
+        const deletePromises = config.selectedRows.map(row => 
+          axios.delete(`/api/S3dDictWallThickness/${row.id}`)
+        )
+        await Promise.all(deletePromises)
+        ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
+        // 刷新数据
+        await fetchWallThicknessData()
+        config.selectedRows = []
+      } catch (error) {
+        console.error('删除失败:', error)
+        ElMessage.error('删除失败，请重试')
+      }
+      return
+    }
+
+    if (configId === 'bend-parameter') {
+      try {
+        const deletePromises = config.selectedRows.map(row =>
+          axios.delete(`/api/S3dRulePipingBendParameter/${row.id}`)
+        )
+        await Promise.all(deletePromises)
+        ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
+        await fetchBendParameterData()
+        config.selectedRows = []
+      } catch (error) {
+        console.error('删除失败:', error)
+        ElMessage.error('删除失败，请重试')
+      }
+      return
+    }
+
+    if (configId === 'shortcode') {
+      try {
+        const deletePromises = config.selectedRows.map(row =>
+          axios.delete(`/api/S3dRuleShortCodeHierarchyRule/${row.id}`)
+        )
+        await Promise.all(deletePromises)
+        ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
+        await fetchShortCodeMinorData()
         config.selectedRows = []
       } catch (error) {
         console.error('删除失败:', error)
@@ -389,9 +732,16 @@ const batchAddDialogVisible = ref(false)
 const batchAddData = ref([])
 const batchSaveLoading = ref(false)
 
-const openAddDialog = (configId) => {
+const openAddDialog = async (configId) => {
   const config = configs[configId]
   if (!config) return
+
+  // 刷新选项数据
+  if (configId === 'wall-thickness-series') {
+    await Promise.all([fetchScheduleOptions(), fetchEndStandardOptions()])
+  } else if (configId === 'bend-parameter') {
+    await Promise.all([fetchMaterialOptions(), fetchScheduleOptions()])
+  }
   
   batchAddData.value = []
   handleAddBatchRow() // 默认添加一行
@@ -404,13 +754,32 @@ const handleAddBatchRow = () => {
   
   const newRow = {}
   config.columns.forEach(col => {
-    newRow[col.prop] = ''
+    newRow[col.prop] = col.prop === 'status' ? true : ''
   })
   batchAddData.value.push(newRow)
 }
 
 const handleDeleteBatchRow = (index) => {
   batchAddData.value.splice(index, 1)
+}
+
+const getKeyColumns = (config) => {
+  return config.columns.filter(c => c.prop !== 'id' && c.prop !== 'status')
+}
+
+const generateRowFingerprint = (row, config) => {
+  const keyColumns = getKeyColumns(config)
+  return keyColumns.map(col => {
+    let val = row[col.prop]
+    if (config.id === 'wall-thickness-series') {
+      if (col.prop === 'scheduleThickness') val = getScheduleCode(val)
+      if (col.prop === 'endStandard') val = getEndStandardCode(val)
+    } else if (config.id === 'bend-parameter') {
+      if (col.prop === 'mainMaterial') val = getMaterialCode(val)
+      if (col.prop === 'scheduleThickness') val = getScheduleCode(val)
+    }
+    return String(val ?? '').trim()
+  }).join('|')
 }
 
 const confirmBatchAdd = async () => {
@@ -434,35 +803,24 @@ const confirmBatchAdd = async () => {
     }
   }
 
-  // 校验重复数据
-  // 1. 检查批量新增列表中是否有重复行
-  const batchRowsStr = batchAddData.value.map(row => {
-    // 提取所有列的值组合成字符串用于比较
-    return config.columns.map(col => String(row[col.prop]).trim()).join('|')
-  })
-  
-  const batchSet = new Set()
-  for (let i = 0; i < batchRowsStr.length; i++) {
-    const str = batchRowsStr[i]
-    if (batchSet.has(str)) {
-      ElMessage.warning(`新增列表中存在重复数据（第 ${i + 1} 行与其他行重复）`)
+  // 1. 批量数据内部去重
+  const batchFingerprints = new Set()
+  for (const row of batchAddData.value) {
+    const fp = generateRowFingerprint(row, config)
+    if (batchFingerprints.has(fp)) {
+      ElMessage.warning('检测到批量新增列表中有重复数据，请检查')
       return
     }
-    batchSet.add(str)
+    batchFingerprints.add(fp)
   }
 
-  // 2. 检查是否与数据库已有数据重复
-  if (config.data && config.data.length > 0) {
-    const existingRowsStr = config.data.map(row => {
-      return config.columns.map(col => String(row[col.prop]).trim()).join('|')
-    })
-    
-    for (let i = 0; i < batchRowsStr.length; i++) {
-      const str = batchRowsStr[i]
-      if (existingRowsStr.includes(str)) {
-        ElMessage.warning(`第 ${i + 1} 行数据已存在于数据库中，不能重复添加`)
-        return
-      }
+  // 2. 与现有数据对比去重
+  const existingFingerprints = new Set(config.data.map(r => generateRowFingerprint(r, config)))
+  for (const row of batchAddData.value) {
+    const fp = generateRowFingerprint(row, config)
+    if (existingFingerprints.has(fp)) {
+      ElMessage.warning('检测到新增数据已存在于数据库中，无法添加')
+      return
     }
   }
 
@@ -470,44 +828,136 @@ const confirmBatchAdd = async () => {
   
   try {
     if (config.id === 'bend-pipe') {
-      // 弯管数据：循环调用POST接口
-      const promises = batchAddData.value.map(row => {
-        // 构造请求体，确保数据格式正确
-        const payload = {
-          ...row,
-          // 确保数值类型正确转换
-          outSideDiameter: Number(row.outSideDiameter) || 0,
-          headerClampLength: Number(row.headerClampLength) || 0,
-          tailClampLength: Number(row.tailClampLength) || 0
-        }
-        return axios.post('/api/DspSpmcDictPipingBend', payload)
-      })
+
+      let successCount = 0
+      let failCount = 0
       
-      await Promise.all(promises)
+      // 按顺序执行新增
+      for (const row of batchAddData.value) {
+        try {
+          const payload = {
+            ...row,
+            outSideDiameter: Number(row.outSideDiameter) || 0,
+            headerClampLength: Number(row.headerClampLength) || 0,
+            tailClampLength: Number(row.tailClampLength) || 0,
+            status: toBool(row.status ?? true)
+          }
+          await axios.post('/api/DspSpmcDictPipingBendData', payload)
+          successCount++
+        } catch (e) {
+          console.error('新增单行失败:', e)
+          failCount++
+        }
+      }
+      
       await fetchBendPipeData()
-      ElMessage.success(`成功添加 ${batchAddData.value.length} 条数据`)
+      if (successCount > 0) {
+        ElMessage.success(`成功添加 ${successCount} 条数据${failCount > 0 ? `，失败 ${failCount} 条` : ''}`)
+      } else {
+        ElMessage.error('批量新增全部失败，请检查数据或网络')
+      }
+      scrollTableToBottom()
+    } else if (config.id === 'wall-thickness-series') {
+      let successCount = 0
+      let failCount = 0
+      
+      // 按顺序执行新增
+      for (const row of batchAddData.value) {
+        try {
+          const payload = {
+            ...row,
+            npd: String(row.npd || ''),
+            ndpunit: String(row.ndpunit || ''),
+            scheduleThicknessCl: getScheduleCode(row.scheduleThickness),
+            endStandardCl: getEndStandardCode(row.endStandard),
+            pipingOutsideDiameter: Number(row.pipingOutsideDiameter) || 0,
+            wallThickness: Number(row.wallThickness) || 0,
+            status: toBool(row.status ?? true)
+          }
+          await axios.post('/api/S3dDictWallThickness', payload)
+          successCount++
+        } catch (e) {
+          console.error('新增单行失败:', e)
+          failCount++
+        }
+      }
+
+      await fetchWallThicknessData()
+      if (successCount > 0) {
+        ElMessage.success(`成功添加 ${successCount} 条数据${failCount > 0 ? `，失败 ${failCount} 条` : ''}`)
+      } else {
+        ElMessage.error('批量新增全部失败，请检查数据或网络')
+      }
+      scrollTableToBottom()
+    } else if (config.id === 'bend-parameter') {
+      let successCount = 0
+      let failCount = 0
+
+      for (const row of batchAddData.value) {
+        try {
+          const payload = {
+            ...row,
+            materialsCategoryCl: getMaterialCode(row.mainMaterial),
+            normalDiameter: String(row.npd || ''),
+            unitType: String(row.ndpunit || ''),
+            scheduleThicknessCl: getScheduleCode(row.scheduleThickness),
+            bendRadiusMultiplier: Number(row.bendRadius) || 0,
+            status: toBool(row.status ?? true)
+          }
+          await axios.post('/api/S3dRulePipingBendParameter', payload)
+          successCount++
+        } catch (e) {
+          console.error('新增单行失败:', e)
+          failCount++
+        }
+      }
+
+      await fetchBendParameterData()
+      if (successCount > 0) {
+        ElMessage.success(`成功添加 ${successCount} 条数据${failCount > 0 ? `，失败 ${failCount} 条` : ''}`)
+      } else {
+        ElMessage.error('批量新增全部失败，请检查数据或网络')
+      }
+      scrollTableToBottom()
+    } else if (config.id === 'shortcode') {
+      let successCount = 0
+      let failCount = 0
+
+      for (const row of batchAddData.value) {
+        try {
+          const payload = {
+            shortCodeHierarchyType: row.shortCodeHierarchyType,
+            shortCode: row.shortCode
+          }
+          await axios.post('/api/S3dRuleShortCodeHierarchyRule', payload)
+          successCount++
+        } catch (e) {
+          console.error('新增单行失败:', e)
+          failCount++
+        }
+      }
+
+      await fetchShortCodeMinorData()
+      if (successCount > 0) {
+        ElMessage.success(`成功添加 ${successCount} 条数据${failCount > 0 ? `，失败 ${failCount} 条` : ''}`)
+      } else {
+        ElMessage.error('批量新增全部失败，请检查数据或网络')
+      }
+      scrollTableToBottom()
     } else {
-      // 其他配置：前端模拟添加
       let newId = config.data.length > 0 
         ? Math.max(...config.data.map(item => item.id)) + 1 
         : 1
-        
+
       const newRows = batchAddData.value.map((row, index) => ({
         ...row,
         id: newId + index
       }))
-      
+
       config.data.push(...newRows)
       ElMessage.success(`成功添加 ${batchAddData.value.length} 条数据`)
-      
-      // 自动滚动到底部
-      setTimeout(() => {
-        const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap') 
-                          || document.querySelector('.el-table__body-wrapper')
-        if (tableBody) {
-          tableBody.scrollTop = tableBody.scrollHeight
-        }
-      }, 100)
+
+      scrollTableToBottom()
     }
     
     batchAddDialogVisible.value = false
@@ -524,10 +974,23 @@ const editDialogVisible = ref(false)
 const editRowData = ref(null)
 const editSaveLoading = ref(false)
 
-const handleRowDblClick = (row) => {
+const handleRowDblClick = async (row) => {
   const config = currentConfig.value
   if (!config) return
+  if (config.id === 'shortcode-major') return
+
+  // 刷新选项数据
+  if (config.id === 'wall-thickness-series') {
+    await Promise.all([fetchScheduleOptions(), fetchEndStandardOptions()])
+  } else if (config.id === 'bend-parameter') {
+    await Promise.all([fetchMaterialOptions(), fetchScheduleOptions()])
+  }
+
   editRowData.value = { ...row }
+  if (config.id === 'wall-thickness-series') {
+    editRowData.value.scheduleThickness = getScheduleCode(editRowData.value.scheduleThickness)
+    editRowData.value.endStandard = getEndStandardCode(editRowData.value.endStandard)
+  }
   editDialogVisible.value = true
 }
 
@@ -551,13 +1014,14 @@ const confirmEdit = async () => {
     }
   }
 
+  // 校验数据重复
   if (config.data && config.data.length > 0) {
     const targetId = editRowData.value.id
-    const existingRowsStr = config.data
-      .filter(r => r.id !== targetId)
-      .map(r => config.columns.map(col => String(r[col.prop]).trim()).join('|'))
-    const currentStr = config.columns.map(col => String(editRowData.value[col.prop]).trim()).join('|')
-    if (existingRowsStr.includes(currentStr)) {
+    const existingRows = config.data.filter(r => r.id !== targetId)
+    const existingFingerprints = new Set(existingRows.map(r => generateRowFingerprint(r, config)))
+    const currentFingerprint = generateRowFingerprint(editRowData.value, config)
+    
+    if (existingFingerprints.has(currentFingerprint)) {
       ElMessage.warning('该数据已存在，不能重复添加')
       return
     }
@@ -570,10 +1034,45 @@ const confirmEdit = async () => {
         ...editRowData.value,
         outSideDiameter: Number(editRowData.value.outSideDiameter) || 0,
         headerClampLength: Number(editRowData.value.headerClampLength) || 0,
-        tailClampLength: Number(editRowData.value.tailClampLength) || 0
+        tailClampLength: Number(editRowData.value.tailClampLength) || 0,
+        status: toBool(editRowData.value.status)
       }
-      await axios.put('http://localhost:5022/api/DspSpmcDictPipingBend', payload)
+      await axios.put('/api/DspSpmcDictPipingBendData', payload)
       await fetchBendPipeData()
+      ElMessage.success('更新成功')
+    } else if (config.id === 'wall-thickness-series') {
+      const payload = {
+        ...editRowData.value,
+        npd: String(editRowData.value.npd || ''),
+        ndpunit: String(editRowData.value.ndpunit || ''),
+        scheduleThicknessCl: getScheduleCode(editRowData.value.scheduleThickness),
+        endStandardCl: getEndStandardCode(editRowData.value.endStandard),
+        pipingOutsideDiameter: Number(editRowData.value.pipingOutsideDiameter) || 0,
+        wallThickness: Number(editRowData.value.wallThickness) || 0,
+        status: toBool(editRowData.value.status)
+      }
+      await axios.put('/api/S3dDictWallThickness', payload)
+      await fetchWallThicknessData()
+      ElMessage.success('更新成功')
+    } else if (config.id === 'bend-parameter') {
+      const payload = {
+        ...editRowData.value,
+        materialsCategoryCl: getMaterialCode(editRowData.value.mainMaterial),
+        normalDiameter: String(editRowData.value.npd || ''),
+        unitType: String(editRowData.value.ndpunit || ''),
+        scheduleThicknessCl: getScheduleCode(editRowData.value.scheduleThickness),
+        bendRadiusMultiplier: Number(editRowData.value.bendRadius) || 0,
+        status: toBool(editRowData.value.status)
+      }
+      await axios.put('/api/S3dRulePipingBendParameter', payload)
+      await fetchBendParameterData()
+      ElMessage.success('更新成功')
+    } else if (config.id === 'shortcode') {
+      const payload = {
+        ...editRowData.value
+      }
+      await axios.put('/api/S3dRuleShortCodeHierarchyRule', payload)
+      await fetchShortCodeMinorData()
       ElMessage.success('更新成功')
     } else {
       const idx = config.data.findIndex(r => r.id === editRowData.value.id)
@@ -618,29 +1117,115 @@ const handleImageError = () => {
 
 const fetchBendPipeData = async () => {
   try {
-    const res = await axios.get('/api/DspSpmcDictPipingBend')
-    if (res?.data?.code === 200) {
-      const rows = Array.isArray(res.data.data) ? res.data.data : []
-      const cfg = configs['bend-pipe'] || {
-        id: 'bend-pipe',
-        title: '弯管数据',
-        selectedRows: [],
-        columns: [],
-        data: []
+    const res = await axios.get('/api/DspSpmcDictPipingBendData')
+    let rows = getRowsFromResponse(res)
+    rows.forEach(row => {
+      if (row.status === undefined) {
+        row.status = true
+      } else {
+        row.status = toBool(row.status)
       }
-      cfg.columns = [
-        { prop: 'outSideDiameter', label: '外径DN', editable: false },
-        { prop: 'outSideDiameterUnit', label: '外径单位', editable: false },
-        { prop: 'headerClampLength', label: '前夹长L1', editable: false },
-        { prop: 'tailClampLength', label: '后夹长L2', editable: false }
-      ]
-      cfg.data = rows
-      configs['bend-pipe'] = cfg
-    } else {
-      ElMessage.error(res?.data?.message || '弯管数据接口返回异常')
+      if (row.MachineNum === undefined) {
+        row.MachineNum = row.machineNum ?? row.machineNumber ?? ''
+      }
+    })
+    const cfg = configs['bend-pipe'] || {
+      id: 'bend-pipe',
+      title: LOCAL_TITLES['bend-pipe'] || '弯管机数据',
+      selectedRows: [],
+      columns: [],
+      data: []
     }
+    cfg.columns = LOCAL_COLUMNS['bend-pipe'] || []
+    cfg.data = rows
+    configs['bend-pipe'] = cfg
   } catch (e) {
-    ElMessage.error(`弯管数据接口请求失败：${e?.message || '网络错误'}`)
+    ElMessage.error(`弯管机数据接口请求失败：${e?.message || '网络错误'}`)
+  }
+}
+
+const fetchShortCodeMinorData = async () => {
+  try {
+    const res = await axios.get('/api/S3dRuleShortCodeHierarchyRule')
+    let rows = getRowsFromResponse(res)
+    rows = rows.map((r, idx) => ({
+      id: r.id ?? idx + 1,
+      shortCodeHierarchyType: r.shortCodeHierarchyType ?? r.ShortCodeHierarchyType ?? '',
+      shortCode: r.shortCode ?? r.ShortCode ?? ''
+    }))
+    const cfg = configs['shortcode'] || {
+      id: 'shortcode',
+      title: LOCAL_TITLES['shortcode'] || '部件库名称：ShortCodeHierarchyRule',
+      selectedRows: [],
+      columns: [],
+      data: []
+    }
+    cfg.columns = LOCAL_COLUMNS['shortcode'] || []
+    cfg.data = rows
+    configs['shortcode'] = cfg
+  } catch (e) {
+    ElMessage.error(`ShortCode细类接口请求失败：${e?.message || '网络错误'}`)
+  }
+}
+
+const fetchBendParameterData = async () => {
+  try {
+    const res = await axios.get('/api/PipingBendParameterCodeConverted')
+    let rows = getRowsFromResponse(res)
+    rows = rows.map((r, idx) => {
+      const row = {
+        id: r.id ?? idx + 1,
+        mainMaterial: r.materialsCategory ?? '',
+        npd: r.normalDiameter ?? '',
+        ndpunit: r.unitType ?? '',
+        scheduleThickness: r.scheduleThickness ?? r.ScheduleThickness ?? r.schedule ?? '',
+        bendRadius: r.bendRadiusMultiplier ?? ''
+      }
+      if (r.status === undefined) {
+        row.status = true
+      } else {
+        row.status = toBool(r.status)
+      }
+      return row
+    })
+    const cfg = configs['bend-parameter'] || {
+      id: 'bend-parameter',
+      title: LOCAL_TITLES['bend-parameter'] || '弯管参数',
+      selectedRows: [],
+      columns: [],
+      data: []
+    }
+    cfg.columns = LOCAL_COLUMNS['bend-parameter'] || []
+    cfg.data = rows
+    configs['bend-parameter'] = cfg
+  } catch (e) {
+    ElMessage.error(`弯管参数接口请求失败：${e?.message || '网络错误'}`)
+  }
+}
+
+const fetchWallThicknessData = async () => {
+  try {
+    const res = await axios.get('/api/WallThicknessCodeConverted')
+    let rows = getRowsFromResponse(res)
+    rows.forEach(r => {
+      if (r.status === undefined) {
+        r.status = true
+      } else {
+        r.status = toBool(r.status)
+      }
+    })
+    const cfg = configs['wall-thickness-series'] || {
+      id: 'wall-thickness-series',
+      title: LOCAL_TITLES['wall-thickness-series'] || '壁厚等级',
+      selectedRows: [],
+      columns: [],
+      data: []
+    }
+    cfg.columns = LOCAL_COLUMNS['wall-thickness-series'] || []
+    cfg.data = rows
+    configs['wall-thickness-series'] = cfg
+  } catch (e) {
+    ElMessage.error(`壁厚等级数据接口请求失败：${e?.message || '网络错误'}`)
   }
 }
 
@@ -648,11 +1233,23 @@ const fetchBendPipeData = async () => {
 onMounted(() => {
   initializeConfigs()
   fetchBendPipeData()
+  fetchBendParameterData()
+  fetchWallThicknessData()
+  fetchShortCodeMinorData()
+  fetchScheduleOptions()
+  fetchEndStandardOptions()
+  fetchMaterialOptions()
 })
 
 watch(currentNode, (node) => {
   if (node?.id === 'bend-pipe') {
     fetchBendPipeData()
+  } else if (node?.id === 'bend-parameter') {
+    fetchBendParameterData()
+  } else if (node?.id === 'wall-thickness-series') {
+    fetchWallThicknessData()
+  } else if (node?.id === 'shortcode') {
+    fetchShortCodeMinorData()
   }
 })
 </script>
@@ -674,21 +1271,35 @@ watch(currentNode, (node) => {
 }
 
 .basic-config-sidebar {
-  width: 240px;
+  width: 280px;
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.2s ease;
+}
+
+.basic-config-sidebar.collapsed {
+  width: 60px;
 }
 
 .sidebar-header {
-  padding: 16px;
+  padding: 16px 10px;
   border-bottom: 1px solid #e4e7ed;
   font-weight: 600;
+  font-size: 18px;
   color: #303133;
   background-color: #fafafa;
+  background-color: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.collapse-btn {
+  margin-left: 8px;
 }
 
 .sidebar-tree {
@@ -732,7 +1343,7 @@ watch(currentNode, (node) => {
 }
 
 .main-header {
-  padding: 16px 20px;
+  padding: 12px 20px;
   border-bottom: 1px solid #e4e7ed;
   display: flex;
   justify-content: space-between;
@@ -743,7 +1354,7 @@ watch(currentNode, (node) => {
 
 .title-section h3 {
   margin: 0 0 4px 0;
-  font-size: 16px;
+  font-size: 18px;
   color: #303133;
 }
 
@@ -775,8 +1386,8 @@ watch(currentNode, (node) => {
 
 .action-buttons {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }
 
 .table-container {
@@ -861,5 +1472,11 @@ watch(currentNode, (node) => {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+:deep(.el-table .disabled-row) {
+  background-color: #fafafa;
+  color: #c0c4cc;
+  text-decoration: line-through;
 }
 </style>
