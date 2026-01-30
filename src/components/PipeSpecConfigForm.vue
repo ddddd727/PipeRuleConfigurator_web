@@ -181,6 +181,7 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { pipeSpecConfigStore } from '@/constants/PipeSpec-item'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -505,7 +506,9 @@ const handleSubmit = async () => {
     
     // 准备提交数据 - 简化参数传递
     const submitData = {
-      ...form.value,
+      partType: form.value.partType,
+      standardFileIds: form.value.standardFileIds,
+      standardFileConfigurations: form.value.standardFileConfigurations,
       // 转换为更友好的格式，传递数组即可
       configurations: form.value.standardFileConfigurations.map(config => {
         const material = props.materials.find(m => m.id === config.material)
@@ -534,6 +537,7 @@ const handleSubmit = async () => {
     try {
       const res = await axios.post('/api/pipe-spec/configure', submitData)
       if (res.data.code === 200) {
+        // 不在这里保存到本地存储，由父组件 PipeSpec.vue 统一管理
         emit('confirm', submitData)
         dialogVisible.value = false
         ElMessage.success('配置已保存！')
@@ -579,6 +583,34 @@ watch(dialogVisible, (val) => {
       duplicateRangeDefaultsMap.value = {}
     })
     fetchPartTypes()
+  }
+})
+
+// 监听部件类型变化，尝试从存储中加载已有配置
+watch(() => form.value.partType, async (newPartType) => {
+  if (newPartType && dialogVisible.value) {
+    // 尝试从存储中获取该部件类型的已有配置
+    const existingConfig = pipeSpecConfigStore.getConfigByPartType(newPartType)
+    
+    if (existingConfig) {
+      // 如果存在已有配置，恢复到表单中
+      await nextTick()
+      
+      // 恢复标准文件选择
+      form.value.standardFileIds = [...existingConfig.standardFileIds]
+      
+      // 恢复标准文件配置
+      form.value.standardFileConfigurations = existingConfig.standardFileConfigurations.map(config => ({
+        ...config
+      }))
+      
+      // 恢复重复范围默认配置
+      if (existingConfig.duplicateRangeDefaults && existingConfig.duplicateRangeDefaults.length > 0) {
+        existingConfig.duplicateRangeDefaults.forEach(defaultConfig => {
+          duplicateRangeDefaultsMap.value[defaultConfig.rangeKey] = defaultConfig.defaultStandardFileId
+        })
+      }
+    }
   }
 })
 

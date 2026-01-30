@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, Setting, Plus, Ship } from '@element-plus/icons-vue'
 import PipeSpecConfigForm from '@/components/PipeSpecConfigForm.vue'    // 导入 PipeSpecConfigForm 组件，用于配置按钮的弹窗实现
 import PipeSpecPreviewForm from '@/components/PipeSpecPreviewForm.vue'  // 导入规格书预览窗口组件
+import { pipeSpecConfigStore } from '@/constants/PipeSpec-item'  // 导入管道规格配置存储
 
 // 树形数据
 const treeData = ref([])
@@ -481,10 +482,10 @@ const fetchDimensionData = async (endStandard, schedule) => {
 
 // 配置按钮列表
 const configButtons = ref([
-  { id: 1, type: '', configResult: '' },
-  { id: 2, type: '', configResult: '' },
-  { id: 3, type: '', configResult: '' },
-  { id: 4, type: '', configResult: '' }
+  { id: 1, type: '', configResult: '', configData: null },
+  { id: 2, type: '', configResult: '', configData: null },
+  { id: 3, type: '', configResult: '', configData: null },
+  { id: 4, type: '', configResult: '', configData: null }
 ])
 
 // 当前选中的按钮ID
@@ -613,6 +614,10 @@ const columnCount = computed(() => {
 
 // 处理配置确认
 const handleConfirm = (data) => {
+  // 获取当前按钮的原有配置
+  const currentButton = configButtons.value.find(btn => btn.id === currentButtonId.value)
+  const isCurrentButtonReconfig = currentButton && currentButton.type === data.partType && currentButton.configResult
+  
   // 检查部件类型是否已配置（排除当前正在编辑的按钮）
   const existingButton = configButtons.value.find(btn => {
     return btn.type === data.partType && 
@@ -620,8 +625,9 @@ const handleConfirm = (data) => {
            btn.id !== currentButtonId.value
   })
   
+  // 只有在其他按钮已配置了相同部件类型时才提示
   if (existingButton) {
-    // 部件类型已配置，询问用户是否重新配置
+    // 部件类型已配置在其他按钮上，询问用户是否重新配置
     ElMessageBox.confirm(
       `部件类型 "${data.partType}" 已经配置过了，是否重新配置该部件类型？`,
       '提示',
@@ -631,28 +637,67 @@ const handleConfirm = (data) => {
         type: 'warning'
       }
     ).then(() => {
-      // 用户确认重新配置，清空之前的配置并更新
+      // 用户确认重新配置
       const existingButtonIndex = configButtons.value.findIndex(btn => btn.id === existingButton.id)
       if (existingButtonIndex !== -1) {
+        // 更新存储中的配置
+        pipeSpecConfigStore.updateConfigByPartType(data.partType, {
+          standardFileIds: data.standardFileIds || [],
+          standardFileConfigurations: data.standardFileConfigurations || [],
+          configurations: data.configurations,
+          duplicateRangeDefaults: data.duplicateRangeDefaults
+        })
+        
         // 更新已存在的配置按钮
         updateConfigButton(data, existingButton.id)
+        
         // 清空当前按钮
         const currentButtonIndex = configButtons.value.findIndex(btn => btn.id === currentButtonId.value)
         if (currentButtonIndex !== -1 && currentButtonId.value !== existingButton.id) {
+          // 如果当前按钮有配置数据，从存储中删除
+          const currentButton = configButtons.value[currentButtonIndex]
+          if (currentButton.type && currentButton.configData && currentButton.type !== data.partType) {
+            pipeSpecConfigStore.deleteConfigByPartType(currentButton.type)
+          }
           configButtons.value[currentButtonIndex].type = ''
           configButtons.value[currentButtonIndex].configResult = ''
+          configButtons.value[currentButtonIndex].configData = null
         }
-        // 关闭对话框
-        showDialog.value = false
-        ElMessage.success('重新配置成功，已更新该部件类型的配置')
       }
+      
+      // 关闭对话框
+      showDialog.value = false
+      ElMessage.success('重新配置成功，已更新该部件类型的配置')
     }).catch(() => {
       // 用户取消，不做任何操作
       ElMessage.info('已取消操作')
     })
   } else {
-    // 部件类型未配置过，直接保存配置
+    // 当前按钮是第一次配置或重新配置自己
+    if (isCurrentButtonReconfig) {
+      // 当前按钮重新配置，更新存储
+      pipeSpecConfigStore.updateConfigByPartType(data.partType, {
+        standardFileIds: data.standardFileIds || [],
+        standardFileConfigurations: data.standardFileConfigurations || [],
+        configurations: data.configurations,
+        duplicateRangeDefaults: data.duplicateRangeDefaults
+      })
+    } else {
+      // 全新配置，添加到存储
+      pipeSpecConfigStore.addConfig({
+        partType: data.partType,
+        standardFileIds: data.standardFileIds || [],
+        standardFileConfigurations: data.standardFileConfigurations || [],
+        configurations: data.configurations,
+        duplicateRangeDefaults: data.duplicateRangeDefaults
+      })
+    }
+    
+    // 更新当前按钮
     updateConfigButton(data, currentButtonId.value)
+    
+    // 关闭对话框
+    showDialog.value = false
   }
 }
 
@@ -677,6 +722,16 @@ const updateConfigButton = (data, buttonId) => {
     if (buttonIndex !== -1) {
       configButtons.value[buttonIndex].type = data.partType
       configButtons.value[buttonIndex].configResult = configStr
+      
+      // 将按钮ID与配置存储中的ID关联
+      // 存储完整的配置数据到按钮对象中，方便后续使用
+      configButtons.value[buttonIndex].configData = {
+        partType: data.partType,
+        standardFileIds: data.standardFileIds || [],
+        standardFileConfigurations: data.standardFileConfigurations || [],
+        configurations: data.configurations,
+        duplicateRangeDefaults: data.duplicateRangeDefaults
+      }
       
       // 检查是否需要添加新按钮
       const hasEmptyButton = configButtons.value.some(btn => !btn.type && !btn.configResult)
@@ -730,15 +785,30 @@ const handleSaveSpecification = async () => {
   }
   
   try {
-    // 准备保存数据
+    // 从存储中获取所有配置的完整数据
+    const allStoredConfigs = pipeSpecConfigStore.getAllConfigs()
+    
+    // 准备保存数据，包含完整的配置信息
     const saveData = {
       shipType: selectedShipClass.value ? shipClasses.value.find(item => item.id === selectedShipClass.value)?.name : '',
       shipNumber: selectedShipNumber.value ? shipNumbers.value.find(item => item.id === selectedShipNumber.value)?.name : '',
       pmcCode: currentNode.value.label || '',
-      configurations: configuredButtons.map(btn => ({
-        partType: btn.type,
-        configResult: btn.configResult
-      }))
+      configurations: configuredButtons.map(btn => {
+        // 优先使用按钮中存储的完整配置数据
+        const fullConfigData = btn.configData || allStoredConfigs.find(config => config.partType === btn.type)
+        
+        return {
+          partType: btn.type,
+          configResult: btn.configResult,
+          // 包含完整的配置数据
+          fullConfig: fullConfigData ? {
+            standardFileIds: fullConfigData.standardFileIds,
+            standardFileConfigurations: fullConfigData.standardFileConfigurations,
+            configurations: fullConfigData.configurations,
+            duplicateRangeDefaults: fullConfigData.duplicateRangeDefaults
+          } : null
+        }
+      })
     }
     
     // 调用保存接口
@@ -763,6 +833,26 @@ const getStatusLabel = (status) => {
     'approved': '已审核'
   }
   return statusMap[status] || status
+}
+
+// 获取所有存储的配置（用于调试或导出）
+const getAllStoredConfigs = () => {
+  const allConfigs = pipeSpecConfigStore.getAllConfigs()
+  console.log('当前存储的所有配置:', allConfigs)
+  console.log('配置数量:', pipeSpecConfigStore.getCount())
+  return allConfigs
+}
+
+// 清空所有存储的配置
+const clearAllStoredConfigs = () => {
+  pipeSpecConfigStore.clearAll()
+  // 同时清空按钮配置
+  configButtons.value.forEach(btn => {
+    btn.type = ''
+    btn.configResult = ''
+    btn.configData = null
+  })
+  ElMessage.success('已清空所有配置')
 }
 </script>
 
