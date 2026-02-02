@@ -124,6 +124,17 @@ Mock.mock(/\/api\/pipe-spec\/standard-files/, 'get', (options) => {
   }
 })
 
+// 优选规则列表
+Mock.mock(/\/api\/pipe-spec\/preferred-rules/, 'get', () => ({
+  code: 200,
+  msg: 'success',
+  data: [
+    { label: '规则-按标准优先', value: 'rule-standard' },
+    { label: '规则-按材料优先', value: 'rule-material' },
+    { label: '规则-按通径优先', value: 'rule-npd' }
+  ]
+}))
+
 // 保存配置
 Mock.mock(/\/api\/pipe-spec\/configure/, 'post', () => ({
   code: 200,

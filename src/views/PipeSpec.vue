@@ -1,18 +1,72 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, Setting, Plus, Ship } from '@element-plus/icons-vue'
 import PipeSpecConfigForm from '@/components/PipeSpecConfigForm.vue'    // 导入 PipeSpecConfigForm 组件，用于配置按钮的弹窗实现
 import PipeSpecPreviewForm from '@/components/PipeSpecPreviewForm.vue'  // 导入规格书预览窗口组件
 import { pipeSpecConfigStore } from '@/constants/PipeSpec-item'  // 导入管道规格配置存储
+import { usePmcTree } from '@/composables/usePmcTree'
+import { usePmcDetails } from '@/composables/usePmcDetails'
+import { useNpdTable } from '@/composables/useNpdTable'
+import { usePreferredRule } from '@/composables/usePreferredRule'
+import { useMaterials } from '@/composables/useMaterials'
 
-// 树形数据
-const treeData = ref([])
-const treeLoading = ref(false)
+// 树形数据 / 规则 / 表格 / 表单 逻辑
+const {
+  treeData,
+  treeLoading,
+  shipInfosLoading,
+  selectedShipClass,
+  selectedShipNumber,
+  shipClasses,
+  shipNumbers,
+  fetchShipInfos
+} = usePmcTree()
 
-// 当前选中的树形节点
-const currentNode = ref({ label: 'Piping Specification' })
+const {
+  dimensionData,
+  dimensionLoading,
+  baseDimensionCache,
+  columnCount,
+  filteredNpdRanges,
+  fetchDimensionData,
+  setDimensionData,
+  clearDimensionData,
+  getCellStyle,
+  handleCellClick
+} = useNpdTable()
+
+const preferredRule = ref(null)
+
+const {
+  currentNode,
+  formData,
+  fetchPmcCodeDetails,
+  handleNodeClick
+} = usePmcDetails({
+  fetchDimensionData,
+  preferredRule,
+  clearDimensionData
+})
+
+const {
+  preferredRuleOptions,
+  preferredRuleLoading,
+  fetchPreferredRules
+} = usePreferredRule({
+  formData,
+  fetchDimensionData,
+  baseDimensionCache,
+  setDimensionData,
+  preferredRule
+})
+
+const {
+  materials,
+  materialsLoading,
+  fetchMaterialsData
+} = useMaterials()
 
 // 侧边栏折叠状态
 const sidebarCollapsed = ref(false)
@@ -20,473 +74,6 @@ const sidebarCollapsed = ref(false)
 // 切换侧边栏折叠状态
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
-}
-
-// 右侧表单数据
-const formData = ref({
-  service: '',
-  pipingMaterialClass: '',
-  pipe: '',
-  material: '',
-  pressureClass: '',
-  wallThickness: ''
-})
-
-// 优选规则选择
-const preferredRule = ref('')
-const preferredRuleOptions = ref([
-  { label: '默认规则', value: 'default' },
-  { label: '优选规则A', value: 'ruleA' },
-  { label: '优选规则B', value: 'ruleB' }
-])
-
-
-// 船型船号数据
-const shipInfos = ref([])
-const shipInfosLoading = ref(false)
-
-// 当前选中的船型和船号
-const selectedShipClass = ref(null)
-const selectedShipNumber = ref(null)
-
-// 船型列表（从后端数据中提取唯一的船型）
-const shipClasses = computed(() => {
-  const uniqueTypes = [...new Set(shipInfos.value.map(item => item.shipType))]
-  return uniqueTypes.map((type, index) => ({
-    id: index + 1,
-    name: type
-  }))
-})
-
-// 船号列表（根据选中的船型过滤）
-const shipNumbers = computed(() => {
-  if (!selectedShipClass.value) return []
-  const shipType = shipClasses.value.find(item => item.id === selectedShipClass.value)?.name
-  if (!shipType) return []
-  
-  return shipInfos.value
-    .filter(item => item.shipType === shipType)
-    .map((item, index) => ({
-      id: index + 1,
-      name: item.shipNumber
-    }))
-})
-
-// 获取船型船号信息
-const fetchShipInfos = async () => {
-  shipInfosLoading.value = true
-  try {
-    const res = await axios.get('/api/PmcSpec/ShipInfos')
-    if (res.data.code === 200) {
-      shipInfos.value = res.data.data
-    } else {
-      ElMessage.error(res.data.message || '获取船型船号信息失败')
-    }
-  } catch (error) {
-    console.error('获取船型船号信息错误:', error)
-    ElMessage.error('网络错误，获取船型船号信息失败')
-  } finally {
-    shipInfosLoading.value = false
-  }
-}
-
-let pmcRulesRequestId = 0
-
-// 获取船号的 PMC 规则数据
-const fetchPmcRules = async (shipNumber) => {
-  const requestId = ++pmcRulesRequestId
-  treeLoading.value = true
-  try {
-    const res = await axios.get(`/api/PmcSpec/PmcRules/${shipNumber}`)
-    if (res.data.code === 200) {
-      if (requestId === pmcRulesRequestId) {
-        treeData.value = transformToTreeStructure(res.data.data)
-      }
-    } else {
-      ElMessage.error(res.data.message || '获取PMC规则数据失败')
-    }
-  } catch (error) {
-    console.error('获取PMC规则数据错误:', error)
-    ElMessage.error('网络错误，获取PMC规则数据失败')
-  } finally {
-    if (requestId === pmcRulesRequestId) {
-      treeLoading.value = false
-    }
-  }
-}
-
-// 将后端返回的数据转换为树形结构
-const transformToTreeStructure = (data) => {
-  if (!data || data.length === 0) {
-    return []
-  }
-
-  const materialMap = new Map()
-
-  data.forEach(item => {
-    const material = item.material
-    const pipeStandard = item.pipeStandard || item.pipeStadard
-    const pmcCode = item.pmcCode
-
-    if (!materialMap.has(material)) {
-      materialMap.set(material, {
-        label: material,
-        children: new Map()
-      })
-    }
-
-    const materialNode = materialMap.get(material)
-    
-    if (!materialNode.children.has(pipeStandard)) {
-      materialNode.children.set(pipeStandard, {
-        label: pipeStandard,
-        children: []
-      })
-    }
-
-    const pipeStandardNode = materialNode.children.get(pipeStandard)
-    pipeStandardNode.children.push({
-      label: pmcCode,
-      shipNumber: item.shipNumber,
-      material: item.material,
-      pipeStandard: pipeStandard || '',
-      status: item.status
-    })
-  })
-
-  const result = []
-  materialMap.forEach((value, key) => {
-    const children = []
-    value.children.forEach((childValue) => {
-      children.push(childValue)
-    })
-    result.push({
-      label: value.label,
-      children: children
-    })
-  })
-
-  return result
-}
-
-// 获取编码详细信息
-const fetchPmcCodeDetails = async (code) => {
-  try {
-    const res = await axios.get(`/api/PmcSpec/Analyze/${code}`)
-    if (res.data.code === 200) {
-      const data = res.data.data
-      formData.value = {
-        service: data.service || '',
-        pipingMaterialClass: data.pipingMaterialClass || code,
-        pipe: data.pipeStandard || '',
-        material: data.materialGrade || '',
-        pressureClass: data.pressureRating || '',
-        wallThickness: data.wallThickness || ''
-      }
-      
-      // 当获取到 Pipe 和 Wall Thickness 后，自动获取尺寸数据
-      if (formData.value.pipe && formData.value.wallThickness) {
-        await fetchDimensionData(formData.value.pipe, formData.value.wallThickness)
-      }
-    } else {
-      ElMessage.error(res.data.message || '获取编码详情失败')
-    }
-  } catch (error) {
-    console.error('获取编码详情错误:', error)
-    ElMessage.error('网络错误，获取编码详情失败')
-  }
-}
-
-// 处理树形节点点击
-const handleNodeClick = (data) => {
-  currentNode.value = data
-  
-  // 判断是否为第四级节点（没有children且label为7位字母数字）
-  if (!data.children && data.label && data.label.length === 7) {
-    fetchPmcCodeDetails(data.label)
-  } else {
-    // 清空右侧表单
-    formData.value = {
-      service: '',
-      pipingMaterialClass: '',
-      pipe: '',
-      material: '',
-      pressureClass: '',
-      wallThickness: ''
-    }
-    // 清空尺寸数据
-    dimensionData.value = []
-    selectedMin.value = null
-    selectedMax.value = null
-  }
-}
-
-// 处理表格单元格点击
-const handleCellClick = (row, column, cell, event) => {
-  if (row.name !== 'NPD') return
-  
-  // 获取当前列索引，如果超出实际数据范围，不允许选中
-  const currentColumnIndex = parseInt(column.property.replace('col', ''))
-  if (currentColumnIndex > actualColumnCount.value) {
-    return // 不允许选中超出实际数据范围的单元格
-  }
-  
-  const cellValue = row[column.property]
-  if (cellValue === undefined || cellValue === null || isNaN(parseInt(cellValue))) return
-  const value = parseInt(cellValue)
-  if (isNaN(value)) return 
-  
-  // 第一次点击设置最小值，第二次点击设置最大值
-  if (selectedMin.value === null) {
-    selectedMin.value = value
-    selectedMax.value = null
-  } else if (selectedMax.value === null) {
-    if (value < selectedMin.value) {
-      selectedMax.value = selectedMin.value
-      selectedMin.value = value
-    } else {
-      selectedMax.value = value
-    }
-  } else {
-    // 重置选择
-    selectedMin.value = value
-    selectedMax.value = null
-  }
-}
-
-// 获取列索引对应的NPD值（用于判断连续范围）
-const getNpdValueByColumnIndex = (columnIndex) => {
-  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
-  if (!npdRow) return null
-  
-  // columnIndex从1开始（因为第一列是name，从第二列开始是col1, col2...）
-  const colKey = `col${columnIndex}`
-  const value = parseInt(npdRow[colKey])
-  return isNaN(value) ? null : value
-}
-
-// 获取所有列索引到NPD值的映射（按列顺序）
-const columnNpdMap = computed(() => {
-  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
-  if (!npdRow) return new Map()
-  
-  const map = new Map()
-  const sortedNpdValues = [...allNpdValues.value]
-  
-  // 遍历所有列，建立列索引到NPD值的映射
-  for (let i = 1; i <= columnCount.value; i++) {
-    const colKey = `col${i}`
-    const value = parseInt(npdRow[colKey])
-    if (!isNaN(value)) {
-      map.set(i, value)
-    }
-  }
-  
-  return map
-})
-
-// 计算属性：实际数据列数（基于NPD行的实际数据）
-const actualColumnCount = computed(() => {
-  if (!dimensionData.value || dimensionData.value.length === 0) {
-    return 0
-  }
-  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
-  if (!npdRow) return 0
-  
-  // 计算实际有多少列以'col'开头的有效数据（值不为undefined、null且能转换为数字）
-  let count = 0
-  for (let i = 1; i <= columnCount.value; i++) {
-    const colKey = `col${i}`
-    const value = npdRow[colKey]
-    if (value !== undefined && value !== null && !isNaN(parseInt(value))) {
-      count++
-    }
-  }
-  return count
-})
-
-// 计算单元格样式（包括背景色和圆角）
-const getCellStyle = (row, column) => {
-  const baseStyle = {
-    cursor: row.name === 'NPD' ? 'pointer' : 'default',
-    display: 'block',
-    width: '100%',
-    height: '100%',
-    padding: '8px 0',
-    textAlign: 'center'
-  }
-  
-  // 获取当前列索引
-  const currentColumnIndex = parseInt(column.property.replace('col', ''))
-  const isBeyondActualData = currentColumnIndex > actualColumnCount.value
-  
-  // 如果超出实际数据范围，标记为灰色且不可点击
-  if (isBeyondActualData) {
-    return { ...baseStyle, backgroundColor: '#f5f5f5', cursor: 'not-allowed' }
-  }
-  
-  // 只对NPD行应用颜色和圆角
-  if (row.name !== 'NPD') {
-    return baseStyle
-  }
-  
-  const value = parseInt(row[column.property])
-  if (isNaN(value)) {
-    return { ...baseStyle, backgroundColor: '#FFFFE0' }
-  }
-  
-  // 判断是否在选中范围内
-  let isInRange = false
-  let isFirst = false
-  let isLast = false
-  
-  if (selectedMin.value !== null && selectedMax.value !== null) {
-    isInRange = value >= selectedMin.value && value <= selectedMax.value
-  } else if (selectedMin.value !== null) {
-    isInRange = value === selectedMin.value
-  }
-  
-  if (isInRange) {
-    // 判断是否是连续范围的第一个或最后一个单元格
-    const currentColumnIndex = parseInt(column.property.replace('col', ''))
-    
-    // 获取所有在范围内的列索引（按列顺序）
-    const rangeColumns = []
-    columnNpdMap.value.forEach((npdValue, colIndex) => {
-      if (selectedMin.value !== null && selectedMax.value !== null) {
-        if (npdValue >= selectedMin.value && npdValue <= selectedMax.value) {
-          rangeColumns.push({ colIndex, npdValue })
-        }
-      } else if (selectedMin.value !== null) {
-        if (npdValue === selectedMin.value) {
-          rangeColumns.push({ colIndex, npdValue })
-        }
-      }
-    })
-    
-    // 按列索引排序
-    rangeColumns.sort((a, b) => a.colIndex - b.colIndex)
-    
-    // 判断当前列是否是第一个或最后一个
-    if (rangeColumns.length > 0) {
-      const firstCol = rangeColumns[0]
-      const lastCol = rangeColumns[rangeColumns.length - 1]
-      
-      if (currentColumnIndex === firstCol.colIndex) {
-        isFirst = true
-      }
-      if (currentColumnIndex === lastCol.colIndex) {
-        isLast = true
-      }
-    }
-  }
-  
-  // 设置背景色
-  const backgroundColor = isInRange ? '#90EE90' : '#FFFFE0'
-  
-  // 设置圆角和边距（用于实现颜色连续）
-  let borderRadius = '0'
-  let marginRight = '0'
-  let marginLeft = '0'
-  
-  if (isInRange) {
-    // 连续范围内的单元格，移除右边距让颜色连续
-    marginRight = '-1px'
-    
-    if (isFirst) {
-      borderRadius = '4px 0 0 4px' // 左侧圆角
-      marginLeft = '0'
-    }
-    if (isLast && !isFirst) {
-      borderRadius = '0 4px 4px 0' // 右侧圆角
-      marginRight = '0' // 最后一个不需要负边距
-    }
-    if (isFirst && isLast) {
-      borderRadius = '4px' // 单个单元格，四个角都圆角
-      marginRight = '0'
-      marginLeft = '0'
-    }
-  }
-  
-  return {
-    ...baseStyle,
-    backgroundColor,
-    borderRadius,
-    marginRight,
-    marginLeft
-  }
-}
-
-// 管材通道通径、外径、壁厚数据
-const dimensionData = ref([])
-const dimensionLoading = ref(false)
-
-// 获取管材规格数据
-const fetchDimensionData = async (endStandard, schedule) => {
-  // 如果没有提供必要的参数，不执行请求
-  if (!endStandard || !schedule) {
-    dimensionData.value = []
-    return
-  }
-
-  dimensionLoading.value = true
-  try {
-    const res = await axios.get('/api/PmcSpec/NPDInfo', {
-      params: {
-        endStandard: endStandard,
-        Schedule: schedule
-      }
-    })
-    if (res.data.code === 200) {
-      // 将新格式转换为旧格式
-      const apiData = res.data.data
-      const transformedData = []
-      
-      // 转换 NPD 数据
-      if (apiData.npd && apiData.npd.length > 0) {
-        const npdRow = { name: 'NPD' }
-        apiData.npd.forEach((value, index) => {
-          npdRow[`col${index + 1}`] = value
-        })
-        transformedData.push(npdRow)
-      }
-      
-      // 转换外径 (OD) 数据
-      if (apiData.outsideDiameter && apiData.outsideDiameter.length > 0) {
-        const odRow = { name: 'OD' }
-        apiData.outsideDiameter.forEach((value, index) => {
-          odRow[`col${index + 1}`] = value
-        })
-        transformedData.push(odRow)
-      }
-      
-      // 转换壁厚 (Thickness) 数据
-      if (apiData.wallThickness && apiData.wallThickness.length > 0) {
-        const thicknessRow = { name: 'Thickness' }
-        apiData.wallThickness.forEach((value, index) => {
-          thicknessRow[`col${index + 1}`] = value
-        })
-        transformedData.push(thicknessRow)
-      }
-      
-      dimensionData.value = transformedData
-      
-      // 数据加载完成后初始化NPD默认选择范围
-      if (dimensionData.value.length > 0) {
-        selectedMin.value = minNpdValue.value
-        selectedMax.value = maxNpdValue.value
-      }
-    } else {
-      ElMessage.error(res.data.message || '获取管材规格数据失败')
-      dimensionData.value = []
-    }
-  } catch (error) {
-    console.error('获取管材规格数据错误:', error)
-    ElMessage.error('网络错误，获取管材规格数据失败')
-    dimensionData.value = []
-  } finally {
-    dimensionLoading.value = false
-  }
 }
 
 // 配置按钮列表
@@ -500,64 +87,13 @@ const configButtons = ref([
 // 当前选中的按钮ID
 const currentButtonId = ref(null)
 
-// 获取所有NPD值并排序（缓存计算结果）
-const allNpdValues = computed(() => {
-  const npdRow = dimensionData.value.find(row => row.name === 'NPD')
-  if (!npdRow) return []
-
-  const values = []
-  // 直接获取所有以col开头的属性，不依赖columnCount
-  for (const key in npdRow) {
-    if (key.startsWith('col')) {
-      const value = parseInt(npdRow[key])
-      if (!isNaN(value)) {
-        values.push(value)
-      }
-    }
-  }
-  return values.sort((a, b) => a - b)
-})
-
-// 获取最小NPD值
-const minNpdValue = computed(() => {
-  const values = allNpdValues.value
-  return values.length > 0 ? values[0] : null
-})
-
-// 获取最大NPD值
-const maxNpdValue = computed(() => {
-  const values = allNpdValues.value
-  return values.length > 0 ? values[values.length - 1] : null
-})
-
-// 选择范围变量 - 默认选中所有NPD
-const selectedMin = ref(null)
-const selectedMax = ref(null)
-
-// 监听船型变化，自动重置船号选择
-watch(selectedShipClass, (newVal) => {
-  selectedShipNumber.value = null // 重置船号选择
-  treeData.value = [] // 清空树形数据
-})
-
-// 监听船号变化，自动获取 PMC 规则数据
-watch(selectedShipNumber, async (newVal) => {
-  if (newVal) {
-    const shipNumber = shipNumbers.value.find(item => item.id === newVal)?.name
-    if (shipNumber) {
-      await fetchPmcRules(shipNumber)
-    }
-  } else {
-    treeData.value = [] // 清空树形数据
-  }
-})
-
 // 在组件挂载后初始化数据
 onMounted(async () => {
   // 并行获取所有数据（树形数据在船号选择时加载，尺寸数据需要 Pipe 和 Wall Thickness 参数，在获取编码详情后加载）
   await Promise.all([
     fetchMaterialsData(),
-    fetchShipInfos()
+    fetchShipInfos(),
+    fetchPreferredRules()
   ])
 })
 
@@ -565,61 +101,6 @@ const showDialog = ref(false)
 
 // 当前选中的按钮Label
 const currentButtonLabel = ref('')
-
-// 材料数据
-const materials = ref([])
-const materialsLoading = ref(false)
-
-// 获取材料数据
-const fetchMaterialsData = async () => {
-  materialsLoading.value = true
-  try {
-    const res = await axios.get('/api/pipe-spec/material')
-    if (res.data.code === 200) {
-      materials.value = res.data.data
-    } else {
-      ElMessage.error(res.data.msg || '获取材料数据失败')
-    }
-  } catch (error) {
-    console.error('获取材料数据错误:', error)
-    ElMessage.error('网络错误，获取材料数据失败')
-  } finally {
-    materialsLoading.value = false
-  }
-}
-
-// 计算属性：根据NPD表格选中的范围生成所有可能的单个范围选项
-const filteredNpdRanges = computed(() => {
-  if (selectedMin.value === null || selectedMax.value === null) {
-    return []
-  }
-
-  const npdValues = allNpdValues.value.filter(
-    value => value >= selectedMin.value && value <= selectedMax.value
-  )
-
-  // 为每个NPD值生成一个单独的范围选项
-  return npdValues.map(value => ({
-    id: `npd-${value}`,
-    minSize: value,
-    maxSize: value,
-    name: `通径 ${value} mm`
-  }))
-})
-
-// 计算属性：动态计算表格列数
-const columnCount = computed(() => {
-  if (!dimensionData.value || dimensionData.value.length === 0) {
-    return 15 // 默认最小15列
-  }
-  
-  // 获取第一行数据的属性数量，减去name属性
-  const firstRow = dimensionData.value[0]
-  const cols = Object.keys(firstRow).filter(key => key.startsWith('col')).length
-  
-  // 返回最大的列数，最小为15列
-  return Math.max(cols, 15)
-})
 
 // 处理配置确认
 const handleConfirm = (data) => {
@@ -1037,6 +518,8 @@ const clearAllStoredConfigs = () => {
                         v-model="preferredRule"
                         placeholder="请选择优选规则"
                         size="small"
+                        clearable
+                        :loading="preferredRuleLoading"
                         style="width: 200px"
                       >
                         <el-option
