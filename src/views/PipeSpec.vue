@@ -32,6 +32,15 @@ const formData = ref({
   wallThickness: ''
 })
 
+// 优选规则选择
+const preferredRule = ref('')
+const preferredRuleOptions = ref([
+  { label: '默认规则', value: 'default' },
+  { label: '优选规则A', value: 'ruleA' },
+  { label: '优选规则B', value: 'ruleB' }
+])
+
+
 // 船型船号数据
 const shipInfos = ref([])
 const shipInfosLoading = ref(false)
@@ -1021,6 +1030,25 @@ const clearAllStoredConfigs = () => {
             <!-- 管系规格书的通径外径壁厚对照表格 -->
             <el-form-item label-width="0" prop="">
               <div class="form-section-pmc">
+                <el-row class="form-section-pmc" :gutter="20">
+                  <el-col :span="8">
+                    <el-form-item label="优选规则" label-width="80px">
+                      <el-select
+                        v-model="preferredRule"
+                        placeholder="请选择优选规则"
+                        size="small"
+                        style="width: 200px"
+                      >
+                        <el-option
+                          v-for="rule in preferredRuleOptions"
+                          :key="rule.value"
+                          :label="rule.label"
+                          :value="rule.value"
+                        />
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
                 <el-row>
                   <el-col :span="24">
                     <div style="width: 95%; overflow-x: auto; max-width: 95%;">
