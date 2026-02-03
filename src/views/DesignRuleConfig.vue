@@ -188,6 +188,16 @@
                   />
                 </el-select>
               </template>
+              <template v-else-if="currentConfig?.id === 'bend-pipe' && col.prop === 'MaterialsCategory_CL'">
+                <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in MATERIAL_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.label"
+                  />
+                </el-select>
+              </template>
               <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'scheduleThickness'">
                 <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
                   <el-option
@@ -278,6 +288,16 @@
                   />
                 </el-select>
               </template>
+              <template v-else-if="currentConfig?.id === 'bend-pipe' && col.prop === 'MaterialsCategory_CL'">
+                <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in MATERIAL_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.label"
+                  />
+                </el-select>
+              </template>
               <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'scheduleThickness'">
                 <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
                   <el-option
@@ -353,11 +373,16 @@ const handleRowClick = (row) => {
 
 const LOCAL_COLUMNS = {
   'bend-pipe': [
+    { prop: 'MaterialsCategory_CL', label: '主材料', editable: true },
+    { prop: 'OutSideDiameter', label: '外径', editable: false },
+    { prop: 'OutSideDiameterUnit', label: '外径单位', editable: false },
+    { prop: 'HeaderClampLength', label: '前夹L1', editable: false },
+    { prop: 'TailClampLength', label: '后夹L2', editable: false },
+    { prop: 'BendRadius', label: '弯曲半径R', editable: false },
+    { prop: 'MaxPipeLength', label: '最大管长L', editable: false },
+    { prop: 'WallThicknessFrom', label: '最小壁厚', editable: false },
+    { prop: 'WallThicknessTo', label: '最大壁厚', editable: false },
     { prop: 'MachineNum', label: '机器号', editable: true },
-    { prop: 'outSideDiameter', label: '外径', editable: false },
-    { prop: 'outSideDiameterUnit', label: '外径单位', editable: false },
-    { prop: 'headerClampLength', label: '前夹长L1', editable: false },
-    { prop: 'tailClampLength', label: '后夹长L2', editable: false },
     { prop: 'status', label: '状态', editable: true, type: 'status', hidden: true }
   ],
   'bend-parameter': [
@@ -430,14 +455,23 @@ const fetchEndStandardOptions = async () => {
   }
 }
 
+const getValueIgnoreCase = (obj, key) => {
+  if (!obj) return undefined
+  const targetKey = key.toLowerCase()
+  const foundKey = Object.keys(obj).find(k => k.toLowerCase() === targetKey)
+  return foundKey ? obj[foundKey] : undefined
+}
+
 const fetchMaterialOptions = async () => {
   try {
     const res = await axios.get('/api/S3dCommonCodeListValue/OPmaterialscategory')
     const rows = getRowsFromResponse(res)
+    console.log('Material Options Raw:', rows)
     MATERIAL_OPTIONS.value = rows.map(item => ({
-      label: item.longStringValue || item.LongStringValue || '',
-      value: String(item.codeListNumber || item.CodeListNumber || '')
+      label: getValueIgnoreCase(item, 'longStringValue') || getValueIgnoreCase(item, 'shortStringValue') || getValueIgnoreCase(item, 'name') || '',
+      value: String(getValueIgnoreCase(item, 'codeListNumber') || getValueIgnoreCase(item, 'code') || getValueIgnoreCase(item, 'value') || '')
     }))
+    console.log('Material Options Mapped:', MATERIAL_OPTIONS.value)
   } catch (e) {
     console.error('获取材料分类选项失败', e)
   }
@@ -459,6 +493,12 @@ const getMaterialCode = (v) => {
   const s = String(v ?? '')
   const found = MATERIAL_OPTIONS.value.find(o => o.value === s || o.label === s)
   return found ? found.value : s
+}
+
+const getMaterialLabel = (v) => {
+  const s = String(v ?? '')
+  const found = MATERIAL_OPTIONS.value.find(o => o.value === s)
+  return found ? found.label : s
 }
 
 const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
@@ -615,6 +655,16 @@ const handleNodeClick = (node) => {
         }
       }
     }
+
+    if (node.id === 'bend-pipe') {
+      fetchBendPipeData()
+    } else if (node.id === 'shortcode') {
+      fetchShortCodeMinorData()
+    } else if (node.id === 'bend-parameter') {
+      fetchBendParameterData()
+    } else if (node.id === 'wall-thickness-series') {
+      fetchWallThicknessData()
+    }
     
     currentNode.value = node
     // 清空所有配置的选中行
@@ -651,7 +701,7 @@ const handleDeleteRows = (configId) => {
     if (configId === 'bend-pipe') {
       try {
         const deletePromises = config.selectedRows.map(row => 
-          axios.delete(`/api/DspSpmcDictPipingBendData/${row.id}`)
+          axios.delete(`/api/S3dDictPipingBendData/${row.id}`)
         )
         await Promise.all(deletePromises)
         ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
@@ -741,6 +791,8 @@ const openAddDialog = async (configId) => {
     await Promise.all([fetchScheduleOptions(), fetchEndStandardOptions()])
   } else if (configId === 'bend-parameter') {
     await Promise.all([fetchMaterialOptions(), fetchScheduleOptions()])
+  } else if (configId === 'bend-pipe') {
+    await fetchMaterialOptions()
   }
   
   batchAddData.value = []
@@ -777,6 +829,8 @@ const generateRowFingerprint = (row, config) => {
     } else if (config.id === 'bend-parameter') {
       if (col.prop === 'mainMaterial') val = getMaterialCode(val)
       if (col.prop === 'scheduleThickness') val = getScheduleCode(val)
+    } else if (config.id === 'bend-pipe') {
+      if (col.prop === 'MaterialsCategory_CL') val = getMaterialCode(val)
     }
     return String(val ?? '').trim()
   }).join('|')
@@ -837,12 +891,19 @@ const confirmBatchAdd = async () => {
         try {
           const payload = {
             ...row,
-            outSideDiameter: Number(row.outSideDiameter) || 0,
-            headerClampLength: Number(row.headerClampLength) || 0,
-            tailClampLength: Number(row.tailClampLength) || 0,
+            materialsCategoryCl: Number(getMaterialCode(row.MaterialsCategory_CL)),
+            outSideDiameter: Number(row.OutSideDiameter) || 0,
+            outSideDiameterUnit: row.OutSideDiameterUnit || '',
+            headerClampLength: Number(row.HeaderClampLength) || 0,
+            tailClampLength: Number(row.TailClampLength) || 0,
+            bendRadius: Number(row.BendRadius) || 0,
+            maxPipeLength: Number(row.MaxPipeLength) || 0,
+            wallThicknessFrom: Number(row.WallThicknessFrom) || 0,
+            wallThicknessTo: Number(row.WallThicknessTo) || 0,
+            machineNum: row.MachineNum,
             status: toBool(row.status ?? true)
           }
-          await axios.post('/api/DspSpmcDictPipingBendData', payload)
+          await axios.post('/api/S3dDictPipingBendData', payload)
           successCount++
         } catch (e) {
           console.error('新增单行失败:', e)
@@ -984,6 +1045,8 @@ const handleRowDblClick = async (row) => {
     await Promise.all([fetchScheduleOptions(), fetchEndStandardOptions()])
   } else if (config.id === 'bend-parameter') {
     await Promise.all([fetchMaterialOptions(), fetchScheduleOptions()])
+  } else if (config.id === 'bend-pipe') {
+    await fetchMaterialOptions()
   }
 
   editRowData.value = { ...row }
@@ -1032,12 +1095,19 @@ const confirmEdit = async () => {
     if (config.id === 'bend-pipe') {
       const payload = {
         ...editRowData.value,
-        outSideDiameter: Number(editRowData.value.outSideDiameter) || 0,
-        headerClampLength: Number(editRowData.value.headerClampLength) || 0,
-        tailClampLength: Number(editRowData.value.tailClampLength) || 0,
+        materialsCategoryCl: Number(getMaterialCode(editRowData.value.MaterialsCategory_CL)),
+        outSideDiameter: Number(editRowData.value.OutSideDiameter) || 0,
+        outSideDiameterUnit: editRowData.value.OutSideDiameterUnit || '',
+        headerClampLength: Number(editRowData.value.HeaderClampLength) || 0,
+        tailClampLength: Number(editRowData.value.TailClampLength) || 0,
+        bendRadius: Number(editRowData.value.BendRadius) || 0,
+        maxPipeLength: Number(editRowData.value.MaxPipeLength) || 0,
+        wallThicknessFrom: Number(editRowData.value.WallThicknessFrom) || 0,
+        wallThicknessTo: Number(editRowData.value.WallThicknessTo) || 0,
+        machineNum: editRowData.value.MachineNum,
         status: toBool(editRowData.value.status)
       }
-      await axios.put('/api/DspSpmcDictPipingBendData', payload)
+      await axios.put('/api/S3dDictPipingBendData', payload)
       await fetchBendPipeData()
       ElMessage.success('更新成功')
     } else if (config.id === 'wall-thickness-series') {
@@ -1117,18 +1187,44 @@ const handleImageError = () => {
 
 const fetchBendPipeData = async () => {
   try {
-    const res = await axios.get('/api/DspSpmcDictPipingBendData')
+    // 确保加载材料选项
+    if (MATERIAL_OPTIONS.value.length === 0) {
+      await fetchMaterialOptions()
+    }
+
+    const res = await axios.get('/api/S3dDictPipingBendData')
     let rows = getRowsFromResponse(res)
-    rows.forEach(row => {
-      if (row.status === undefined) {
-        row.status = true
-      } else {
-        row.status = toBool(row.status)
+    if (rows.length > 0) {
+      console.log('BendPipe First Row Keys:', Object.keys(rows[0]))
+    }
+    rows = rows.map((r, idx) => {
+      // 兼容API可能返回的大小写字段名
+      const getVal = (keys) => {
+        for (const k of keys) {
+          const val = getValueIgnoreCase(r, k)
+          if (val !== undefined && val !== null) return val
+        }
+        return undefined
       }
-      if (row.MachineNum === undefined) {
-        row.MachineNum = row.machineNum ?? row.machineNumber ?? ''
+
+      const row = {
+        ...r,
+        id: r.ID ?? r.id, // 保留数据库ID
+        MaterialsCategory_CL: getMaterialLabel(getVal(['MaterialsCategory_CL', 'MaterialsCategoryCl', 'MaterialsCategory', 'MaterialCategory_CL', 'MaterialCategoryCl', 'MaterialCategory', 'MainMaterial', 'Material'])),
+        OutSideDiameter: getVal(['OutSideDiameter']),
+        OutSideDiameterUnit: getVal(['OutSideDiameterUnit']),
+        HeaderClampLength: getVal(['HeaderClampLength']),
+        TailClampLength: getVal(['TailClampLength']),
+        BendRadius: getVal(['BendRadius']),
+        MaxPipeLength: getVal(['MaxPipeLength']),
+        WallThicknessFrom: getVal(['WallThicknessFrom']),
+        WallThicknessTo: getVal(['WallThicknessTo']),
+        MachineNum: getVal(['MachineNum']) ?? '',
+        status: toBool(getVal(['Status']) ?? true)
       }
+      return row
     })
+    
     const cfg = configs['bend-pipe'] || {
       id: 'bend-pipe',
       title: LOCAL_TITLES['bend-pipe'] || '弯管机数据',

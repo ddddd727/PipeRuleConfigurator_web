@@ -167,52 +167,7 @@ export const db = {
       'name': '@ctitle(5, 12)',
       'status|1': ['现行', '废止', '即将实施']
     }]
-  },
-
-  // 1. 弯管数据 (bend-pipe)
-  'bend-pipe': {
-    title: '部件库名称：PlainPipingGenericData',
-    'data|5': [{
-      'id|+1': 1,
-      'diameter|1': ['DN15', 'DN20', 'DN25', 'DN32', 'DN40', 'DN50'],
-      'unit': 'mm',
-      'l1|100-500': 1,
-      'l2|100-500': 1
-    }]
-  },
-
-  // 2. 壁厚系列 (wall-thickness-series)
-  'wall-thickness-series': {
-    title: '部件库名称：PlainPipingGenericData',
-    'data|5': [{
-      'id|+1': 1,
-      'diameter|1': ['DN15', 'DN20', 'DN25', 'DN32', 'DN40', 'DN50'],
-      'unit': 'mm',
-      'standard|1': ['ASTM A106', 'GB/T 8163', 'ASTM A53'],
-      'series|1': ['Sch10', 'Sch20', 'Sch40', 'Sch80', 'Sch160'],
-      'outer|20-200': 1,
-      'value|1.0-10.0': 1
-    }]
-  },
-
-  // 3. ShortCode (shortcode)
-  'shortcode': {
-    title: '部件库名称：ShortCodeHierarchyRule',
-    'data|5': [{
-      'id|+1': 1,
-      'type|1': ['PIPE', 'VALVE', 'FLANGE', 'FITTING', 'INSTRUMENT', 'EQUIPMENT'],
-      'shortcode|1': ['管道', '阀门', '法兰', '管件', '仪表', '设备']
-    }]
-  },
-
-  // 4. Spec (spec)
-  'spec': {
-    title: '部件库名称：PipingCommodityFilter',
-    'data|5': [{
-      'id|+1': 1,
-      'shortcode|1': ['管道', '阀门', '法兰', '管件', '仪表', '设备']
-    }]
-  },
+  }
 }
 
 // 拦截请求
