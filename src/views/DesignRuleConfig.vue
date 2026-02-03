@@ -178,10 +178,30 @@
                   />
                 </el-select>
               </template>
-              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'mainMaterial'">
+              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'materialsCategory'">
                 <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
                   <el-option
                     v-for="opt in MATERIAL_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.label"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'geometricIndustryStandard'">
+                <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in GEOMETRIC_STANDARD_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'materialsGrade'">
+                <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in MATERIAL_GRADE_OPTIONS"
                     :key="opt.value"
                     :label="opt.label"
                     :value="opt.value"
@@ -278,13 +298,33 @@
                   />
                 </el-select>
               </template>
-              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'mainMaterial'">
+              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'materialsCategory'">
                 <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
                   <el-option
                     v-for="opt in MATERIAL_OPTIONS"
                     :key="opt.value"
                     :label="opt.label"
                     :value="opt.label"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'geometricIndustryStandard'">
+                <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in GEOMETRIC_STANDARD_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'materialsGrade'">
+                <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in MATERIAL_GRADE_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
                   />
                 </el-select>
               </template>
@@ -292,16 +332,6 @@
                 <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
                   <el-option
                     v-for="opt in MATERIAL_OPTIONS"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.label"
-                  />
-                </el-select>
-              </template>
-              <template v-else-if="currentConfig?.id === 'bend-parameter' && col.prop === 'scheduleThickness'">
-                <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
-                  <el-option
-                    v-for="opt in WALL_THICKNESS_SCHEDULE_OPTIONS"
                     :key="opt.value"
                     :label="opt.label"
                     :value="opt.label"
@@ -386,11 +416,14 @@ const LOCAL_COLUMNS = {
     { prop: 'status', label: '状态', editable: true, type: 'status', hidden: true }
   ],
   'bend-parameter': [
-    { prop: 'mainMaterial', label: '主材料', editable: true },
-    { prop: 'npd', label: '通径DN', editable: true },
-    { prop: 'ndpunit', label: '通径单位', editable: true },
-    { prop: 'scheduleThickness', label: '壁厚等级', editable: true },
-    { prop: 'bendRadius', label: '弯曲半径', editable: true },
+    { prop: 'materialsCategory', label: '主材料', editable: true },
+    { prop: 'geometricIndustryStandard', label: '几何工艺标准', editable: true },
+    { prop: 'materialsGrade', label: '材料等级', editable: true },
+    { prop: 'normalDiameter', label: '通径DN', editable: true },
+    { prop: 'unitType', label: '通径单位', editable: true },
+    { prop: 'wallThicknessFrom', label: '最小壁厚', editable: true },
+    { prop: 'wallThicknessTo', label: '最大壁厚', editable: true },
+    { prop: 'bendRadiusMultiplier', label: '弯曲半径系数', editable: true },
     { prop: 'status', label: '状态', editable: true, type: 'status', hidden: true }
   ],
   'wall-thickness-series': [
@@ -428,6 +461,8 @@ const LOCAL_TITLES = {
 const WALL_THICKNESS_SCHEDULE_OPTIONS = ref([])
 const END_STANDARD_OPTIONS = ref([])
 const MATERIAL_OPTIONS = ref([])
+const GEOMETRIC_STANDARD_OPTIONS = ref([])
+const MATERIAL_GRADE_OPTIONS = ref([])
 
 const fetchScheduleOptions = async () => {
   try {
@@ -477,6 +512,35 @@ const fetchMaterialOptions = async () => {
   }
 }
 
+const fetchGeometricStandardOptions = async () => {
+  try {
+    const res = await axios.get('/api/S3dCommonCodeListValue/OPGeometricIndustryStandard')
+    const rows = getRowsFromResponse(res)
+    GEOMETRIC_STANDARD_OPTIONS.value = rows.map(item => ({
+      label: getValueIgnoreCase(item, 'shortStringValue') || getValueIgnoreCase(item, 'longStringValue') || getValueIgnoreCase(item, 'name') || '',
+      value: getValueIgnoreCase(item, 'shortStringValue') || getValueIgnoreCase(item, 'longStringValue') || getValueIgnoreCase(item, 'name') || '',
+      code: String(getValueIgnoreCase(item, 'codeListNumber') || getValueIgnoreCase(item, 'code') || getValueIgnoreCase(item, 'value') || '')
+    }))
+  } catch (e) {
+    console.error('获取几何工艺标准选项失败', e)
+  }
+}
+
+const fetchMaterialsGradeOptions = async () => {
+  try {
+    const res = await axios.get('/api/S3dCommonCodeListValue/OPMaterialsGrade')
+    const rows = getRowsFromResponse(res)
+    MATERIAL_GRADE_OPTIONS.value = rows.map(item => ({
+      label: getValueIgnoreCase(item, 'shortStringValue') || getValueIgnoreCase(item, 'longStringValue') || getValueIgnoreCase(item, 'name') || '',
+      value: getValueIgnoreCase(item, 'shortStringValue') || getValueIgnoreCase(item, 'longStringValue') || getValueIgnoreCase(item, 'name') || '',
+      code: String(getValueIgnoreCase(item, 'codeListNumber') || getValueIgnoreCase(item, 'code') || getValueIgnoreCase(item, 'value') || '')
+    }))
+  } catch (e) {
+    console.error('获取材料等级选项失败', e)
+  }
+}
+
+
 const getScheduleCode = (v) => {
   const s = String(v ?? '')
   const found = WALL_THICKNESS_SCHEDULE_OPTIONS.value.find(o => o.value === s || o.label === s)
@@ -499,6 +563,18 @@ const getMaterialLabel = (v) => {
   const s = String(v ?? '')
   const found = MATERIAL_OPTIONS.value.find(o => o.value === s)
   return found ? found.label : s
+}
+
+const getGeometricStandardCode = (v) => {
+  const s = String(v ?? '')
+  const found = GEOMETRIC_STANDARD_OPTIONS.value.find(o => o.value === s || o.label === s)
+  return found ? found.code : '10001'
+}
+
+const getMaterialsGradeCode = (v) => {
+  const s = String(v ?? '')
+  const found = MATERIAL_GRADE_OPTIONS.value.find(o => o.value === s || o.label === s)
+  return found ? found.code : '10001'
 }
 
 const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
@@ -958,11 +1034,14 @@ const confirmBatchAdd = async () => {
         try {
           const payload = {
             ...row,
-            materialsCategoryCl: getMaterialCode(row.mainMaterial),
-            normalDiameter: String(row.npd || ''),
-            unitType: String(row.ndpunit || ''),
-            scheduleThicknessCl: getScheduleCode(row.scheduleThickness),
-            bendRadiusMultiplier: Number(row.bendRadius) || 0,
+            materialsCategoryCl: getMaterialCode(row.materialsCategory),
+            geometricIndustryStandardCl: getGeometricStandardCode(row.geometricIndustryStandard),
+            materialsGradeCl: getMaterialsGradeCode(row.materialsGrade),
+            normalDiameter: String(row.normalDiameter || ''),
+            unitType: String(row.unitType || ''),
+            wallThicknessFrom: String(row.wallThicknessFrom || ''),
+            wallThicknessTo: String(row.wallThicknessTo || ''),
+            bendRadiusMultiplier: Number(row.bendRadiusMultiplier) || 0,
             status: toBool(row.status ?? true)
           }
           await axios.post('/api/S3dRulePipingBendParameter', payload)
@@ -1044,7 +1123,12 @@ const handleRowDblClick = async (row) => {
   if (config.id === 'wall-thickness-series') {
     await Promise.all([fetchScheduleOptions(), fetchEndStandardOptions()])
   } else if (config.id === 'bend-parameter') {
-    await Promise.all([fetchMaterialOptions(), fetchScheduleOptions()])
+    await Promise.all([
+      fetchMaterialOptions(),
+      fetchScheduleOptions(),
+      fetchGeometricStandardOptions(),
+      fetchMaterialsGradeOptions()
+    ])
   } else if (config.id === 'bend-pipe') {
     await fetchMaterialOptions()
   }
@@ -1127,11 +1211,14 @@ const confirmEdit = async () => {
     } else if (config.id === 'bend-parameter') {
       const payload = {
         ...editRowData.value,
-        materialsCategoryCl: getMaterialCode(editRowData.value.mainMaterial),
-        normalDiameter: String(editRowData.value.npd || ''),
-        unitType: String(editRowData.value.ndpunit || ''),
-        scheduleThicknessCl: getScheduleCode(editRowData.value.scheduleThickness),
-        bendRadiusMultiplier: Number(editRowData.value.bendRadius) || 0,
+        materialsCategoryCl: getMaterialCode(editRowData.value.materialsCategory),
+        geometricIndustryStandardCl: getGeometricStandardCode(editRowData.value.geometricIndustryStandard),
+        materialsGradeCl: getMaterialsGradeCode(editRowData.value.materialsGrade),
+        normalDiameter: String(editRowData.value.normalDiameter || ''),
+        unitType: String(editRowData.value.unitType || ''),
+        wallThicknessFrom: String(editRowData.value.wallThicknessFrom || ''),
+        wallThicknessTo: String(editRowData.value.wallThicknessTo || ''),
+        bendRadiusMultiplier: Number(editRowData.value.bendRadiusMultiplier) || 0,
         status: toBool(editRowData.value.status)
       }
       await axios.put('/api/S3dRulePipingBendParameter', payload)
@@ -1266,16 +1353,20 @@ const fetchShortCodeMinorData = async () => {
 
 const fetchBendParameterData = async () => {
   try {
-    const res = await axios.get('/api/PipingBendParameterCodeConverted')
+    const res = await axios.get('/api/S3dCodePipingBendParameter')
     let rows = getRowsFromResponse(res)
     rows = rows.map((r, idx) => {
       const row = {
+        ...r,
         id: r.id ?? idx + 1,
-        mainMaterial: r.materialsCategory ?? '',
-        npd: r.normalDiameter ?? '',
-        ndpunit: r.unitType ?? '',
-        scheduleThickness: r.scheduleThickness ?? r.ScheduleThickness ?? r.schedule ?? '',
-        bendRadius: r.bendRadiusMultiplier ?? ''
+        materialsCategory: r.materialsCategory || '',
+        geometricIndustryStandard: r.geometricIndustryStandard || '',
+        materialsGrade: r.materialsGrade || '',
+        normalDiameter: r.normalDiameter ?? '',
+        unitType: r.unitType ?? '',
+        wallThicknessFrom: r.wallThicknessFrom ?? '',
+        wallThicknessTo: r.wallThicknessTo ?? '',
+        bendRadiusMultiplier: r.bendRadiusMultiplier ?? ''
       }
       if (r.status === undefined) {
         row.status = true
@@ -1335,6 +1426,8 @@ onMounted(() => {
   fetchScheduleOptions()
   fetchEndStandardOptions()
   fetchMaterialOptions()
+  fetchGeometricStandardOptions()
+  fetchMaterialsGradeOptions()
 })
 
 watch(currentNode, (node) => {
@@ -1527,6 +1620,12 @@ watch(currentNode, (node) => {
 
 :deep(.el-tree-node__expand-icon) {
   color: #c0c4cc;
+}
+
+:deep(.el-table .disabled-row) {
+  color: #909399;
+  text-decoration: line-through;
+  background-color: #fafafa;
 }
 
 :deep(.el-table .cell) {
