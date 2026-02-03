@@ -228,6 +228,16 @@
                   />
                 </el-select>
               </template>
+              <template v-else-if="currentConfig?.id === 'spec' && col.prop === 'componentTypeName'">
+                <el-select v-model="row[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in COMPONENT_TYPE_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.label"
+                  />
+                </el-select>
+              </template>
               <el-input v-else v-model="row[col.prop]" size="small" />
             </template>
           </el-table-column>
@@ -332,6 +342,16 @@
                 <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
                   <el-option
                     v-for="opt in MATERIAL_OPTIONS"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.label"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="currentConfig?.id === 'spec' && col.prop === 'componentTypeName'">
+                <el-select v-model="editRowData[col.prop]" size="small" style="width: 100%;">
+                  <el-option
+                    v-for="opt in COMPONENT_TYPE_OPTIONS"
                     :key="opt.value"
                     :label="opt.label"
                     :value="opt.label"
@@ -444,9 +464,8 @@ const LOCAL_COLUMNS = {
     { prop: 'ShortCodeHierarchyTypeLongDescription', label: 'ShortCodeHierarchyTypeLongDescription', editable: false }
   ],
   'spec': [
-    { prop: 'shortcode', label: 'ShortCode', editable: true },
-    { prop: 'type', label: 'GeometricIndustryStandard', editable: true },
-    { prop: 'type', label: 'CommodityCode', editable: true }
+    { prop: 'componentTypeName', label: 'ComponentType', editable: true },
+    { prop: 'shortCode', label: 'ShortCode', editable: true }
   ]
 }
 
@@ -463,6 +482,7 @@ const END_STANDARD_OPTIONS = ref([])
 const MATERIAL_OPTIONS = ref([])
 const GEOMETRIC_STANDARD_OPTIONS = ref([])
 const MATERIAL_GRADE_OPTIONS = ref([])
+const COMPONENT_TYPE_OPTIONS = ref([])
 
 const fetchScheduleOptions = async () => {
   try {
@@ -540,6 +560,21 @@ const fetchMaterialsGradeOptions = async () => {
   }
 }
 
+const fetchComponentTypeOptions = async () => {
+  try {
+    const res = await axios.get('/api/S3dDictPipingComponentType')
+    const rows = getRowsFromResponse(res)
+    // 筛选 status 为 true 的项
+    const activeRows = rows.filter(r => r.status === true || r.status === 1 || String(r.status) === 'true')
+    COMPONENT_TYPE_OPTIONS.value = activeRows.map(item => ({
+      label: item.componentTypeName || '',
+      value: item.id || ''
+    }))
+  } catch (e) {
+    console.error('获取组件类型选项失败', e)
+  }
+}
+
 
 const getScheduleCode = (v) => {
   const s = String(v ?? '')
@@ -575,6 +610,12 @@ const getMaterialsGradeCode = (v) => {
   const s = String(v ?? '')
   const found = MATERIAL_GRADE_OPTIONS.value.find(o => o.value === s || o.label === s)
   return found ? found.code : '10001'
+}
+
+const getComponentTypeId = (v) => {
+  const s = String(v ?? '')
+  const found = COMPONENT_TYPE_OPTIONS.value.find(o => o.value === s || o.label === s)
+  return found ? found.value : ''
 }
 
 const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
@@ -733,6 +774,8 @@ const handleNodeClick = (node) => {
       fetchWallThicknessData()
     } else if (node.id === 'shortcode-major') {
       fetchShortCodeMajorData()
+    } else if (node.id === 'spec') {
+      fetchSpecData()
     }
     
     currentNode.value = node
@@ -833,6 +876,22 @@ const handleDeleteRows = (configId) => {
       return
     }
 
+    if (configId === 'spec') {
+      try {
+        const deletePromises = config.selectedRows.map(row =>
+          axios.delete(`/api/S3dRuleShortCodeMap/${row.id}`)
+        )
+        await Promise.all(deletePromises)
+        ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
+        await fetchSpecData()
+        config.selectedRows = []
+      } catch (error) {
+        console.error('删除失败:', error)
+        ElMessage.error('删除失败，请重试')
+      }
+      return
+    }
+
     // 其他配置走前端假删除
     const selectedIds = config.selectedRows.map(row => row.id)
     config.data = config.data.filter(row => !selectedIds.includes(row.id))
@@ -862,6 +921,8 @@ const openAddDialog = async (configId) => {
     await Promise.all([fetchMaterialOptions(), fetchScheduleOptions()])
   } else if (configId === 'bend-pipe') {
     await fetchMaterialOptions()
+  } else if (configId === 'spec') {
+    await fetchComponentTypeOptions()
   }
   
   batchAddData.value = []
@@ -900,6 +961,8 @@ const generateRowFingerprint = (row, config) => {
       if (col.prop === 'scheduleThickness') val = getScheduleCode(val)
     } else if (config.id === 'bend-pipe') {
       if (col.prop === 'MaterialsCategory_CL') val = getMaterialCode(val)
+    } else if (config.id === 'spec') {
+      if (col.prop === 'componentTypeName') val = getComponentTypeId(val)
     }
     return String(val ?? '').trim()
   }).join('|')
@@ -1077,6 +1140,31 @@ const confirmBatchAdd = async () => {
         ElMessage.error('批量新增全部失败，请检查数据或网络')
       }
       scrollTableToBottom()
+    } else if (config.id === 'spec') {
+      let successCount = 0
+      let failCount = 0
+
+      for (const row of batchAddData.value) {
+        try {
+          const payload = {
+            componentTypeId: getComponentTypeId(row.componentTypeName),
+            shortCode: row.shortCode
+          }
+          await axios.post('/api/S3dRuleShortCodeMap', payload)
+          successCount++
+        } catch (e) {
+          console.error('新增单行失败:', e)
+          failCount++
+        }
+      }
+
+      await fetchSpecData()
+      if (successCount > 0) {
+        ElMessage.success(`成功添加 ${successCount} 条数据${failCount > 0 ? `，失败 ${failCount} 条` : ''}`)
+      } else {
+        ElMessage.error('批量新增全部失败，请检查数据或网络')
+      }
+      scrollTableToBottom()
     } else {
       let newId = config.data.length > 0 
         ? Math.max(...config.data.map(item => item.id)) + 1 
@@ -1124,6 +1212,8 @@ const handleRowDblClick = async (row) => {
     ])
   } else if (config.id === 'bend-pipe') {
     await fetchMaterialOptions()
+  } else if (config.id === 'spec') {
+    await fetchComponentTypeOptions()
   }
 
   editRowData.value = { ...row }
@@ -1223,6 +1313,15 @@ const confirmEdit = async () => {
       }
       await axios.put('/api/S3dRuleShortCodeHierarchyRule', payload)
       await fetchShortCodeMinorData()
+      ElMessage.success('更新成功')
+    } else if (config.id === 'spec') {
+      const payload = {
+        id: editRowData.value.id,
+        componentTypeId: getComponentTypeId(editRowData.value.componentTypeName),
+        shortCode: editRowData.value.shortCode
+      }
+      await axios.put('/api/S3dRuleShortCodeMap', payload)
+      await fetchSpecData()
       ElMessage.success('更新成功')
     } else {
       const idx = config.data.findIndex(r => r.id === editRowData.value.id)
@@ -1366,6 +1465,31 @@ const fetchShortCodeMinorData = async () => {
     configs['shortcode'] = cfg
   } catch (e) {
     ElMessage.error(`ShortCode细类接口请求失败：${e?.message || '网络错误'}`)
+  }
+}
+
+const fetchSpecData = async () => {
+  try {
+    const res = await axios.get('/api/S3dCodeShortCodeMap')
+    let rows = getRowsFromResponse(res)
+    rows = rows.map((r, idx) => ({
+      id: r.id ?? idx + 1,
+      componentTypeId: r.componentTypeId,
+      componentTypeName: r.componentTypeName || '',
+      shortCode: r.shortCode || ''
+    }))
+    const cfg = configs['spec'] || {
+      id: 'spec',
+      title: LOCAL_TITLES['spec'] || '部件库名称：PipingCommodityFilter',
+      selectedRows: [],
+      columns: [],
+      data: []
+    }
+    cfg.columns = LOCAL_COLUMNS['spec'] || []
+    cfg.data = rows
+    configs['spec'] = cfg
+  } catch (e) {
+    ElMessage.error(`Spec接口请求失败：${e?.message || '网络错误'}`)
   }
 }
 
