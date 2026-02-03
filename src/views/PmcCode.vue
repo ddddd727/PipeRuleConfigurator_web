@@ -1,10 +1,13 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
-import { Plus, Delete, Check } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Delete, Check, Search, CopyDocument, CaretTop, CaretBottom } from '@element-plus/icons-vue'
 
 // --- Data & State ---
+
+// UI State
+const showRulePanel = ref(true)
 
 // 1. Ship Selection
 const allShipInfos = ref([]) // 存储所有船型船号信息
@@ -18,6 +21,24 @@ const sourceShipNumber = ref('')
 const targetShipNumber = ref('')
 const sourceShipNumbers = ref([])
 const targetShipNumbers = ref([])
+
+// Save Dialog State
+const saveDialogVisible = ref(false)
+const targetSaveShipType = ref('')
+const targetSaveShipNumber = ref('')
+const targetSaveShipNumbers = ref([])
+
+// 监听保存弹窗中的船型变化
+watch(targetSaveShipType, (newVal) => {
+  if (!newVal) {
+    targetSaveShipNumbers.value = []
+    targetSaveShipNumber.value = ''
+    return
+  }
+  const filtered = allShipInfos.value.filter(item => item.shipType === newVal)
+  targetSaveShipNumbers.value = filtered.map(item => ({ label: item.shipNumber, value: item.shipNumber }))
+  targetSaveShipNumber.value = ''
+})
 
 // 2. Rules Selection (Mock下拉选项，实际可能也是接口)
 const mainMaterialRules = ref([])
@@ -356,10 +377,22 @@ const saveDialogData = () => {
   if (currentEditingId.value === null) {
     // Add New
     const newId = resultData.value.length > 0 ? Math.max(...resultData.value.map(item => item.id)) + 1 : 1
-    resultData.value.push({
+    const newRow = {
       id: newId,
       ...formData.value, // Stores descriptions
-      pmc: pmcCode
+      pmc: pmcCode,
+      isByRule: true
+    }
+    resultData.value.push(newRow)
+
+    // Scroll to new row
+    nextTick(() => {
+      // Find row by specific ID class
+      const rowEl = resultTableRef.value?.$el.querySelector(`.el-table__body .row-id-${newId}`)
+      if (rowEl) {
+        rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        resultTableRef.value.toggleRowSelection(newRow, true)
+      }
     })
   } else {
     // Edit Existing
@@ -376,22 +409,11 @@ const saveDialogData = () => {
   editDialogVisible.value = false
 }
 
-// 保存PMC编码到后端
-const saveToApi = async () => {
-  if (!selectedShipType.value || !selectedShipNumber.value) {
-    ElMessage.error('请填写船型船号')
-    return
-  }
-
-  // 检查是否有勾选的行
-  if (selectedRows.value.length === 0) {
-    ElMessage.error('请勾选需要保存的行')
-    return
-  }
-
+// 核心保存逻辑
+const performSave = async (shipType, shipNo) => {
   const payload = {
-    shipType: selectedShipType.value,
-    shipNo: selectedShipNumber.value,
+    shipType: shipType,
+    shipNo: shipNo,
     items: selectedRows.value.map(row => ({
       pmcCode: row.pmc,
       pipingClassName: row.a,
@@ -400,7 +422,8 @@ const saveToApi = async () => {
       materialsGradeName: row.b3,
       flangeStandardName: row.c1,
       pressureRatingName: row.c2,
-      scheduleThicknessName: row.d
+      scheduleThicknessName: row.d,
+      isByRule: !!row.isByRule
     }))
   }
 
@@ -408,12 +431,79 @@ const saveToApi = async () => {
     const res = await axios.post('/api/pmc/pmccode/save', payload)
     if (res?.data?.code === 200) {
       ElMessage.success(res.data.message || '保存成功')
+      // 如果保存的是当前选中的船型船号，则刷新数据
+      if (shipType === selectedShipType.value && shipNo === selectedShipNumber.value) {
+        refreshData()
+      }
     } else {
       ElMessage.error(res?.data?.message || '保存失败')
     }
   } catch (error) {
     console.error('保存PMC编码失败', error)
     ElMessage.error('保存PMC编码失败')
+  }
+}
+
+// 保存PMC编码到后端（入口）
+const saveToApi = async () => {
+  // 如果已经选择了船型船号，直接保存（需二次确认）
+  if (selectedShipType.value && selectedShipNumber.value) {
+    if (selectedRows.value.length === 0) {
+      try {
+        await ElMessageBox.confirm(
+          `当前未勾选需要保存的数据，是否清空当前船型船号(${selectedShipType.value}/${selectedShipNumber.value})下的所有数据？`,
+          '警告',
+          {
+            confirmButtonText: '是',
+            cancelButtonText: '否',
+            type: 'warning'
+          }
+        )
+        // 用户点击“是”后继续
+        await performSave(selectedShipType.value, selectedShipNumber.value)
+      } catch (e) {
+        // 用户点击“否”或取消
+        return
+      }
+    } else {
+      await performSave(selectedShipType.value, selectedShipNumber.value)
+    }
+  } else {
+    // 否则弹出窗口选择
+    targetSaveShipType.value = ''
+    targetSaveShipNumber.value = ''
+    saveDialogVisible.value = true
+  }
+}
+
+// 弹窗确认保存
+const confirmSaveFromDialog = async () => {
+  if (!targetSaveShipType.value || !targetSaveShipNumber.value) {
+    ElMessage.error('请选择船型船号')
+    return
+  }
+  
+  if (selectedRows.value.length === 0) {
+    try {
+      await ElMessageBox.confirm(
+        `当前未勾选需要保存的数据，是否清空目标船型船号(${targetSaveShipType.value}/${targetSaveShipNumber.value})下的所有数据？`,
+        '警告',
+        {
+          confirmButtonText: '是',
+          cancelButtonText: '否',
+          type: 'warning'
+        }
+      )
+      // 用户点击“是”后继续
+      await performSave(targetSaveShipType.value, targetSaveShipNumber.value)
+      saveDialogVisible.value = false
+    } catch (e) {
+      // 用户点击“否”或取消
+      return
+    }
+  } else {
+    await performSave(targetSaveShipType.value, targetSaveShipNumber.value)
+    saveDialogVisible.value = false
   }
 }
 
@@ -443,15 +533,16 @@ const refreshData = async () => {
         b3: item.materialsGradeName,
         c1: item.flangeStandardName,
         c2: item.pressureRatingName,
-        d: item.scheduleThicknessName
+        d: item.scheduleThicknessName,
+        isByRule: item.isByRule
       }))
-      ElMessage.success(`刷新成功，共 ${list.length} 条数据`)
+      ElMessage.success(`查询成功，共 ${list.length} 条数据`)
     } else {
       ElMessage.error(res.data?.message || '刷新失败')
     }
   } catch (error) {
     console.error('Refresh failed:', error)
-    ElMessage.error('刷新失败')
+    ElMessage.error('查询失败')
   }
 }
 const cancelDialog = () => {
@@ -467,7 +558,7 @@ const deleteFromApi = (ids) => {
 // Delete Button Click
 const handleDelete = () => {
   if (selectedRows.value.length === 0) {
-    alert('请先选择要删除的数据')
+    ElMessage.error('请先选择要删除的数据')
     return
   }
   // Show confirmation dialog
@@ -478,7 +569,7 @@ const handleDelete = () => {
     
     // Call API placeholder
     deleteFromApi(selectedIds)
-    // alert('删除成功 (预留接口)')
+    ElMessage.success('删除成功')
   }
 }
 
@@ -486,6 +577,64 @@ const resultTableRef = ref(null)
 const mainMaterialTableRef = ref(null)
 const flangeTableRef = ref(null)
 const pipeLimitTableRef = ref(null)
+const searchPmcCodeInput = ref('')
+const highlightedRowId = ref(null)
+let highlightTimeout = null
+
+const tableRowClassName = ({ row }) => {
+  const classes = [`row-id-${row.id}`]
+  if (row.id === highlightedRowId.value) {
+    classes.push('highlight-row')
+  }
+  if (row.isByRule) {
+    classes.push('new-added-row')
+  }
+  return classes.join(' ')
+}
+
+// Search PMC Code in Table
+const searchPmcCode = () => {
+  if (!searchPmcCodeInput.value) {
+    ElMessage.warning('请输入PMC编码')
+    return
+  }
+
+  const targetRow = resultData.value.find(item => item.pmc && item.pmc.toLowerCase() === searchPmcCodeInput.value.toLowerCase())
+  if (targetRow) {
+    // Set highlight
+    if (highlightTimeout) clearTimeout(highlightTimeout)
+    highlightedRowId.value = targetRow.id
+    highlightTimeout = setTimeout(() => {
+      highlightedRowId.value = null
+      highlightTimeout = null
+    }, 3000)
+
+    // 1. Select the row
+    resultTableRef.value.setCurrentRow(targetRow)
+    
+    // 2. Scroll to the row
+    const index = resultData.value.indexOf(targetRow)
+    if (index !== -1 && resultTableRef.value) {
+      const tableBodyWrapper = resultTableRef.value.$el.querySelector('.el-table__body-wrapper .el-scrollbar__wrap')
+      if (tableBodyWrapper) {
+        // Find the row element
+        const rowEl = tableBodyWrapper.querySelector(`tr:nth-child(${index + 1})`)
+        if (rowEl) {
+           rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+           resultTableRef.value.toggleRowSelection(targetRow, true)
+           ElMessage.success(`找到 PMC 编码: ${targetRow.pmc}`)
+           return
+        }
+      }
+      
+      // Fallback if DOM manipulation fails
+      resultTableRef.value.toggleRowSelection(targetRow, true)
+      ElMessage.success(`找到 PMC 编码: ${targetRow.pmc}`)
+    }
+  } else {
+    ElMessage.info('未找到该 PMC 编码')
+  }
+}
 
 // Handle Row Click
 const handleRowClick = (row, tableInstance) => {
@@ -521,7 +670,7 @@ const handlePipeLimitSelectionChange = (val) => {
 const generatePmcCode = async () => {
   // Check if main material and flange rows are selected
   if (selectedMainMaterialRows.value.length === 0 || selectedFlangeRows.value.length === 0) {
-    alert('请先在B1B2B3D组合数据和C1C2组合数据表格中选择至少一行数据')
+    ElMessage.error('请在“B1B2B3D组合数据”和“C1C2组合数据”表格中选择至少一行数据')
     return
   }
 
@@ -585,7 +734,7 @@ const generatePmcCode = async () => {
   }
 
   if (combinations.length === 0) {
-    alert('没有符合校验要求的组合数据')
+    ElMessage.warning('没有符合校验要求的组合数据')
     return
   }
 
@@ -603,7 +752,7 @@ const generatePmcCode = async () => {
   })
 
   if (pmcList.length === 0) {
-    alert('所有生成的PMC编码均已存在，未新增数据')
+    ElMessage.warning('所有生成的PMC编码均已存在，未新增数据')
     return
   }
 
@@ -635,7 +784,7 @@ const generatePmcCode = async () => {
     })
 
     resultData.value = [...resultData.value, ...newRows]
-    alert(`成功生成 ${newRows.length} 条PMC编码（已去重）`)
+    ElMessage.success(`成功生成 ${newRows.length} 条PMC编码`)
   } catch (error) {
     console.error('生成PMC编码失败', error)
     ElMessage.error('生成PMC编码失败')
@@ -705,123 +854,137 @@ const cancelCopyRule = () => {
 <template>
   <div class="pmc-container">
     <!-- Top Section -->
-    <div class="section-block">
-      <!-- Top Toolbar -->
-      <div class="table-header">
-        <div class="title-area">
-          <el-select v-model="selectedShipType" placeholder="船型" style="width: 120px;">
-            <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-          <el-select v-model="selectedShipNumber" placeholder="船号" style="width: 120px;">
-            <el-option v-for="item in shipNumbers" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
+    <transition name="el-zoom-in-top">
+      <div class="section-block" v-show="showRulePanel">
+        <!-- Top Toolbar -->
+        <div class="table-header" style="justify-content: flex-end; display: none;">
+          <!-- <div class="title-area">
+            <el-select v-model="selectedShipType" placeholder="船型" style="width: 120px;">
+              <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+            <el-select v-model="selectedShipNumber" placeholder="船号" style="width: 120px;">
+              <el-option v-for="item in shipNumbers" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+          </div> -->
+          <div class="actions">
+            <el-button type="primary" @click="generatePmcCode">生成7位编码</el-button>
+          </div>
         </div>
-        <div class="actions">
-          <el-button type="primary" @click="generatePmcCode">生成7位编码</el-button>
-        </div>
+
+        <!-- Rule Tables Row -->
+        <el-row :gutter="20" class="rule-row">
+          <!-- Col 1 -->
+          <el-col :span="8">
+            <div class="rule-card">
+              <div class="rule-header">
+                <span>主材料规则：</span>
+                <el-select v-model="selectedMainMaterialRule" style="width: 130px;">
+                  <el-option v-for="item in mainMaterialRules" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+              </div>
+              <div class="rule-table-wrap">
+                <div class="table-title">B1B2B3D组合数据</div>
+                <el-table 
+                  ref="mainMaterialTableRef"
+                  :data="mainMaterialData" 
+                  border 
+                  stripe 
+                  size="small" 
+                  height="200" 
+                  @selection-change="handleMainMaterialSelectionChange"
+                  @row-click="(row) => handleRowClick(row, mainMaterialTableRef)"
+                >
+                  <el-table-column type="selection" width="40" />
+                  <el-table-column prop="id" label="ID" width="40" />
+                  <el-table-column prop="code" label="主材料" />
+                  <el-table-column prop="std" label="管材标准" />
+                  <el-table-column prop="grade" label="牌号" />
+                  <el-table-column prop="thickness" label="壁厚等级" />
+                </el-table>
+              </div>
+            </div>
+          </el-col>
+
+          <!-- Col 2 -->
+          <el-col :span="8">
+            <div class="rule-card">
+              <div class="rule-header">
+                <span>法兰规则：</span>
+                <el-select v-model="selectedFlangeRule" style="width: 130px;">
+                  <el-option v-for="item in flangeRules" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+              </div>
+              <div class="rule-table-wrap">
+                <div class="table-title">C1C2组合数据</div>
+                <el-table 
+                  ref="flangeTableRef"
+                  :data="flangeData" 
+                  border 
+                  stripe 
+                  size="small" 
+                  height="200" 
+                  @selection-change="handleFlangeSelectionChange"
+                  @row-click="(row) => handleRowClick(row, flangeTableRef)"
+                >
+                  <el-table-column type="selection" width="40" />
+                  <el-table-column prop="id" label="ID" width="40" />
+                  <el-table-column prop="std" label="法兰标准" />
+                  <el-table-column prop="press" label="法兰压力等级" />
+                </el-table>
+              </div>
+            </div>
+          </el-col>
+
+          <!-- Col 3 -->
+          <el-col :span="8">
+            <div class="rule-card">
+              <div class="rule-header">
+                <span>管材一二级限定规则：</span>
+                <el-select v-model="selectedPipeLimitRule" style="width: 130px;">
+                  <el-option v-for="item in pipeLimitRules" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+                <el-button type="primary" @click="generatePmcCode" style="margin-left: auto;">生成7位编码</el-button>
+              </div>
+              <div class="rule-table-wrap">
+                <div class="table-title">AB2B3C2组合数据</div>
+                <el-table 
+                  ref="pipeLimitTableRef"
+                  :data="pipeLimitData" 
+                  border 
+                  stripe 
+                  size="small" 
+                  height="200" 
+                  @selection-change="handlePipeLimitSelectionChange"
+                  @row-click="(row) => handleRowClick(row, pipeLimitTableRef)"
+                >
+                  <el-table-column type="selection" width="40" />
+                  <el-table-column prop="id" label="ID" width="40" />
+                  <el-table-column prop="pipingClassCode" label="管材等级" />
+                  <el-table-column prop="pipingStandardCode" label="管材标准" />
+                  <el-table-column prop="materialsGradeCode" label="牌号" />
+                  <el-table-column prop="pressureRatingCode" label="法兰压力等级" align="center"/>
+                </el-table>
+              </div>
+            </div>
+          </el-col>
+        </el-row>
       </div>
-
-      <!-- Rule Tables Row -->
-      <el-row :gutter="20" class="rule-row">
-        <!-- Col 1 -->
-        <el-col :span="8">
-          <div class="rule-card">
-            <div class="rule-header">
-              <span>主材料规则：</span>
-              <el-select v-model="selectedMainMaterialRule" size="small" style="width: 150px;">
-                <el-option v-for="item in mainMaterialRules" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
-            </div>
-            <div class="rule-table-wrap">
-              <div class="table-title">B1B2B3D组合数据</div>
-              <el-table 
-                ref="mainMaterialTableRef"
-                :data="mainMaterialData" 
-                border 
-                stripe 
-                size="small" 
-                height="200" 
-                @selection-change="handleMainMaterialSelectionChange"
-                @row-click="(row) => handleRowClick(row, mainMaterialTableRef)"
-              >
-                <el-table-column type="selection" width="40" />
-                <el-table-column prop="id" label="ID" width="40" />
-                <el-table-column prop="code" label="主材料编码" />
-                <el-table-column prop="std" label="管材标准编码" />
-                <el-table-column prop="grade" label="牌号编码" />
-                <el-table-column prop="thickness" label="壁厚等级编码" />
-              </el-table>
-            </div>
-          </div>
-        </el-col>
-
-        <!-- Col 2 -->
-        <el-col :span="8">
-          <div class="rule-card">
-            <div class="rule-header">
-              <span>法兰规则：</span>
-              <el-select v-model="selectedFlangeRule" size="small" style="width: 150px;">
-                <el-option v-for="item in flangeRules" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
-            </div>
-            <div class="rule-table-wrap">
-              <div class="table-title">C1C2组合数据</div>
-              <el-table 
-                ref="flangeTableRef"
-                :data="flangeData" 
-                border 
-                stripe 
-                size="small" 
-                height="200" 
-                @selection-change="handleFlangeSelectionChange"
-                @row-click="(row) => handleRowClick(row, flangeTableRef)"
-              >
-                <el-table-column type="selection" width="40" />
-                <el-table-column prop="id" label="ID" width="40" />
-                <el-table-column prop="std" label="法兰标准编码" />
-                <el-table-column prop="press" label="法兰压力等级编码" />
-              </el-table>
-            </div>
-          </div>
-        </el-col>
-
-        <!-- Col 3 -->
-        <el-col :span="8">
-          <div class="rule-card">
-            <div class="rule-header">
-              <span>管材一二级限定规则：</span>
-              <el-select v-model="selectedPipeLimitRule" size="small" style="width: 150px;">
-                <el-option v-for="item in pipeLimitRules" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
-            </div>
-            <div class="rule-table-wrap">
-              <div class="table-title">AB2B3C2组合数据</div>
-              <el-table 
-                ref="pipeLimitTableRef"
-                :data="pipeLimitData" 
-                border 
-                stripe 
-                size="small" 
-                height="200" 
-                @selection-change="handlePipeLimitSelectionChange"
-                @row-click="(row) => handleRowClick(row, pipeLimitTableRef)"
-              >
-                <el-table-column type="selection" width="40" />
-                <el-table-column prop="id" label="ID" width="40" />
-                <el-table-column prop="pipingClassCode" label="管材等级编码 A" />
-                <el-table-column prop="pipingStandardCode" label="管材标准编码 B2" />
-                <el-table-column prop="materialsGradeCode" label="牌号编码 B3" />
-                <el-table-column prop="pressureRatingCode" label="法兰压力等级编码 C2" align="center"/>
-              </el-table>
-            </div>
-          </div>
-        </el-col>
-      </el-row>
-    </div>
+    </transition>
 
     <!-- Bottom Section -->
     <div class="section-block bottom-block">
-      <!-- Bottom Toolbar -->
+      <!-- Centered Toggle Icon -->
+      <div 
+        style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 10; cursor: pointer; padding: 2px 12px; background-color: #fff; border: 1px solid #dcdfe6; border-top: none; border-radius: 0 0 6px 6px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);"
+        @click="showRulePanel = !showRulePanel"
+        :title="showRulePanel ? '折叠规则面板' : '展开规则面板'"
+      >
+        <el-icon style="font-size: 16px; color: #409eff; display: block;">
+          <component :is="showRulePanel ? 'CaretTop' : 'CaretBottom'" />
+        </el-icon>
+      </div>
+
+      <!-- Toolbar -->
       <div class="table-header">
         <div class="title-area">
           <el-select v-model="selectedShipType" placeholder="船型" style="width: 120px;">
@@ -830,10 +993,22 @@ const cancelCopyRule = () => {
           <el-select v-model="selectedShipNumber" placeholder="船号" style="width: 120px;">
             <el-option v-for="item in shipNumbers" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
+          <el-button type="primary" icon="Search" @click="refreshData">查询</el-button>
         </div>
+
         <div class="actions">
-          <el-button @click="refreshData">刷新</el-button>
-          <el-button @click="openCopyRuleDialog">从其他船号复制规则</el-button>
+          <el-input 
+            v-model="searchPmcCodeInput" 
+            placeholder="输入PMC编码" 
+            style="width: 180px; margin-right: 12px;" 
+            @keyup.enter="searchPmcCode"
+            clearable
+          >
+            <template #append>
+              <el-button icon="Search" @click="searchPmcCode" />
+            </template>
+          </el-input>
+          <el-button icon="CopyDocument" @click="openCopyRuleDialog">从其他船号复制规则</el-button>
           <el-button type="primary" icon="Plus" @click="handleAdd">增加</el-button>
           <el-button type="danger" plain icon="Delete" :disabled="selectedRows.length === 0" @click="handleDelete">删除</el-button>
           <el-button type="primary" icon="Check" @click="saveToApi">保存</el-button>
@@ -845,10 +1020,11 @@ const cancelCopyRule = () => {
         <el-table 
           ref="resultTableRef"
           :data="resultData" 
+          :row-class-name="tableRowClassName"
           border 
           stripe 
           style="width: 100%" 
-          height="400" 
+          height="100%" 
           @selection-change="handleSelectionChange"
           @row-click="(row) => handleRowClick(row, resultTableRef)"
         >
@@ -885,7 +1061,7 @@ const cancelCopyRule = () => {
         </el-select>
       </el-form-item>
       <el-form-item label="管材标准 B2">
-        <el-select v-model="formData.b2" placeholder="请选择">
+        <el-select v-model="formData.b2" placeholder="请选择" :disabled="!formData.b1">
           <el-option v-for="opt in optionsB2" :key="opt.value" :label="opt.label" :value="opt.label" />
         </el-select>
       </el-form-item>
@@ -949,15 +1125,40 @@ const cancelCopyRule = () => {
       </span>
     </template>
   </el-dialog>
+
+  <!-- Save Selection Dialog -->
+  <el-dialog title="选择保存目标" v-model="saveDialogVisible" width="30%">
+    <el-form label-width="100px">
+      <el-form-item label="目标船号">
+        <div style="display: flex; gap: 12px;">
+          <el-select v-model="targetSaveShipType" placeholder="船型" style="width: 120px;">
+            <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+          <el-select v-model="targetSaveShipNumber" placeholder="船号" style="width: 140px;">
+            <el-option v-for="item in targetSaveShipNumbers" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </div>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="saveDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmSaveFromDialog">保存</el-button>
+      </span>
+    </template>
+  </el-dialog>
 </template>
 <style scoped>
 .pmc-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px; /* Reduced gap to accommodate toggle bar */
   height: 100%;
   min-width: 0;
   overflow: hidden;
+  padding: 0px;
+  background-color: #f5f7fa;
+  box-sizing: border-box;
 }
 
 .section-block {
@@ -972,6 +1173,7 @@ const cancelCopyRule = () => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  position: relative; /* Ensure absolute positioning works for toggle icon */
 }
 
 .table-header {
@@ -1001,14 +1203,20 @@ const cancelCopyRule = () => {
 .rule-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .rule-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   white-space: nowrap;
+  height: 40px; /* 固定高度确保对齐 */
+}
+
+.rule-header span {
+  font-size: 16px;
+  font-weight: bold;
 }
 
 .rule-table-wrap {
@@ -1025,7 +1233,8 @@ const cancelCopyRule = () => {
 
 .main-table-wrap {
   flex: 1;
-  overflow: auto;
+  overflow: hidden; /* Changed from auto to hidden to let el-table handle scrolling */
+  min-height: 0; /* Ensure flex child can shrink */
 }
 
 .main-table-wrap :deep(.el-table) {
@@ -1045,5 +1254,28 @@ const cancelCopyRule = () => {
 
 :deep(.el-input__inner) {
   text-align: center;
+}
+
+:deep(.el-table .new-added-row) {
+  --el-table-tr-bg-color: var(--el-color-success-light-9);
+}
+
+:deep(.el-table .new-added-row td.el-table__cell) {
+  background-color: var(--el-color-success-light-9) !important;
+}
+
+:deep(.el-table .highlight-row) {
+  --el-table-tr-bg-color: var(--el-color-warning-light-7);
+}
+
+:deep(.el-table .highlight-row td.el-table__cell) {
+  background-color: var(--el-color-warning-light-7) !important;
+  animation: flash-highlight 3s;
+}
+
+@keyframes flash-highlight {
+  0% { background-color: var(--el-color-warning-light-3); }
+  50% { background-color: var(--el-color-warning-light-5); }
+  100% { background-color: transparent; }
 }
 </style>
