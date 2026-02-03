@@ -890,7 +890,7 @@ const cancelCopyRule = () => {
                   border 
                   stripe 
                   size="small" 
-                  height="200" 
+                  height="260" 
                   @selection-change="handleMainMaterialSelectionChange"
                   @row-click="(row) => handleRowClick(row, mainMaterialTableRef)"
                 >
@@ -922,7 +922,7 @@ const cancelCopyRule = () => {
                   border 
                   stripe 
                   size="small" 
-                  height="200" 
+                  height="260" 
                   @selection-change="handleFlangeSelectionChange"
                   @row-click="(row) => handleRowClick(row, flangeTableRef)"
                 >
@@ -953,7 +953,7 @@ const cancelCopyRule = () => {
                   border 
                   stripe 
                   size="small" 
-                  height="200" 
+                  height="260" 
                   @selection-change="handlePipeLimitSelectionChange"
                   @row-click="(row) => handleRowClick(row, pipeLimitTableRef)"
                 >
@@ -1196,7 +1196,7 @@ const cancelCopyRule = () => {
 }
 
 .rule-row {
-  margin-bottom: 10px;
+  margin-bottom: 2px;
   overflow-x: auto;
 }
 
