@@ -1392,7 +1392,7 @@ const fetchBendParameterData = async () => {
 
 const fetchWallThicknessData = async () => {
   try {
-    const res = await axios.get('/api/WallThicknessCodeConverted')
+    const res = await axios.get('/api/S3dCodeWallThickness')
     let rows = getRowsFromResponse(res)
     rows.forEach(r => {
       if (r.status === undefined) {
