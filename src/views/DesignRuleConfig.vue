@@ -451,7 +451,7 @@ const LOCAL_COLUMNS = {
 }
 
 const LOCAL_TITLES = {
-  'bend-pipe': '部件库名称：PlainPipingGenericData',
+  'bend-pipe': '弯管机参数',
   'bend-parameter': '部件库名称：PipingBendParameterCodeConverted',
   'wall-thickness-series': '部件库名称：PlainPipingGenericData',
   'shortcode': '部件库名称：ShortCodeHierarchyRule',
@@ -698,24 +698,15 @@ const handleNodeClick = (node) => {
   if (node.id !== 'basic') {
     if (!configs[node.id]) {
       if (node.id === 'shortcode-major') {
-        let source = null
-        if (db['shortcode']) {
-          source = Mock.mock(db['shortcode'])
-        }
-        const baseRows = Array.isArray(source?.data) ? source.data : []
         configs['shortcode-major'] = {
           id: 'shortcode-major',
-          title: '部件库名称：ShortCodeHierarchyRule',
+          title: '部件库名称：ShortCodeHierarchyType',
           selectedRows: [],
           columns: (LOCAL_COLUMNS['shortcode-major'] || []).map(col => ({
             ...col,
             editable: col.editable !== undefined ? col.editable : true
           })),
-          data: baseRows.map((item, index) => ({
-            id: item.id ?? index + 1,
-            ShortCodeHierarchyTypeShortDescription: item.type ?? '',
-            ShortCodeHierarchyTypeLongDescription: item.shortcode ?? ''
-          }))
+          data: []
         }
       } else if (db[node.id]) {
         const mockData = Mock.mock(db[node.id])
@@ -740,6 +731,8 @@ const handleNodeClick = (node) => {
       fetchBendParameterData()
     } else if (node.id === 'wall-thickness-series') {
       fetchWallThicknessData()
+    } else if (node.id === 'shortcode-major') {
+      fetchShortCodeMajorData()
     }
     
     currentNode.value = node
@@ -1324,6 +1317,31 @@ const fetchBendPipeData = async () => {
     configs['bend-pipe'] = cfg
   } catch (e) {
     ElMessage.error(`弯管机数据接口请求失败：${e?.message || '网络错误'}`)
+  }
+}
+
+const fetchShortCodeMajorData = async () => {
+  try {
+    const res = await axios.get('/api/S3dCommonCodeListValue/ShortCodeHierarchyClass')
+    let rows = getRowsFromResponse(res)
+    rows = rows.map((r, idx) => ({
+      id: getValueIgnoreCase(r, 'codeListNumber') ?? idx + 1,
+      ShortCodeHierarchyTypeShortDescription: getValueIgnoreCase(r, 'shortStringValue') || '',
+      ShortCodeHierarchyTypeLongDescription: getValueIgnoreCase(r, 'longStringValue') || ''
+    }))
+    
+    const cfg = configs['shortcode-major'] || {
+      id: 'shortcode-major',
+      title: LOCAL_TITLES['shortcode-major'] || '部件库名称：ShortCodeHierarchyType',
+      selectedRows: [],
+      columns: [],
+      data: []
+    }
+    cfg.columns = LOCAL_COLUMNS['shortcode-major'] || []
+    cfg.data = rows
+    configs['shortcode-major'] = cfg
+  } catch (e) {
+    ElMessage.error(`ShortCode大类接口请求失败：${e?.message || '网络错误'}`)
   }
 }
 
