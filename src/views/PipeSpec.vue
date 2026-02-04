@@ -223,7 +223,7 @@ const updateConfigButton = (data, buttonId) => {
   // 将配置数据转换为指定格式的字符串
   const configStr = data.configurations.map(item => {
     // 基础配置信息
-    let configLine = `${item.standardFileName} - ${item.materialName} - ${item.npdRange[0]}~${item.npdRange[1]}mm`
+    let configLine = `${item.standardFileName} - ${item.materialName}`
     
     // 如果是Bend配置且有弯管半径倍数信息，则添加
     if (data.partType === 'Bend' && item.bendRadiusMultiple) {

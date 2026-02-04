@@ -9,7 +9,7 @@
       <div style="display:flex; align-items:center; gap:12px;">
         <span>{{ buttonLabel ? buttonLabel + ' - ' : '' }}标准文件选择与配置</span>
         <el-select v-model="form.partType" placeholder="部件类型" size="small" style="width:160px">
-          <el-option v-for="pt in partTypes" :key="pt.componentTypeName" :label="pt.componenTypeDescription || pt.componentTypeName" :value="pt.componentTypeName" />
+          <el-option v-for="pt in partTypes" :key="pt.componentTypeName" :label="pt.componentTypeDescription || pt.componentTypeName" :value="pt.componentTypeName" />
         </el-select>
       </div>
     </template>
