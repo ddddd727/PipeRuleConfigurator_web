@@ -24,7 +24,7 @@ export const usePmcDetails = ({
         const data = res.data.data
         formData.value = {
           service: '', // 契约中无此字段，置空
-          pipingMaterialClass: data.pipingClass || code,
+          pipingMaterialClass: data.pmcCode || code,
           pipe: data.pipeStandard || '',
           material: data.materialGrade || '',
           pressureClass: data.pressureRating || '',

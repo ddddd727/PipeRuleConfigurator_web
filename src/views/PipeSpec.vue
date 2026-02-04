@@ -285,6 +285,20 @@ const handleGenerateSpecification = () => {
 
 // 处理保存规格书按钮点击
 const handleSaveSpecification = async () => {
+  // 校验必填项：船型、船号、PMC编码
+  if (!selectedShipClass.value) {
+    ElMessage.warning('请选择船型')
+    return
+  }
+  if (!selectedShipNumber.value) {
+    ElMessage.warning('请选择船号')
+    return
+  }
+  if (!currentNode.value.label) {
+    ElMessage.warning('请选择有效的PMC编码')
+    return
+  }
+
   // 检查是否有已配置的部件类型
   const configuredButtons = configButtons.value.filter(btn => btn.type && btn.configResult)
   
