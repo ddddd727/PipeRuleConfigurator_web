@@ -1,10 +1,13 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, Setting, Plus, Ship } from '@element-plus/icons-vue'
 import PipeSpecConfigForm from '@/components/PipeSpecConfigForm.vue'    // 导入 PipeSpecConfigForm 组件，用于配置按钮的弹窗实现
 import PipeSpecPreviewForm from '@/components/PipeSpecPreviewForm.vue'  // 导入规格书预览窗口组件
+import PipeSpecNpdTable from '@/components/pipe-spec/PipeSpecNpdTable.vue'
+import PipeSpecConfigButtons from '@/components/pipe-spec/PipeSpecConfigButtons.vue'
+import PipeSpecTreeSearch from '@/components/pipe-spec/PipeSpecTreeSearch.vue'
 import { pipeSpecConfigStore } from '@/constants/PipeSpec-item'  // 导入管道规格配置存储
 import { usePmcTree } from '@/composables/usePmcTree'
 import { usePmcDetails } from '@/composables/usePmcDetails'
@@ -68,8 +71,32 @@ const {
   fetchMaterialsData
 } = useMaterials()
 
+// 树形搜索相关
+const filterText = ref('')
+const treeRef = ref(null)
+
+watch(filterText, (val) => {
+  treeRef.value?.filter(val)
+})
+
+const filterNode = (value, data) => {
+  if (!value) return true
+  return data.label.toLowerCase().includes(value.toLowerCase())
+}
+
 // 侧边栏折叠状态
 const sidebarCollapsed = ref(false)
+
+// 使用computed缓存船型和船号名称，避免模板中重复计算
+const currentShipClassName = computed(() => {
+  if (!selectedShipClass.value || !shipClasses.value.length) return '-'
+  return shipClasses.value.find(item => item.id === selectedShipClass.value)?.name || '-'
+})
+
+const currentShipNumberName = computed(() => {
+  if (!selectedShipNumber.value || !shipNumbers.value.length) return '-'
+  return shipNumbers.value.find(item => item.id === selectedShipNumber.value)?.name || '-'
+})
 
 // 切换侧边栏折叠状态
 const toggleSidebar = () => {
@@ -391,6 +418,11 @@ const clearAllStoredConfigs = () => {
             <el-icon><ArrowLeft v-if="!sidebarCollapsed" /><ArrowRight v-else /></el-icon>
           </el-button>
         </div>
+        <!-- 搜索框 -->
+        <PipeSpecTreeSearch 
+          v-model="filterText" 
+          v-show="!sidebarCollapsed"
+        />
         <!-- 状态颜色图例 -->
         <div class="status-legend" v-show="!sidebarCollapsed">
           <div class="legend-item">
@@ -408,8 +440,10 @@ const clearAllStoredConfigs = () => {
         </div>
         <div class="sidebar-tree" v-show="!sidebarCollapsed">
           <el-tree
+            ref="treeRef"
             :data="treeData"
             :highlight-current="true"
+            :filter-node-method="filterNode"
             @node-click="handleNodeClick"
             v-loading="treeLoading">
             <template #default="{ node, data }">
@@ -435,11 +469,11 @@ const clearAllStoredConfigs = () => {
             <div class="header-status" v-if="selectedShipClass && selectedShipNumber">
               <span class="status-item">
                 <span class="status-label">船型：</span>
-                <span class="status-value">{{ shipClasses.find(item => item.id === selectedShipClass)?.name || '-' }}</span>
+                <span class="status-value">{{ currentShipClassName }}</span>
               </span>
               <span class="status-item">
                 <span class="status-label">船号：</span>
-                <span class="status-value">{{ shipNumbers.find(item => item.id === selectedShipNumber)?.name || '-' }}</span>
+                <span class="status-value">{{ currentShipNumberName }}</span>
               </span>
               <span class="status-item" v-if="currentNode.label && currentNode.label.length === 7">
                 <span class="status-label">PMC编码：</span>
@@ -510,99 +544,23 @@ const clearAllStoredConfigs = () => {
 
             <!-- 管系规格书的通径外径壁厚对照表格 -->
             <el-form-item label-width="0" prop="">
-              <div class="form-section-pmc">
-                <el-row class="form-section-pmc" :gutter="20">
-                  <el-col :span="8">
-                    <el-form-item label="优选规则" label-width="80px">
-                      <el-select
-                        v-model="preferredRule"
-                        placeholder="请选择优选规则"
-                        size="small"
-                        clearable
-                        :loading="preferredRuleLoading"
-                        style="width: 200px"
-                      >
-                        <el-option
-                          v-for="rule in preferredRuleOptions"
-                          :key="rule.value"
-                          :label="rule.label"
-                          :value="rule.value"
-                        />
-                      </el-select>
-                    </el-form-item>
-                  </el-col>
-                </el-row>
-                <el-row>
-                  <el-col :span="24">
-                    <div style="width: 95%; overflow-x: auto; max-width: 95%;">
-                    <el-table 
-                      :data="dimensionData" 
-                      style="width: 100%; min-width: 1000px;" 
-                      :show-header="false" 
-                      id="npd-dataTable"
-                      @cell-click="handleCellClick"
-                    >
-                    <el-table-column prop="name" label="参数" width="100" fixed="left">
-                      <template #header-cell>
-                        <span style="font-weight: bold;"></span>
-                      </template>
-                      <template #default="{ row }">
-                        <span>{{ row.name }}</span>
-                      </template>
-                    </el-table-column>
-                    <el-table-column v-for="i in columnCount" :key="'col-' + i" :label="i" :prop="'col' + i" width="66">
-                      <template #default="{ row, column }">
-                        <span 
-                          :style="getCellStyle(row, column)"
-                        >
-                          {{ row[column.property] || '-' }}
-                            </span>
-                          </template>
-                        </el-table-column>
-                      </el-table>
-                    </div>
-                  </el-col>
-                </el-row>
-              </div>
+              <PipeSpecNpdTable
+                :dimensionData="dimensionData"
+                :columnCount="columnCount"
+                v-model:preferredRule="preferredRule"
+                :preferredRuleLoading="preferredRuleLoading"
+                :preferredRuleOptions="preferredRuleOptions"
+                :getCellStyle="getCellStyle"
+                :handleCellClick="handleCellClick"
+              />
             </el-form-item>
 
             <!-- 配置按钮区域 -->
             <el-form-item label-width="0" prop="">
-              <div class="form-section-pmc" style="flex:1">
-                <el-row :gutter="20" v-for="row in Math.ceil(configButtons.length / 2)" :key="row" class="config-row">
-                  <el-col :span="12" v-for="i in 2" :key="i">
-                    <div v-if="configButtons[(row-1)*2 + (i-1)]" class="config-cell">
-                      <div v-if="configButtons[(row-1)*2 + (i-1)].configResult" class="config-result-container frosted">
-                        <div v-if="configButtons[(row-1)*2 + (i-1)].type" class="config-type-label">{{ configButtons[(row-1)*2 + (i-1)].type }}</div>
-                        <div class="config-result-scroll">
-                          <div v-for="(line, index) in configButtons[(row-1)*2 + (i-1)].configResult.split('\n')" :key="index" class="config-result-line">{{ line }}</div>
-                        </div>
-                        <el-button 
-                          type="primary" plain
-                          size="small" 
-                          class="reconfig-btn"
-                          @click="handleConfigClick(configButtons[(row-1)*2 + (i-1)].id)"
-                        >
-                          重新配置
-                        </el-button>
-                      </div>
-                      <el-button 
-                        v-else
-                        type="primary" 
-                        round 
-                        size="large" 
-                        class="config-add-btn frosted"
-                        @click="handleConfigClick(configButtons[(row-1)*2 + (i-1)].id)"
-                      >
-                        <div class="config-add-content">
-                          <el-icon class="plus-icon"><Plus /></el-icon>
-                          <div class="config-add-text">配置</div>
-                        </div>
-                      </el-button>
-                    </div>
-                  </el-col>
-                </el-row>
-              </div>
+              <PipeSpecConfigButtons
+                :configButtons="configButtons"
+                :handleConfigClick="handleConfigClick"
+              />
             </el-form-item>
           </el-form>
         </div>
@@ -622,6 +580,10 @@ const clearAllStoredConfigs = () => {
 </template>
 
 <style scoped>
+/* CSS变量定义 - 统一管理样式值 */
+:root {
+}
+
 .pipe-spec-container {
   height: 100%;
   padding: 0;
@@ -809,8 +771,9 @@ const clearAllStoredConfigs = () => {
 /* 左侧：标题或状态信息 */
 .header-left {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 20px;
   flex: 1;
 }
 
@@ -825,6 +788,7 @@ const clearAllStoredConfigs = () => {
   align-items: center;
   gap: 16px;
   font-size: 14px;
+  color: #909399;
 }
 
 .status-item {
@@ -838,8 +802,8 @@ const clearAllStoredConfigs = () => {
 }
 
 .status-value {
-  color: #303133;
-  font-weight: 500;
+  color: #606266;
+  font-weight: normal;
 }
 
 /* 右侧：搜索框与功能按钮 */
@@ -878,72 +842,7 @@ const clearAllStoredConfigs = () => {
   margin-bottom: 20px;
 }
 
-/* 通径外径壁厚对照表格样式 - 实现颜色连续跨越和圆角效果 */
-#npd-dataTable :deep(.el-table__body-wrapper) {
-  overflow-x: auto;
-}
-
-/* 表格单元格基础样式 */
-#npd-dataTable :deep(.el-table__body td) {
-  padding: 0 !important;
-  border-right: 1px solid #ebeef5;
-  position: relative;
-  vertical-align: middle;
-}
-
-/* 确保单元格内容容器可定位 */
-#npd-dataTable :deep(.el-table__body td .el-table__cell) {
-  padding: 0 !important;
-  height: 100%;
-  position: relative;
-}
-
-/* 所有span元素基础样式 */
-#npd-dataTable :deep(.el-table__body td .el-table__cell > span) {
-  display: block;
-  min-height: 40px;
-  line-height: 40px;
-  box-sizing: border-box;
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-}
-
-/* 对于选中范围内的单元格（有负边距的），使用绝对定位覆盖边框 */
-/* 匹配包含 margin-right: -1px 的样式 */
-#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="margin-right: -1px"]),
-#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="marginRight: -1px"]) {
-  position: absolute !important;
-  top: 0;
-  left: 0;
-  right: -1px; /* 延伸到下一个单元格，覆盖边框 */
-  width: auto !important;
-  height: 100%;
-  z-index: 2;
-  margin-right: 0 !important; /* 移除负边距，改用right定位 */
-}
-
-/* 第一个选中单元格，左侧圆角 */
-#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="border-radius: 4px 0 0 4px"]),
-#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="borderRadius: 4px 0 0 4px"]) {
-  left: 0;
-  right: -1px;
-}
-
-/* 最后一个选中单元格，右侧圆角 */
-#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="border-radius: 0 4px 4px 0"]),
-#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="borderRadius: 0 4px 4px 0"]) {
-  left: 0;
-  right: 0;
-}
-
-/* 单个选中单元格，四个角都圆角 */
-#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="border-radius: 4px"]),
-#npd-dataTable :deep(.el-table__body td .el-table__cell > span[style*="borderRadius: 4px"]) {
-  left: 0;
-  right: 0;
-}
+/* 通径外径壁厚对照表格样式 - 已移动到组件 */
 
 .form-section h4 {
   margin: 0 0 15px 0;
@@ -1003,108 +902,5 @@ const clearAllStoredConfigs = () => {
   width: 100%;
 }
 
-/* 配置按钮区域样式，避免已配置内容遮挡其他控件 */
-.config-row {
-  margin-bottom: 24px;
-}
-
-
-.config-cell {
-  padding: 6px;
-  box-sizing: border-box;
-  height: 140px; /* 固定高度，保证按钮与显示区域高度一致 */
-}
-
-.config-result-container {
-  background-color: #f0f9ff;
-  border: 1px solid #91d5ff;
-  border-radius: 8px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  height: calc(100% - 12px); /* 保证容器在父项内有固定高度 */
-  overflow: hidden;
-  position: relative;
-}
-
-.config-result-scroll {
-  overflow-y: auto; /* 内容超出时滚动显示 */
-  flex-grow: 1;
-  min-height: 0;
-  padding-right: 6px;
-  padding-top: 24px; /* 给顶部的类型标签留出空间，不随内容滚动 */
-}
-
-.config-result-line {
-  margin-bottom: 6px;
-  font-size: 12px;
-  word-break: break-word;
-}
-
-.reconfig-btn {
-  align-self: flex-end;
-  margin-top: 8px;
-}
-
-.config-add-btn {
-  width: 100%;
-  height: 140px; /* 与已配置项高度一致 */
-  padding: 18px 0;
-}
-
-.config-add-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-}
-
-.config-add-text { font-size: 14px; }
-
-/* 毛玻璃效果（浅蓝色基调）用于配置按钮和已配置项背景 */
-.frosted {
-  background: rgba(224, 242, 255, 0.55); /* 浅蓝色半透明 */
-  backdrop-filter: blur(6px) saturate(120%);
-  -webkit-backdrop-filter: blur(6px) saturate(120%);
-  box-shadow: 0 6px 16px rgba(11, 40, 80, 0.06);
-  border: 1px solid rgba(170, 200, 230, 0.45);
-  color: #033a66; /* 默认文字颜色为深蓝，保证可见 */
-}
-
-.config-result-container.frosted {
-  background: rgba(220, 235, 255, 0.6);
-  border: 1px solid rgba(150, 185, 230, 0.45);
-  color: #033a66;
-}
-
-.config-add-btn.frosted {
-  background: rgba(220, 235, 255, 0.6);
-  border: 1px solid rgba(150, 185, 230, 0.45);
-  color: #033a66;
-}
-
-/* 确保按钮内部文字和图标可见，覆盖 ElementPlus 默认样式 */
-.config-add-btn.frosted,
-.config-add-btn.frosted .el-icon,
-.config-add-btn.frosted .config-add-text {
-  color: #033a66 !important;
-}
-
-
-.config-type-label {
-  position: absolute;
-  top: 8px;
-  left: 12px;
-  z-index: 2;
-  font-size: 12px;
-  font-weight: 600;
-  background: rgba(230, 245, 255, 0.9);
-  color: #033a66;
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid rgba(140,170,210,0.35);
-}
+/* 配置按钮区域样式 - 已移动到组件 */
 </style>
