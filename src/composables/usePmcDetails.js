@@ -16,20 +16,29 @@ export const usePmcDetails = ({
     pressureClass: '',
     wallThickness: ''
   })
+  
+  const configurations = ref([])
+  const isConfigured = ref(false)
 
   const fetchPmcCodeDetails = async (code) => {
     try {
       const res = await axios.get(`/api/PmcSpec/Analyze/${code}`)
       if (res.data.code === 200) {
         const data = res.data.data
+        // API 契约变更：data 包含 baseInfo, configurations, isConfigured
+        const baseInfo = data.baseInfo || {}
+        
         formData.value = {
           service: '', // 契约中无此字段，置空
-          pipingMaterialClass: data.pmcCode || code,
-          pipe: data.pipeStandard || '',
-          material: data.materialGrade || '',
-          pressureClass: data.pressureRating || '',
-          wallThickness: data.wallThickness || ''
+          pipingMaterialClass: baseInfo.pmcCode || code,
+          pipe: baseInfo.pipeStandard || '',
+          material: baseInfo.materialGrade || '',
+          pressureClass: baseInfo.pressureRating || '',
+          wallThickness: baseInfo.wallThickness || ''
         }
+        
+        configurations.value = data.configurations || []
+        isConfigured.value = data.isConfigured || false
 
         if (formData.value.pipe && formData.value.wallThickness) {
           await fetchDimensionData(
@@ -60,6 +69,8 @@ export const usePmcDetails = ({
         pressureClass: '',
         wallThickness: ''
       }
+      configurations.value = []
+      isConfigured.value = false
       clearDimensionData()
     }
   }
@@ -67,6 +78,8 @@ export const usePmcDetails = ({
   return {
     currentNode,
     formData,
+    configurations,
+    isConfigured,
     fetchPmcCodeDetails,
     handleNodeClick
   }

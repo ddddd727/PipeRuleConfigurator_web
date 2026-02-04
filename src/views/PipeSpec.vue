@@ -45,11 +45,61 @@ const {
   currentNode,
   formData,
   fetchPmcCodeDetails,
-  handleNodeClick
+  handleNodeClick,
+  configurations
 } = usePmcDetails({
   fetchDimensionData,
   preferredRule,
   clearDimensionData
+})
+
+// 监听从后端获取的配置信息，更新界面
+watch(configurations, (newConfigs) => {
+  // 先清空现有配置
+  pipeSpecConfigStore.clearAll()
+  configButtons.value.forEach(btn => {
+    btn.type = ''
+    btn.configResult = ''
+    btn.configData = null
+  })
+
+  if (newConfigs && newConfigs.length > 0) {
+    newConfigs.forEach((config, index) => {
+      // 构造符合前端存储结构的数据
+      const configData = {
+        partType: config.componentType,
+        standardFileIds: [], 
+        standardFileConfigurations: [],
+        configurations: [],
+        duplicateRangeDefaults: [] 
+      }
+      
+      // 映射 fullConfig.standardFileConfigs 到前端 configurations
+      if (config.fullConfig && config.fullConfig.standardFileConfigs) {
+         configData.configurations = config.fullConfig.standardFileConfigs.map(s => ({
+             standardFileName: s.standardFile, // 对应 API 的 standardFile (名称)
+             materialName: s.material,         // 对应 API 的 material (名称)
+             bendRadiusMultiple: s.bendRadiusMultiple,
+             // 注意：简化配置不包含 npdRange
+             npdRange: null
+         }))
+      }
+      
+      // 添加到存储
+      pipeSpecConfigStore.addConfig(configData)
+      
+      // 更新按钮显示
+      // 确保有足够的按钮
+      if (index >= configButtons.value.length) {
+        const newId = Math.max(...configButtons.value.map(btn => btn.id)) + 1
+        configButtons.value.push({ id: newId, type: '', configResult: '' })
+      }
+      
+      // 找到第 index 个按钮并更新
+      const buttonId = configButtons.value[index].id
+      updateConfigButton(configData, buttonId)
+    })
+  }
 })
 
 const {
