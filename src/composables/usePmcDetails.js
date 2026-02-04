@@ -23,8 +23,8 @@ export const usePmcDetails = ({
       if (res.data.code === 200) {
         const data = res.data.data
         formData.value = {
-          service: data.service || '',
-          pipingMaterialClass: data.pipingMaterialClass || code,
+          service: '', // 契约中无此字段，置空
+          pipingMaterialClass: data.pipingClass || code,
           pipe: data.pipeStandard || '',
           material: data.materialGrade || '',
           pressureClass: data.pressureRating || '',

@@ -120,7 +120,7 @@ export const useNpdTable = () => {
     try {
       const params = {
         endStandard: endStandard,
-        Schedule: schedule
+        schedule: schedule
       }
       if (preferredRuleId) {
         params.preferredRuleId = preferredRuleId

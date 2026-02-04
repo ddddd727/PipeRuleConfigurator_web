@@ -13,7 +13,6 @@ import { usePmcTree } from '@/composables/usePmcTree'
 import { usePmcDetails } from '@/composables/usePmcDetails'
 import { useNpdTable } from '@/composables/useNpdTable'
 import { usePreferredRule } from '@/composables/usePreferredRule'
-import { useMaterials } from '@/composables/useMaterials'
 
 // 树形数据 / 规则 / 表格 / 表单 逻辑
 const {
@@ -65,12 +64,6 @@ const {
   preferredRule
 })
 
-const {
-  materials,
-  materialsLoading,
-  fetchMaterialsData
-} = useMaterials()
-
 // 树形搜索相关
 const filterText = ref('')
 const treeRef = ref(null)
@@ -118,7 +111,6 @@ const currentButtonId = ref(null)
 onMounted(async () => {
   // 并行获取所有数据（树形数据在船号选择时加载，尺寸数据需要 Pipe 和 Wall Thickness 参数，在获取编码详情后加载）
   await Promise.all([
-    fetchMaterialsData(),
     fetchShipInfos(),
     fetchPreferredRules()
   ])
@@ -306,6 +298,7 @@ const handleSaveSpecification = async () => {
     const allStoredConfigs = pipeSpecConfigStore.getAllConfigs()
     
     // 准备保存数据，包含完整的配置信息
+    // 按照 SavePipeSpecRequest 接口契约构造数据
     const saveData = {
       shipType: selectedShipClass.value ? shipClasses.value.find(item => item.id === selectedShipClass.value)?.name : '',
       shipNumber: selectedShipNumber.value ? shipNumbers.value.find(item => item.id === selectedShipNumber.value)?.name : '',
@@ -314,22 +307,30 @@ const handleSaveSpecification = async () => {
         // 优先使用按钮中存储的完整配置数据
         const fullConfigData = btn.configData || allStoredConfigs.find(config => config.partType === btn.type)
         
+        // 映射 fullConfigData 到 contract 的 ComponentFullConfiguration 结构
+        // standardFileConfigs: Array<{ standardFile, material, minNpdValue, maxNpdValue, bendRadiusMultiple }>
+        const standardFileConfigs = fullConfigData && fullConfigData.configurations ? fullConfigData.configurations.map(cfg => ({
+          standardFile: cfg.standardFileName, // 使用 standardFileName 对应 contract 中的 standardFile
+          material: cfg.materialName,         // 使用 materialName 对应 contract 中的 material
+          minNpdValue: cfg.npdRange ? cfg.npdRange[0] : null,
+          maxNpdValue: cfg.npdRange ? cfg.npdRange[1] : null,
+          bendRadiusMultiple: cfg.bendRadiusMultiple
+        })) : []
+
         return {
-          partType: btn.type,
+          componentType: btn.type, // 对应 contract 中的 componentType
           configResult: btn.configResult,
           // 包含完整的配置数据
-          fullConfig: fullConfigData ? {
-            standardFileIds: fullConfigData.standardFileIds,
-            standardFileConfigurations: fullConfigData.standardFileConfigurations,
-            configurations: fullConfigData.configurations,
-            duplicateRangeDefaults: fullConfigData.duplicateRangeDefaults
-          } : null
+          fullConfig: {
+            standardFileConfigs: standardFileConfigs,
+            duplicateRangeDefaults: fullConfigData ? fullConfigData.duplicateRangeDefaults : []
+          }
         }
       })
     }
     
-    // 调用保存接口
-    const res = await axios.post('/api/pipe-spec/save-specification', saveData)
+    // 调用保存接口 (Interface 4.7)
+    const res = await axios.post('/api/PmcSpec/SpecRules', saveData)
     
     if (res.data.code === 200) {
       ElMessage.success('规格书保存成功！')
@@ -570,7 +571,6 @@ const clearAllStoredConfigs = () => {
       v-model:modelValue="showDialog"
       :pathRanges="filteredNpdRanges"
       :buttonLabel="currentButtonLabel"
-      :materials="materials"
       @confirm="handleConfirm"
     />
     <PipeSpecPreviewForm
@@ -581,8 +581,7 @@ const clearAllStoredConfigs = () => {
 
 <style scoped>
 /* CSS变量定义 - 统一管理样式值 */
-:root {
-}
+
 
 .pipe-spec-container {
   height: 100%;

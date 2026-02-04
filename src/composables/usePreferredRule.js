@@ -14,6 +14,12 @@ export const usePreferredRule = ({
   const preferredRuleLoading = ref(false)
 
   const fetchPreferredRules = async () => {
+    // 契约中未定义获取优选规则的接口，暂时返回空列表，避免调用错误的接口
+    // 原接口: /api/pipe-spec/preferred-rules
+    preferredRuleOptions.value = []
+    return
+
+    /* 
     preferredRuleLoading.value = true
     try {
       const res = await axios.get('/api/pipe-spec/preferred-rules')
@@ -30,6 +36,7 @@ export const usePreferredRule = ({
     } finally {
       preferredRuleLoading.value = false
     }
+    */
   }
 
   watch(preferredRule, async (newVal) => {
