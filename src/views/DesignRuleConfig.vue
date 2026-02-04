@@ -396,7 +396,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { ref, reactive, onMounted, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { db } from '@/mock/index.js'
 import Mock from 'mockjs'
@@ -414,6 +414,7 @@ const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
 }
 
+const treeRef = ref(null)
 const mainTableRef = ref(null)
 const handleRowClick = (row) => {
   if (mainTableRef.value) {
@@ -736,56 +737,95 @@ const tableRowClassName = ({ row }) => {
 }
 
 const handleNodeClick = (node) => {
-  if (node.id !== 'basic') {
-    if (!configs[node.id]) {
-      if (node.id === 'shortcode-major') {
-        configs['shortcode-major'] = {
-          id: 'shortcode-major',
-          title: '部件库名称：ShortCodeHierarchyType',
-          selectedRows: [],
-          columns: (LOCAL_COLUMNS['shortcode-major'] || []).map(col => ({
-            ...col,
-            editable: col.editable !== undefined ? col.editable : true
-          })),
-          data: []
+  // 处理父节点点击重定向
+  if (node.id === 'basic') {
+    const target = treeData.value[0].children.find(c => c.id === 'bend-parameter')
+    if (target) {
+      handleNodeClick(target)
+      nextTick(() => {
+        if (treeRef.value) {
+          treeRef.value.setCurrentKey(target.id)
         }
-      } else if (db[node.id]) {
-        const mockData = Mock.mock(db[node.id])
-        configs[node.id] = {
-          id: node.id,
-          title: mockData.title || node.id,
-          selectedRows: [],
-          columns: (LOCAL_COLUMNS[node.id] || (mockData.columns || [])).map(col => ({
-            ...col,
-            editable: col.editable !== undefined ? col.editable : true
-          })),
-          data: mockData.data || []
-        }
-      }
+      })
     }
-
-    if (node.id === 'bend-pipe') {
-      fetchBendPipeData()
-    } else if (node.id === 'shortcode') {
-      fetchShortCodeMinorData()
-    } else if (node.id === 'bend-parameter') {
-      fetchBendParameterData()
-    } else if (node.id === 'wall-thickness-series') {
-      fetchWallThicknessData()
-    } else if (node.id === 'shortcode-major') {
-      fetchShortCodeMajorData()
-    } else if (node.id === 'spec') {
-      fetchSpecData()
-    }
-    
-    currentNode.value = node
-    // 清空所有配置的选中行
-    Object.values(configs).forEach(config => {
-      if (config) {
-        config.selectedRows = []
-      }
-    })
+    return
   }
+  
+  if (node.id === 'production') {
+    const target = treeData.value[1].children.find(c => c.id === 'bend-pipe')
+    if (target) {
+      handleNodeClick(target)
+      nextTick(() => {
+        if (treeRef.value) {
+          treeRef.value.setCurrentKey(target.id)
+        }
+      })
+    }
+    return
+  }
+
+  // 初始化配置
+  if (!configs[node.id]) {
+    if (node.id === 'shortcode-major') {
+      configs['shortcode-major'] = {
+        id: 'shortcode-major',
+        title: '部件库名称：ShortCodeHierarchyType',
+        selectedRows: [],
+        columns: (LOCAL_COLUMNS['shortcode-major'] || []).map(col => ({
+          ...col,
+          editable: col.editable !== undefined ? col.editable : true
+        })),
+        data: []
+      }
+    } else if (db[node.id]) {
+      const mockData = Mock.mock(db[node.id])
+      configs[node.id] = {
+        id: node.id,
+        title: mockData.title || node.id,
+        selectedRows: [],
+        columns: (LOCAL_COLUMNS[node.id] || (mockData.columns || [])).map(col => ({
+          ...col,
+          editable: col.editable !== undefined ? col.editable : true
+        })),
+        data: mockData.data || []
+      }
+    } else {
+      // 默认初始化
+      configs[node.id] = {
+        id: node.id,
+        title: LOCAL_TITLES[node.id] || node.id,
+        selectedRows: [],
+        columns: (LOCAL_COLUMNS[node.id] || []).map(col => ({
+          ...col,
+          editable: col.editable !== undefined ? col.editable : true
+        })),
+        data: []
+      }
+    }
+  }
+
+  // 始终刷新数据
+  if (node.id === 'bend-pipe') {
+    fetchBendPipeData()
+  } else if (node.id === 'shortcode') {
+    fetchShortCodeMinorData()
+  } else if (node.id === 'bend-parameter') {
+    fetchBendParameterData()
+  } else if (node.id === 'wall-thickness-series') {
+    fetchWallThicknessData()
+  } else if (node.id === 'shortcode-major') {
+    fetchShortCodeMajorData()
+  } else if (node.id === 'spec') {
+    fetchSpecData()
+  }
+  
+  currentNode.value = node
+  // 清空所有配置的选中行
+  Object.values(configs).forEach(config => {
+    if (config) {
+      config.selectedRows = []
+    }
+  })
 }
 
 
