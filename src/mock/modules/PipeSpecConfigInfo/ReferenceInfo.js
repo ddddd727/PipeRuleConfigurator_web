@@ -99,9 +99,31 @@ Mock.mock(/\/api\/pipe-spec\/standard-files/, 'get', (options) => {
     'Overpass': [
       { id: 100, code: 'GB/T 12459-2017' }
     ],
-    'Blind Flange': [
+    'BlindFlange': [
       { id: 110, code: 'GB/T 9119-2010' },
       { id: 111, code: 'ASME B16.5' }
+    ],
+    'Accessories': [
+      { id: 120, code: 'General Accessories Std' }
+    ],
+    'Bolt': [
+      { id: 130, code: 'ISO 4014' },
+      { id: 131, code: 'ASME B18.2.1' }
+    ],
+    'Gasket': [
+      { id: 140, code: 'ASME B16.20' },
+      { id: 141, code: 'ASME B16.21' }
+    ],
+    'Joints': [
+      { id: 150, code: 'Manufacturer Std' }
+    ],
+    'Nut': [
+      { id: 160, code: 'ISO 4032' },
+      { id: 161, code: 'ASME B18.2.2' }
+    ],
+    'Washer': [
+      { id: 170, code: 'ISO 7089' },
+      { id: 171, code: 'ASME B18.21.1' }
     ]
   }
   
@@ -241,9 +263,31 @@ Mock.mock(/\/api\/PmcSpec\/PipeFittingSpec/, 'get', (options) => {
     'Overpass': [
       { id: 100, code: 'GB/T 12459-2017' }
     ],
-    'Blind Flange': [
+    'BlindFlange': [
       { id: 110, code: 'GB/T 9119-2010' },
       { id: 111, code: 'ASME B16.5' }
+    ],
+    'Accessories': [
+      { id: 120, code: 'General Accessories Std' }
+    ],
+    'Bolt': [
+      { id: 130, code: 'ISO 4014' },
+      { id: 131, code: 'ASME B18.2.1' }
+    ],
+    'Gasket': [
+      { id: 140, code: 'ASME B16.20' },
+      { id: 141, code: 'ASME B16.21' }
+    ],
+    'Joints': [
+      { id: 150, code: 'Manufacturer Std' }
+    ],
+    'Nut': [
+      { id: 160, code: 'ISO 4032' },
+      { id: 161, code: 'ASME B18.2.2' }
+    ],
+    'Washer': [
+      { id: 170, code: 'ISO 7089' },
+      { id: 171, code: 'ASME B18.21.1' }
     ]
   }
 

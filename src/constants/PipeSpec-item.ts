@@ -1,6 +1,11 @@
 /**
  * 管道规格配置信息数据结构
  * 用于前端临时存储 PipeSpecConfigForm 中的配置信息
+ * 
+ * 根据API契约简化版本：
+ * 1. 移除 NPD 通径范围信息 (npdRange)
+ * 2. 移除 重复范围默认配置 (duplicateRangeDefaults)
+ * 3. 仅保留 标准文件和材料信息
  */
 
 // 标准文件配置项接口
@@ -9,39 +14,23 @@ export interface StandardFileConfiguration {
   standardFileName: string
   materialId: string | number
   materialName: string
-  npdRange: [number, number] // [最小NPD, 最大NPD]
-  bendRadiusMultiple?: number | string | null // 弯管半径倍数（仅 Bend 类型使用）
-}
-
-// 重复通径范围默认配置接口
-export interface DuplicateRangeDefault {
-  overlapMin: number
-  overlapMax: number
-  defaultStandardFileId: string | number
-  defaultStandardFileName: string
-  ranges: Array<{
-    minNpdValue: number
-    maxNpdValue: number
-    standardFile: string | number
-  }>
-  standardFiles: Array<string | number>
-  rangeKey: string
+  // bendRadiusMultiple?: number | string | null // 根据简化契约，暂不包含弯管半径倍数
 }
 
 // 单个配置项接口
 export interface PipeSpecConfigItem {
   id: string | number // 配置项唯一标识
   partType: string // 部件类型（如：Bend, Elbow, Tee 等）
-  standardFileIds: Array<string | number> // 选择的标准文件ID数组
-  standardFileConfigurations: Array<{
-    standardFile: string | number
-    material: string | number
-    minNpdValue: number
-    maxNpdValue: number
-    bendRadiusMultiple?: number | string | null
-  }> // 标准文件配置（内部格式）
-  configurations: StandardFileConfiguration[] // 标准文件配置（友好格式）
-  duplicateRangeDefaults: DuplicateRangeDefault[] // 重复通径范围的默认配置
+  standardNames: string[] // 选择的标准文件名称数组
+  
+  // 标准文件配置（内部格式 - 对应后端简化模型）
+  standardConfigurations: Array<{
+    standardName: string
+    materialName: string
+  }> 
+  
+  configurations: StandardFileConfiguration[] // 标准文件配置（友好格式 - 用于UI显示）
+  
   createTime: string // 创建时间
   updateTime?: string // 更新时间
 }

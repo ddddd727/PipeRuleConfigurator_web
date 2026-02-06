@@ -70,18 +70,14 @@ watch(configurations, (newConfigs) => {
         partType: config.componentType,
         standardFileIds: [], 
         standardFileConfigurations: [],
-        configurations: [],
-        duplicateRangeDefaults: [] 
+        configurations: []
       }
       
       // 映射 fullConfig.standardFileConfigs 到前端 configurations
       if (config.fullConfig && config.fullConfig.standardFileConfigs) {
          configData.configurations = config.fullConfig.standardFileConfigs.map(s => ({
              standardFileName: s.standardFile, // 对应 API 的 standardFile (名称)
-             materialName: s.material,         // 对应 API 的 material (名称)
-             bendRadiusMultiple: s.bendRadiusMultiple,
-             // 注意：简化配置不包含 npdRange
-             npdRange: null
+             materialName: s.material          // 对应 API 的 material (名称)
          }))
       }
       
@@ -167,6 +163,7 @@ onMounted(async () => {
 })
 
 const showDialog = ref(false)
+const currentConfigData = ref(null)
 
 // 当前选中的按钮Label
 const currentButtonLabel = ref('')
@@ -203,8 +200,7 @@ const handleConfirm = (data) => {
         pipeSpecConfigStore.updateConfigByPartType(data.partType, {
           standardFileIds: data.standardFileIds || [],
           standardFileConfigurations: data.standardFileConfigurations || [],
-          configurations: data.configurations,
-          duplicateRangeDefaults: data.duplicateRangeDefaults
+          configurations: data.configurations
         })
         
         // 更新已存在的配置按钮
@@ -238,8 +234,7 @@ const handleConfirm = (data) => {
       pipeSpecConfigStore.updateConfigByPartType(data.partType, {
         standardFileIds: data.standardFileIds || [],
         standardFileConfigurations: data.standardFileConfigurations || [],
-        configurations: data.configurations,
-        duplicateRangeDefaults: data.duplicateRangeDefaults
+        configurations: data.configurations
       })
     } else {
       // 全新配置，添加到存储
@@ -247,8 +242,7 @@ const handleConfirm = (data) => {
         partType: data.partType,
         standardFileIds: data.standardFileIds || [],
         standardFileConfigurations: data.standardFileConfigurations || [],
-        configurations: data.configurations,
-        duplicateRangeDefaults: data.duplicateRangeDefaults
+        configurations: data.configurations
       })
     }
     
@@ -265,14 +259,7 @@ const updateConfigButton = (data, buttonId) => {
   // 将配置数据转换为指定格式的字符串
   const configStr = data.configurations.map(item => {
     // 基础配置信息
-    let configLine = `${item.standardFileName} - ${item.materialName}`
-    
-    // 如果是Bend配置且有弯管半径倍数信息，则添加
-    if (data.partType === 'Bend' && item.bendRadiusMultiple) {
-      configLine += ` - 弯管半径倍数: ${item.bendRadiusMultiple}`
-    }
-    
-    return configLine
+    return `${item.standardFileName} - ${item.materialName}`
   }).join('\n')
   
   // 根据按钮ID更新配置结果
@@ -286,10 +273,9 @@ const updateConfigButton = (data, buttonId) => {
       // 存储完整的配置数据到按钮对象中，方便后续使用
       configButtons.value[buttonIndex].configData = {
         partType: data.partType,
-        standardFileIds: data.standardFileIds || [],
-        standardFileConfigurations: data.standardFileConfigurations || [],
-        configurations: data.configurations,
-        duplicateRangeDefaults: data.duplicateRangeDefaults
+        standardNames: data.standardNames || [],
+        standardConfigurations: data.standardConfigurations || [],
+        configurations: data.configurations
       }
       
       // 检查是否需要添加新按钮
@@ -322,6 +308,15 @@ const handleConfigClick = (buttonId) => {
   }
   
   currentButtonId.value = buttonId
+  
+  // 获取当前按钮的配置数据并传递给子组件
+  const btn = configButtons.value.find(b => b.id === buttonId)
+  if (btn && btn.configData) {
+    currentConfigData.value = JSON.parse(JSON.stringify(btn.configData))
+  } else {
+    currentConfigData.value = null
+  }
+  
   showDialog.value = true
 }
 
@@ -372,23 +367,16 @@ const handleSaveSpecification = async () => {
         const fullConfigData = btn.configData || allStoredConfigs.find(config => config.partType === btn.type)
         
         // 映射 fullConfigData 到 contract 的 ComponentFullConfiguration 结构
-        // standardFileConfigs: Array<{ standardFile, material, minNpdValue, maxNpdValue, bendRadiusMultiple }>
+        // standardFileConfigs: Array<{ standardFile, material }>
         const standardFileConfigs = fullConfigData && fullConfigData.configurations ? fullConfigData.configurations.map(cfg => ({
           standardFile: cfg.standardFileName, // 使用 standardFileName 对应 contract 中的 standardFile
-          material: cfg.materialName,         // 使用 materialName 对应 contract 中的 material
-          minNpdValue: cfg.npdRange ? cfg.npdRange[0] : null,
-          maxNpdValue: cfg.npdRange ? cfg.npdRange[1] : null,
-          bendRadiusMultiple: cfg.bendRadiusMultiple
+          material: cfg.materialName          // 使用 materialName 对应 contract 中的 material
         })) : []
 
         return {
           componentType: btn.type, // 对应 contract 中的 componentType
           configResult: btn.configResult,
-          // 包含完整的配置数据
-          fullConfig: {
-            standardFileConfigs: standardFileConfigs,
-            duplicateRangeDefaults: fullConfigData ? fullConfigData.duplicateRangeDefaults : []
-          }
+          standards: standardFileConfigs // 对应 contract 中的 standards
         }
       })
     }
@@ -635,6 +623,7 @@ const clearAllStoredConfigs = () => {
       v-model:modelValue="showDialog"
       :pathRanges="filteredNpdRanges"
       :buttonLabel="currentButtonLabel"
+      :initial-config="currentConfigData"
       @confirm="handleConfirm"
     />
     <PipeSpecPreviewForm

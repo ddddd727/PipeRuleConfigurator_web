@@ -67,26 +67,20 @@
                   />
                 </el-select>
               </div>
-              <div class="bend-radius-multiple" v-if="form.partType === 'Bend'" style="margin-left: 10px;">
-                <el-input
-                  v-model="config.bendRadiusMultiple"
-                  placeholder="弯管半径倍数"
-                  style="width: 150px"
-                />
-              </div>
+              <!-- 根据简化契约，移除弯管半径倍数配置 -->
             </div>
           </div>
-          <div class="bend-radius-hint" v-if="form.partType === 'Bend'" style="margin-top: 5px; color: #909399; font-size: 12px;">填写的值为弯管半径的倍数</div>
         </div>
       </el-form-item>
     </el-form>
 
     <template #footer>
       <span class="dialog-footer">
-        <el-button @click="handleClose">取消</el-button>
         <el-button type="primary" @click="handleSubmit" :loading="submitting">
           确认提交
         </el-button>
+        <el-button @click="handleReset" type="warning" plain style="float: left">重置配置</el-button>
+        <el-button @click="handleClose">取消</el-button>
       </span>
     </template>
   </el-dialog>
@@ -95,22 +89,18 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { pipeSpecConfigStore } from '@/constants/PipeSpec-item'
 
 const props = defineProps({
   modelValue: Boolean,
-  pathRanges: {
-    type: Array,
-    default: () => []
-  },
   buttonLabel: {
     type: String,
     default: ''
   },
-  materials: {
-    type: Array,
-    default: () => []
+  initialConfig: {
+    type: Object,
+    default: null
   }
 })
 
@@ -125,8 +115,7 @@ const dialogVisible = computed({
 const form = ref({
   standardNames: [], // 选择的标准名称数组
   standardConfigurations: [], // 每个元素包含standardName、materialName等
-  partType: '',
-  duplicateRangeDefaults: []
+  partType: ''
 })
 
 // 表单验证规则
@@ -164,29 +153,7 @@ const fetchPipeFittingSpecs = async () => {
   }
 }
 
-// 获取所有可用的NPD值（从pathRanges中提取并去重）
-const npdValues = computed(() => {
-  const valueSet = new Set()
-  props.pathRanges.forEach(range => {
-    valueSet.add(range.minSize)
-    if (range.maxSize !== range.minSize) {
-      valueSet.add(range.maxSize)
-    }
-  })
-  // 按升序排序
-  return Array.from(valueSet).sort((a, b) => a - b)
-})
-
-// 获取最小和最大NPD值
-const minNpdValue = computed(() => {
-  const values = npdValues.value
-  return values.length > 0 ? values[0] : null
-})
-
-const maxNpdValue = computed(() => {
-  const values = npdValues.value
-  return values.length > 0 ? values[values.length - 1] : null
-})
+// NPD logic removed
 
 // 处理标准选择变化
 const handleStandardChange = (value) => {
@@ -213,10 +180,7 @@ const handleStandardChange = (value) => {
       
       newConfigurations.push({
         standardName: stdName,
-        materialName: defaultMaterial,
-        minNpdValue: minNpdValue.value,
-        maxNpdValue: maxNpdValue.value,
-        bendRadiusMultiple: null
+        materialName: defaultMaterial
       })
     }
   })
@@ -256,7 +220,6 @@ watch(() => form.value.partType, (newPartType, oldPartType) => {
   if (newPartType === oldPartType) return
   form.value.standardNames = []
   form.value.standardConfigurations = []
-  form.value.duplicateRangeDefaults = []
   if (newPartType) {
     fetchPipeFittingSpecs()
   } else {
@@ -287,15 +250,12 @@ const handleSubmit = async () => {
       configurations: form.value.standardConfigurations.map(config => {
         return {
           standardFileName: config.standardName, // 契约示例中使用 standardFileName
-          materialName: config.materialName,
-          npdRange: [config.minNpdValue, config.maxNpdValue],
-          bendRadiusMultiple: config.bendRadiusMultiple
+          materialName: config.materialName
         }
       }),
       // 内部使用的字段
       standardNames: form.value.standardNames,
-      standardConfigurations: form.value.standardConfigurations,
-      duplicateRangeDefaults: []
+      standardConfigurations: form.value.standardConfigurations
     }
     
     // 本地确认，不直接调用后端（由父组件处理最终保存）
@@ -309,31 +269,90 @@ const handleSubmit = async () => {
   }
 }
 
-// 关闭对话框
-const handleClose = () => {
-  // 重置表单
+// 重置表单逻辑
+const resetForm = () => {
   if (formRef.value) {
     formRef.value.resetFields()
   }
-  // 清空选择
   form.value.standardNames = []
   form.value.standardConfigurations = []
-  form.value.duplicateRangeDefaults = []
+  form.value.partType = ''
+  pipeFittingSpecs.value = []
+}
+
+// 处理重置按钮点击
+const handleReset = () => {
+  ElMessageBox.confirm(
+    '确定要清空当前所有配置项吗？此操作将清除已选的标准和材料配置。',
+    '确认重置',
+    {
+      confirmButtonText: '确定重置',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  ).then(() => {
+    resetForm()
+    ElMessage.success('配置已重置')
+  }).catch(() => {})
+}
+
+// 关闭对话框
+const handleClose = () => {
+  resetForm()
   dialogVisible.value = false
 }
 
 // 监听对话框显示/隐藏
-watch(dialogVisible, (val) => {
+watch(dialogVisible, async (val) => {
   if (val) {
-    // 对话框打开时重置表单
-    nextTick(() => {
-      if (formRef.value) {
-        formRef.value.resetFields()
-      }
-      form.value.standardConfigurations = []
-      form.value.duplicateRangeDefaults = []
-    })
-    fetchPartTypes()
+    // 获取部件类型列表
+    await fetchPartTypes()
+    
+    // 如果有初始配置，进行回填
+    if (props.initialConfig) {
+      // 使用 nextTick 确保在 watch(partType) 的潜在干扰之后执行
+      // 注意：watch(partType) 也会在 partType 变化时触发并尝试从 Store 恢复数据
+      // 我们需要在那里之后再次覆盖数据
+      nextTick(async () => {
+        const config = JSON.parse(JSON.stringify(props.initialConfig))
+        
+        // 1. 设置部件类型
+        form.value.partType = config.partType
+        
+        // 2. 等待 watch(partType) 及其内部逻辑执行
+        // 由于 watch(partType) 内部有 nextTick，我们需要等待足够长的时间
+        await nextTick()
+        await nextTick()
+        
+        if (config.partType) {
+          // 确保标准列表已加载
+          await fetchPipeFittingSpecs()
+        }
+        
+        // 3. 强制回填标准名称和配置
+        // 优先使用配置中的 standardNames，如果没有则从 configurations 推导
+        if (config.standardNames && config.standardNames.length > 0) {
+            form.value.standardNames = config.standardNames
+        } else if (config.configurations && config.configurations.length > 0) {
+            form.value.standardNames = [...new Set(config.configurations.map(c => c.standardFileName))]
+        } else {
+            form.value.standardNames = []
+        }
+        
+        // 恢复配置详情
+        if (config.configurations && config.configurations.length > 0) {
+           form.value.standardConfigurations = config.configurations.map(c => ({
+             standardName: c.standardFileName,
+             materialName: c.materialName
+           }))
+        } else {
+           form.value.standardConfigurations = []
+        }
+      })
+    } else {
+      // 没有初始配置，执行重置
+      resetForm()
+    }
   }
 })
 
@@ -424,19 +443,6 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* 弯管半径倍数样式 */
-.bend-radius-multiple {
-  display: flex;
-  align-items: center;
-}
-
-/* 弯管半径提示文字 */
-.bend-radius-hint {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 5px;
 }
 
 :deep(.el-select__tags) {
