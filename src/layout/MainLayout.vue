@@ -137,7 +137,7 @@ const menuList = computed(() => {
 .global-footer {
   width: 100%;
   height: 32px;
-  background-color: #264f7b;
+  background-color:var(--primary-color);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -178,7 +178,7 @@ const menuList = computed(() => {
 /* 新增：侧边栏头部样式 */
 .sidebar-header {
   height: 50px;
-  background-color: #264f7b; /* 与旧版 logo 背景一致 */
+  background-color: var(--primary-color); /* 与旧版 logo 背景一致 */
   color: #fff;
   flex-shrink: 0;
 }
@@ -248,7 +248,7 @@ const menuList = computed(() => {
 /* 菜单交互 */
 :deep(.el-menu-item:hover), 
 :deep(.el-sub-menu__title:hover) {
-  background-color: #264f7b !important; 
+  background-color: var(--primary-color) !important; 
   color: #ffffff !important;             
 }
 :deep(.el-menu-item:hover i),
@@ -256,7 +256,7 @@ const menuList = computed(() => {
   color: #ffffff !important;
 }
 :deep(.el-menu-item.is-active) {
-  background-color: #264f7b !important; 
+  background-color: var(--primary-color) !important; 
   color: #ffffff !important;             
 }
 :deep(.el-menu-item.is-active i) {

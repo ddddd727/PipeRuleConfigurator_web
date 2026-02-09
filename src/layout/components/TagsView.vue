@@ -206,7 +206,7 @@ const closeAll = () => {
 
 /* --- 标签项：选中状态 --- */
 :deep(.el-tabs__item.is-active) {
-  background-color: #264f7b !important;
+  background-color: var(--primary-color) !important;
   color: #fff !important;
   border-radius: 8px 8px 0 0 !important;
   
