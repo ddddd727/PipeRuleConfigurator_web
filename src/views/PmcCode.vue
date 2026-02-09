@@ -703,7 +703,8 @@ const cancelCopyRule = () => {
 </script>
 
 <template>
-  <div class="pmc-container">
+  <div class="pmc-page-wrapper">
+    <div class="pmc-container">
     <!-- Top Section -->
     <div class="section-block">
       <!-- Top Toolbar -->
@@ -949,8 +950,17 @@ const cancelCopyRule = () => {
       </span>
     </template>
   </el-dialog>
+  </div>  
+    
 </template>
 <style scoped>
+/* 增加 wrapper 样式确保高度撑满 */
+.pmc-page-wrapper {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
 .pmc-container {
   display: flex;
   flex-direction: column;
