@@ -164,12 +164,15 @@ const menuList = computed(() => {
   transition: width 0.3s;
   flex-shrink: 0;
   z-index: 2000;
-  height: 100%;
+  
+  /* 【修改】高度减去 10px，与右侧 main-content 的 margin-bottom 对齐 */
+  height: calc(100% - 10px);
+  
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 2px 0 8px rgba(0,0,0,0.05);
   display: flex;
-  flex-direction: column; /* 垂直排列 Header 和 Menu */
+  flex-direction: column; 
 }
 
 /* 新增：侧边栏头部样式 */
@@ -223,11 +226,24 @@ const menuList = computed(() => {
 
 /* 菜单样式微调 */
 .el-menu-vertical-demo {
-  border-right: none;
-  flex: 1; /* 占满剩余高度 */
-  overflow-y: auto;
+    /* 1. 必须设置高度和允许溢出，否则无法滚动 */
+    height: 100vh; /* 或者 100% */
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    /* 2. 隐藏滚动条的核心代码 */
+    
+    /* Firefox */
+    scrollbar-width: none; 
+    
+    /* IE 10+ */
+    -ms-overflow-style: none; 
 }
-.el-menu-vertical-demo:not(.el-menu--collapse) { width: 200px; }
+
+/* 3. Chrome, Safari, Edge (Webkit内核) */
+.el-menu-vertical-demo::-webkit-scrollbar {
+    display: none;
+}
 
 /* 菜单交互 */
 :deep(.el-menu-item:hover), 
@@ -274,18 +290,21 @@ const menuList = computed(() => {
   display: flex;
   align-items: center;
   
-  /* 【关键修改】：高度 50px，无 padding */
+  /* 【修改 1】去除 padding，让内容紧贴边缘 */
   padding: 0; 
+  
+  /* 【修改 2】高度改为 50px，与左侧 sidebar-header 对齐 */
   height: 50px; 
   
   box-shadow: 0 1px 4px rgba(0,21,41,0.04);
   overflow: hidden;
 }
 
+/* 确保标签区域高度撑满 */
 .tags-section {
   flex: 1; 
   overflow: hidden;
-  height: 100%; /* 撑满高度 */
+  height: 100%; /* 【修改 3】确保高度 100% */
 }
 
 .tools-section {

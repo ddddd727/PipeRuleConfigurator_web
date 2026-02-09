@@ -119,19 +119,22 @@ const closeAll = () => {
 </template>
 
 <style scoped>
-/* 容器：高度 100% 跟随父级 (50px)，无内边距 */
+/* 1. 根容器 */
 .tags-container {
   height: 100%;
   width: 100%;
   background: #fff;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   padding: 0;
+  /* 【修改】底部边框加粗到 2px */
+  border-bottom: 2px solid #dcdfe6; 
+  box-sizing: border-box;
 }
 
-/* 左侧按钮：宽度 50px 正方形 */
+/* 2. 左侧按钮 */
 .close-all-wrapper {
-  width: 50px; 
+  width: 50px;
   height: 100%;
   display: flex;
   align-items: center;
@@ -142,11 +145,18 @@ const closeAll = () => {
   transition: opacity 0.3s;
   background: #fff;
   z-index: 10;
-  border-right: 1px solid #f0f0f0;
+  
+  /* 【修改】默认透明，hover时显示 2px 边框 */
+  border-right: 2px solid transparent; 
+  transition: border-color 0.3s, opacity 0.3s;
 }
 .close-all-wrapper:hover { color: #F56C6C; }
-.tags-container:hover .close-all-wrapper { opacity: 1; }
+.tags-container:hover .close-all-wrapper { 
+  opacity: 1; 
+  border-right-color: #dcdfe6; /* 2px 灰色 */
+}
 
+/* 3. 标签页容器 */
 .tabs-wrapper {
   flex: 1;
   width: 0;
@@ -154,68 +164,83 @@ const closeAll = () => {
 }
 
 /* --- Element Plus 样式覆盖 --- */
+.tags-tabs { height: 100%; border: none !important; }
 :deep(.el-tabs__header) { margin: 0; border: none !important; height: 100%; }
-:deep(.el-tabs__nav) { border: none !important; height: 100%; }
-:deep(.el-tabs__nav-wrap) { height: 100%; margin: 0; }
+:deep(.el-tabs__nav-wrap) { height: 100%; margin: 0; padding: 0; }
 :deep(.el-tabs__nav-scroll) { height: 100%; }
+:deep(.el-tabs__nav) { 
+  border: none !important; 
+  height: 100%; 
+  display: flex;
+  align-items: flex-end; 
+}
 
-/* 标签页 Item */
+/* --- 标签项：默认状态 --- */
 :deep(.el-tabs__item) {
-  height: 100% !important;      /* 高度铺满 (50px) */
-  display: flex;                
+  height: 100% !important;
+  display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 !important;
-  padding: 0 20px !important;   /* 稍微加大一点内边距 */
+  padding: 0 20px !important;
   
   background: #fff;
   color: #606266;
-  font-size: 13px;              /* 字体稍微大一点点适配 50px 高度 */
+  font-size: 13px;
   
-  border: none !important;      
-  border-right: 1px solid #f0f0f0 !important; 
+  border: none !important;
+  
+  /* 【修改】默认 2px 透明右边框 */
+  border-right: 2px solid transparent !important; 
+  
   border-radius: 0 !important;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+  box-sizing: border-box;
+  position: relative;
 }
 
-/* 选中状态 */
+/* 鼠标进入组件时，显示 2px 分割线 */
+.tags-container:hover :deep(.el-tabs__item) {
+  border-right-color: #dcdfe6 !important;
+}
+
+/* --- 标签项：选中状态 --- */
 :deep(.el-tabs__item.is-active) {
   background-color: #264f7b !important;
   color: #fff !important;
-  border-right-color: #1e3f63 !important;
+  border-radius: 8px 8px 0 0 !important;
+  
+  /* 选中时无边框 */
+  border: none !important; 
+
+  /* 【修改】高度和下边距调整以覆盖 2px 底线 */
+  /* 高度 = 100% + 2px */
+  height: calc(100% + 2px) !important; 
+  /* 向下偏移 2px */
+  margin-bottom: -2px !important;      
+  
+  z-index: 2;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
 }
 
-/* 关闭图标 */
+/* 图标等样式保持不变 */
 :deep(.el-tabs__item.is-active .el-icon-close) {
   color: #fff !important;
-  width: 14px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  vertical-align: middle;
+  transform-origin: center;
 }
 :deep(.el-tabs__item.is-active .el-icon-close:hover) {
-  background-color: rgba(255,255,255,0.2);
+  background-color: rgba(255,255,255,0.25);
   color: #fff;
 }
 
-/* 标签内容 */
-.tab-label-content {
-  display: inline-flex;
-  align-items: center;
-}
+.tab-label-content { display: inline-flex; align-items: center; }
+.is-pinned-label::before { content: ''; display: inline-block; width: 6px; height: 6px; background-color: #E6A23C; border-radius: 50%; margin-right: 8px; }
+:deep(.el-tabs__item.is-active) .is-pinned-label::before { background-color: #fff; }
 
-/* 固定状态圆点 */
-.is-pinned-label::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  background-color: #E6A23C;
-  border-radius: 50%;
-  margin-right: 8px;
-}
-:deep(.el-tabs__item.is-active) .is-pinned-label::before {
-  background-color: #fff;
-}
-
-/* 右键菜单 */
 .contextmenu {
   margin: 0;
   background: #fff;
