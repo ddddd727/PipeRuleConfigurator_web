@@ -203,6 +203,14 @@ const fetchData = async () => {
         let finalProp = col.prop || col.DbField
         if (useCamelCase && finalProp) finalProp = toCamelCase(finalProp)
 
+        // 🟢 [新增] 智能宽度逻辑
+        // 如果后端没指定宽度，且列名是 id，则默认给 60px
+        let smartWidth = col.width
+        if (!smartWidth && finalProp && finalProp.toLowerCase() === 'id') {
+           smartWidth = 80
+        }
+
+
         return {
           ...col,
           prop: finalProp,
@@ -211,7 +219,10 @@ const fetchData = async () => {
           show: col.show !== undefined ? col.show : (col.IsHidden === true ? false : true),
           isReadOnly: col.isReadOnly !== undefined ? col.isReadOnly : col.IsReadOnly,
           required: col.required,
-          dataSource: col.dataSource || col.DataSource 
+          dataSource: col.dataSource || col.DataSource,
+          
+          // 🟢 [修改] 将计算出的 smartWidth 赋值给 width
+          width: smartWidth 
         }
       })
 
@@ -327,21 +338,33 @@ const handleBatchDelete = () => {
   ElMessageBox.confirm('确定要删除选中的行吗？', '提示', { type: 'warning' })
     .then(async () => {
       try {
+        // 1. 获取需要从后端删除的 ID (排除新增行)
         const ids = selectedRows.value
           .filter(r => !r._isNew)
-          .map(r => r.id || r.Id)
-        
-        for (const id of ids) {
-          await axios.delete(`/api/Dict/${props.dictId}/${id}`)
+          // 🟢 [修复点]：同步增加对 r.ID 的支持，兼容多种大小写格式
+          .map(r => r.id || r.Id || r.ID)
+          // 🛡️ [安全防护]：过滤掉 undefined 或 null 的 ID，防止请求报错
+          .filter(id => id !== undefined && id !== null && id !== '')
+
+        // 2. 逐个发送删除请求
+        // (如果选中的全是新增行，ids 为空，则跳过 API 请求，直接在前端移除)
+        if (ids.length > 0) {
+          for (const id of ids) {
+            await axios.delete(`/api/Dict/${props.dictId}/${id}`)
+          }
         }
         
+        // 3. 更新前端视图 (移除所有选中的行，包括新增行)
         tableConfig.value.list = tableConfig.value.list.filter(row => !selectedRows.value.includes(row))
         selectedRows.value = []
         ElMessage.success('删除成功')
       } catch (e) {
+        console.error(e)
         ElMessage.error(e.response?.data?.message || '删除失败')
       }
-    }).catch(() => {})
+    }).catch(() => {
+      // 取消删除
+    })
 }
 
 // --- 6. 保存 (含唯一性校验) ---
@@ -469,9 +492,13 @@ const displayData = computed(() => {
           v-if="col.show !== false"
           :prop="col.prop"
           :label="col.label"
-          :min-width="col.width || 150" 
+          
+          :width="col.width"                 
+          :min-width="col.width ? null : 150" 
+          
           show-overflow-tooltip
           :fixed="col.isPrimaryKey ? 'left' : false"
+          sortable 
         >
           <template #header>
             <span>
