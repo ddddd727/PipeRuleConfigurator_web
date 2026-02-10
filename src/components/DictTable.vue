@@ -197,6 +197,11 @@ const fetchData = async () => {
         if (firstRowKeys.includes('id') || firstRowKeys.some(k => /^[a-z]/.test(k))) {
           useCamelCase = true
         }
+        const idKey = firstRowKeys.find(k => k.toLowerCase() === 'id')
+        if (idKey) {
+            rawRows.sort((a, b) => Number(a[idKey]) - Number(b[idKey]))
+        }
+      
       }
 
       const mappedColumns = (backendData.columns || []).map(col => {
