@@ -548,9 +548,9 @@ const clearAllStoredConfigs = () => {
               </template>
             </el-input> -->
             <!-- 辅助按钮 -->
-            <el-button type="success" plain @click="handleSaveSpecification">保存规格书</el-button>
+            <el-button type="success"  @click="handleSaveSpecification">保存规格书</el-button>
             <!-- 主操作 -->
-            <el-button type="primary" plain @click="handleGenerateSpecification">生成规格书</el-button>
+            <el-button type="primary"  @click="handleGenerateSpecification">生成规格书</el-button>
           </div>
         </div>
 
@@ -633,6 +633,28 @@ const clearAllStoredConfigs = () => {
 </template>
 
 <style scoped>
+/* 
+ * 样式结构概览：
+ * --------------------------------------------------------------------------
+ * 1. 整体布局 (Layout)
+ *    采用 Flex 容器实现左右分栏结构：左侧为资源树(Sidebar)，右侧为配置表单(Main)。
+ * 
+ * 2. 侧边栏 (Sidebar)
+ *    包含船型船号选择、PMC编码树形导航、搜索过滤及折叠交互逻辑。
+ * 
+ * 3. 状态系统 (Status System)
+ *    定义了 Pending(蓝色)、Review(橙色)、Approved(绿色) 三种状态的视觉反馈，
+ *    应用于图例说明和树节点状态标记。
+ * 
+ * 4. 主工作区 (Main Content)
+ *    包含顶部状态栏/操作按钮区和底部的滚动表单容器。
+ * 
+ * 5. 组件适配 (Component Overrides)
+ *    针对 Element Plus 的 Form、Input、Select 等组件进行了特定的宽带和布局调整，
+ *    以适应紧凑的工程配置界面需求。
+ * --------------------------------------------------------------------------
+ */
+
 /* CSS变量定义 - 统一管理样式值 */
 
 
