@@ -217,18 +217,19 @@ const fetchData = async () => {
 
 
         return {
-          ...col,
-          prop: finalProp,
-          label: col.Title || col.DisplayName || col.label || '未命名',
+         ...col,
+         prop: finalProp,
+         label: col.Title || col.DisplayName || col.label || '未命名',
           type: mapUiType(col.uiType || col.UiType), 
           show: col.show !== undefined ? col.show : (col.IsHidden === true ? false : true),
-          isReadOnly: col.isReadOnly !== undefined ? col.isReadOnly : col.IsReadOnly,
-          required: col.required,
-          dataSource: col.dataSource || col.DataSource,
-          
-          // 🟢 [修改] 将计算出的 smartWidth 赋值给 width
-          width: smartWidth 
-        }
+        isReadOnly: col.isReadOnly !== undefined ? col.isReadOnly : col.IsReadOnly,
+    
+    // 🟢 [修复] 兼容后端可能返回的 IsRequired 字段
+        required: col.required !== undefined ? col.required : (col.IsRequired !== undefined ? col.IsRequired : false),
+    
+    dataSource: col.dataSource || col.DataSource,
+    width: smartWidth 
+  }
       })
 
       tableConfig.value = {
@@ -391,25 +392,43 @@ const handleBatchDelete = () => {
 
 // --- 6. 保存 (含唯一性校验) ---
 // --- 6. 保存 (修复 PUT 请求 ID 为 undefined 的问题) ---
+// --- 6. 保存 (含必填校验与唯一性校验) ---
 const handleSave = async () => {
   const currentList = tableConfig.value.list || []
   const columns = tableConfig.value.columns || []
 
-  // 1. 必填校验
+  // ==========================
+  // 1. 必填项空值校验 (新增逻辑)
+  // ==========================
   for (let i = 0; i < currentList.length; i++) {
     const row = currentList[i]
+    
     for (const col of columns) {
-      if (col.required && !col.isReadOnly && (row[col.prop] === null || row[col.prop] === '')) {
-         ElMessage.warning(`第 ${i + 1} 行：[${col.label}] 不能为空`)
-         return
+      // 校验条件：列标记为必填 且 不是只读
+      if (col.required && !col.isReadOnly) {
+         const val = row[col.prop]
+         
+         // 严谨的空值判断：
+         // 1. null 或 undefined
+         // 2. 字符串类型且去除空格后为空
+         const isEmpty = val === null || val === undefined || (typeof val === 'string' && val.trim() === '')
+         
+         if (isEmpty) {
+            // 发现空值，弹出警告并阻断请求
+            ElMessage.warning(`无法保存：第 ${i + 1} 行的 [${col.label}] 为必填项，不能为空。`)
+            return 
+         }
       }
     }
   }
 
-  // 2. CL 字段唯一性校验
+  // ==========================
+  // 2. CL 字段唯一性校验 (保留)
+  // ==========================
   const clColumn = columns.find(col => /_?cl$/i.test(col.prop))
   if (clColumn) {
     const clValues = currentList.map(row => row[clColumn.prop])
+    // 过滤掉无效值，只校验填写了的内容
     const validValues = clValues.filter(v => v !== null && v !== undefined && v !== '')
     
     const uniqueValues = new Set(validValues)
@@ -420,42 +439,55 @@ const handleSave = async () => {
     }
   }
 
+  // ==========================
+  // 3. 提交数据
+  // ==========================
   loading.value = true
   try {
     const promises = []
+    let hasChanges = false
     
     for (const row of currentList) {
+      // 提取 _isNew 标记，避免将其传给后端（如果后端不接受额外字段）
       const { _isNew, ...submitData } = row
       
       if (_isNew) {
-        // 新增 POST
+        // ---> 新增 (POST)
         promises.push(axios.post(`/api/Dict/${props.dictId}`, submitData))
+        hasChanges = true
       } else if (isModified(row)) {
-        // 修改 PUT
-        // 🟢 关键修复：兼容 id, Id, ID 三种格式
+        // ---> 修改 (PUT)
+        // 兼容 ID 的多种写法 (id, Id, ID)
         const id = row.id || row.Id || row.ID
         
-        if (!id) {
-          console.error('❌ 无法获取行ID，跳过保存:', row)
-          continue
+        if (id) {
+          promises.push(axios.put(`/api/Dict/${props.dictId}/${id}`, submitData))
+          hasChanges = true
+        } else {
+          console.error('❌ 无法获取行ID，跳过该行保存:', row)
         }
-        
-        promises.push(axios.put(`/api/Dict/${props.dictId}/${id}`, submitData))
       }
     }
 
-    if (promises.length > 0) {
-      await Promise.all(promises)
-      ElMessage.success('保存成功')
-      await fetchData()
-    } else {
+    if (!hasChanges) {
       ElMessage.info('没有检测到修改')
       isEdit.value = false
+      loading.value = false
+      return
     }
 
+    // 并行发送所有请求
+    await Promise.all(promises)
+    
+    ElMessage.success('保存成功')
+    
+    // 保存成功后刷新数据，以确保获取最新的后端状态（如自动生成的ID或默认值）
+    await fetchData()
+    
   } catch (error) {
     console.error(error)
-    ElMessage.error(error.response?.data?.message || '保存失败')
+    const errorMsg = error.response?.data?.message || '保存失败'
+    ElMessage.error(errorMsg)
   } finally {
     loading.value = false
   }
