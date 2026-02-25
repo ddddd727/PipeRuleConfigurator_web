@@ -225,7 +225,7 @@ const fetchData = async () => {
         isReadOnly: col.isReadOnly !== undefined ? col.isReadOnly : col.IsReadOnly,
     
     // 🟢 [修复] 兼容后端可能返回的 IsRequired 字段
-        required: col.required !== undefined ? col.required : (col.IsRequired !== undefined ? col.IsRequired : false),
+        required: col.required !== undefined ? col.required : (col.IsRequired || false),
     
     dataSource: col.dataSource || col.DataSource,
     width: smartWidth 
@@ -402,21 +402,17 @@ const handleSave = async () => {
   // ==========================
   for (let i = 0; i < currentList.length; i++) {
     const row = currentList[i]
-    
     for (const col of columns) {
-      // 校验条件：列标记为必填 且 不是只读
+      // 只有 "必填" 且 "非只读" 的列才校验
       if (col.required && !col.isReadOnly) {
          const val = row[col.prop]
          
-         // 严谨的空值判断：
-         // 1. null 或 undefined
-         // 2. 字符串类型且去除空格后为空
+         // 严谨判断：null、undefined 或 纯空格
          const isEmpty = val === null || val === undefined || (typeof val === 'string' && val.trim() === '')
          
          if (isEmpty) {
-            // 发现空值，弹出警告并阻断请求
             ElMessage.warning(`无法保存：第 ${i + 1} 行的 [${col.label}] 为必填项，不能为空。`)
-            return 
+            return // ⛔ 校验不通过，直接终止，不发送请求
          }
       }
     }
