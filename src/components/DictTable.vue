@@ -321,9 +321,26 @@ const handleAddRow = () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
   const newRow = { _isNew: true }
   
+  // 🟢 新增逻辑：自动计算最大 ID (Max + 1)
+  let nextId = 1 // 默认从 1 开始
+  // 找到主键列
+  const pkCol = tableConfig.value.columns.find(col => col.isPrimaryKey)
+  
+  if (pkCol) {
+    // 提取现有行中的 ID 列表
+    const existingIds = tableConfig.value.list
+      .map(r => Number(r[pkCol.prop])) // 转为数字
+      .filter(n => !isNaN(n))         // 过滤非法值
+      
+    if (existingIds.length > 0) {
+      nextId = Math.max(...existingIds) + 1
+    }
+  }
+
   tableConfig.value.columns.forEach(col => {
     if (col.isPrimaryKey) {
-        newRow[col.prop] = 0 
+        // 🟢 修改：赋值为计算出的 nextId，而不是 0
+        newRow[col.prop] = nextId 
     } else if (col.type === 'switch') {
         newRow[col.prop] = false 
     } else {
