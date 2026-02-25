@@ -11,6 +11,12 @@ export default {
       name: 'PipeSpec',
       component: () => import('@/views/PipeSpec.vue'),
       meta: { title: '管系规格书配置' }
+    },
+    {
+      path: 'filter-config',
+      name: 'PipeSpecFilterConfig',
+      component: () => import('@/views/PipeSpecFilterConfig.vue'),
+      meta: { title: 'Filter配置页面' }
     }
   ]
 }
