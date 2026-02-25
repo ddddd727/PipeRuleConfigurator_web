@@ -628,6 +628,8 @@ const clearAllStoredConfigs = () => {
     />
     <PipeSpecPreviewForm
       v-model:modelValue="showPreviewDialog"
+      :pmcCode="currentNode.label"
+      template-id="Pipe-Spec"
     />
   </div>
 </template>

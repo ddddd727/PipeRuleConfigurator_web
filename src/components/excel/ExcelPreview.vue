@@ -181,25 +181,58 @@ const fetchData = async () => {
   }
 }
 
-const handleExport = async () => {15022
+const handleExport = async () => {
   try {
-    const response = await axios.post(
-      `/api/template-preview/export/${props.templateId}`,
-      props.params || {},
-      { responseType: 'blob' }
-    )
-    const url = window.URL.createObjectURL(new Blob([response.data]))
+    // 使用 fetch API 绕过 mockjs 对 axios 的拦截，或者手动处理 blob
+    // 由于 mockjs 会重写 XHR，导致 responseType: 'blob' 失效，返回乱码字符串
+    // 这里尝试使用原生的 fetch，或者如果必须用 axios，则需要特殊处理
+    // 鉴于 mockjs 的影响，最稳妥的方式是使用原生 fetch，它通常不会被 mockjs (基于 XHR) 拦截
+    
+    // 构建 URL 参数
+    const urlParams = new URLSearchParams()
+    if (props.params) {
+      Object.entries(props.params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          urlParams.append(key, String(value))
+        }
+      })
+    }
+    const queryString = urlParams.toString()
+    const url = `/api/template-preview/${props.templateId}/export${queryString ? '?' + queryString : ''}`
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      let errorMessage = '未知错误'
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage = errorJson.message || errorJson.msg || errorMessage
+      } catch (e) {
+        errorMessage = errorText || response.statusText
+      }
+      throw new Error(errorMessage)
+    }
+
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.href = url
+    link.href = downloadUrl
     const fileName = rawData.value?.title || props.templateId
     link.setAttribute('download', `${fileName}_${new Date().toISOString().slice(0, 10)}.xlsx`)
     document.body.appendChild(link)
     link.click()
     link.remove()
-    window.URL.revokeObjectURL(url)
+    window.URL.revokeObjectURL(downloadUrl)
     emit('export')
   } catch (err: any) {
-    alert('导出失败：' + (err.response?.data?.message || err.message || '未知错误'))
+    console.error('导出错误:', err)
+    alert('导出失败：' + (err.message || '未知错误'))
   }
 }
 
