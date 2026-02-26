@@ -96,12 +96,18 @@ export const usePmcTree = () => {
       }
 
       const pipeStandardNode = materialNode.children.get(pipeStandard)
+      
+      // 查找船型信息
+      const shipInfo = shipInfos.value.find(s => s.shipNumber === item.shipNumber)
+      const shipType = shipInfo ? shipInfo.shipType : ''
+
       pipeStandardNode.children.push({
         label: pmcCode,
         shipNumber: item.shipNumber,
+        shipType: shipType,
         material: item.material,
         pipeStandard: pipeStandard || '',
-        status: item.status
+        status: item.status || item.configStatus || 'pending'
       })
     })
 

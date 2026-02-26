@@ -20,6 +20,7 @@ export interface StandardFileConfiguration {
 // 单个配置项接口
 export interface PipeSpecConfigItem {
   id: string | number // 配置项唯一标识
+  componentTypeId?: number // 部件类型ID (新增)
   partType: string // 部件类型（如：Bend, Elbow, Tee 等）
   standardNames: string[] // 选择的标准文件名称数组
   
@@ -100,6 +101,28 @@ class PipeSpecConfigStore {
   }
 
   /**
+   * 根据部件类型ID更新配置项 (新增)
+   * @param componentTypeId 部件类型ID
+   * @param configData 新的配置数据
+   * @returns 是否更新成功
+   */
+  updateConfigByComponentTypeId(
+    componentTypeId: number,
+    configData: Partial<Omit<PipeSpecConfigItem, 'id' | 'createTime' | 'updateTime'>>
+  ): boolean {
+    const index = this.configs.findIndex(item => item.componentTypeId === componentTypeId)
+    if (index !== -1) {
+      this.configs[index] = {
+        ...this.configs[index],
+        ...configData,
+        updateTime: new Date().toISOString()
+      }
+      return true
+    }
+    return false
+  }
+
+  /**
    * 根据ID删除配置项
    * @param id 配置项ID
    * @returns 是否删除成功
@@ -128,6 +151,20 @@ class PipeSpecConfigStore {
   }
 
   /**
+   * 根据部件类型ID删除配置项 (新增)
+   * @param componentTypeId 部件类型ID
+   * @returns 是否删除成功
+   */
+  deleteConfigByComponentTypeId(componentTypeId: number): boolean {
+    const index = this.configs.findIndex(item => item.componentTypeId === componentTypeId)
+    if (index !== -1) {
+      this.configs.splice(index, 1)
+      return true
+    }
+    return false
+  }
+
+  /**
    * 根据ID获取配置项
    * @param id 配置项ID
    * @returns 配置项或undefined
@@ -146,6 +183,15 @@ class PipeSpecConfigStore {
   }
 
   /**
+   * 根据部件类型ID获取配置项 (新增)
+   * @param componentTypeId 部件类型ID
+   * @returns 配置项或undefined
+   */
+  getConfigByComponentTypeId(componentTypeId: number): PipeSpecConfigItem | undefined {
+    return this.configs.find(item => item.componentTypeId === componentTypeId)
+  }
+
+  /**
    * 获取所有配置项
    * @returns 所有配置项数组
    */
@@ -160,6 +206,15 @@ class PipeSpecConfigStore {
    */
   hasPartType(partType: string): boolean {
     return this.configs.some(item => item.partType === partType)
+  }
+
+  /**
+   * 检查部件类型ID是否已配置 (新增)
+   * @param componentTypeId 部件类型ID
+   * @returns 是否已配置
+   */
+  hasComponentTypeId(componentTypeId: number): boolean {
+    return this.configs.some(item => item.componentTypeId === componentTypeId)
   }
 
   /**

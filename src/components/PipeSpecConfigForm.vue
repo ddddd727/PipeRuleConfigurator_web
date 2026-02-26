@@ -8,8 +8,19 @@
     <template #title>
       <div style="display:flex; align-items:center; gap:12px;">
         <span>{{ buttonLabel ? buttonLabel + ' - ' : '' }}标准文件选择与配置</span>
-        <el-select v-model="form.partType" placeholder="部件类型" size="small" style="width:160px">
-          <el-option v-for="pt in partTypes" :key="pt.componentTypeName" :label="pt.componentTypeDescription || pt.componentTypeName" :value="pt.componentTypeName" />
+        <el-select 
+          v-model="form.componentTypeId" 
+          placeholder="部件类型" 
+          size="small" 
+          style="width:160px"
+          @change="handleComponentTypeChange"
+        >
+          <el-option 
+            v-for="pt in partTypes" 
+            :key="pt.id" 
+            :label="pt.componentTypeDescription || pt.componentTypeName" 
+            :value="pt.id" 
+          />
         </el-select>
       </div>
     </template>
@@ -32,7 +43,7 @@
           :teleported="false"
           @change="handleStandardChange"
           :loading="specsLoading"
-          :disabled="!form.partType"
+          :disabled="!form.componentTypeId"
         >
           <el-option
             v-for="spec in pipeFittingSpecs"
@@ -41,12 +52,12 @@
             :value="spec.standardName"
           />
         </el-select>
-        <div class="tip-text" v-if="!form.partType">请先选择部件类型，再选择标准</div>
+        <div class="tip-text" v-if="!form.componentTypeId">请先选择部件类型，再选择标准</div>
         <div class="tip-text" v-else>可多选，已选择 {{ form.standardNames.length }} 个标准</div>
       </el-form-item>
 
       <!-- 标准对应材料配置 -->
-      <el-form-item label="材料配置：" v-if="form.partType && form.standardConfigurations.length > 0">
+      <el-form-item label="材料配置：" v-if="form.componentTypeId && form.standardConfigurations.length > 0">
         <div class="configuration-container">
           <div v-for="config in form.standardConfigurations" :key="config.standardName" class="config-item" style="margin-bottom: 10px; display: flex; align-items: center;">
             <div class="config-file-info" style="width: 120px; margin-right: 10px;">
@@ -112,46 +123,53 @@ const dialogVisible = computed({
 })
 
 // 表单数据
-const form = ref({
-  standardNames: [], // 选择的标准名称数组
-  standardConfigurations: [], // 每个元素包含standardName、materialName等
-  partType: ''
-})
+  const form = ref({
+    standardNames: [], // 选择的标准名称数组
+    standardConfigurations: [], // 每个元素包含standardName、materialName等
+    componentTypeId: null, // 部件类型ID
+    partType: '' // 部件类型名称（兼容旧逻辑）
+  })
 
-// 表单验证规则
-const rules = {
-  standardNames: [
-    { required: true, message: '请选择标准', trigger: 'change' }
-  ]
-}
-
-// 标准规格列表 (包含标准名和材料列表)
-const pipeFittingSpecs = ref([])
-const specsLoading = ref(false)
-
-// 获取管附件规格列表
-const fetchPipeFittingSpecs = async () => {
-  if (!form.value.partType) {
-    pipeFittingSpecs.value = []
-    return
+  // 表单验证规则
+  const rules = {
+    componentTypeId: [
+      { required: true, message: '请选择部件类型', trigger: 'change' }
+    ],
+    standardNames: [
+      { required: true, message: '请选择标准', trigger: 'change' }
+    ]
   }
-  specsLoading.value = true
-  try {
-    const res = await axios.get('/api/PmcSpec/PipeFittingSpec', {
-      params: { componentTypeName: form.value.partType }
-    })
-    if (res.data.code === 200) {
-      pipeFittingSpecs.value = res.data.data || []
-    } else {
-      ElMessage.error(res.data.message || '获取管附件规格失败')
+
+  // 标准规格列表 (包含标准名和材料列表)
+  const pipeFittingSpecs = ref([])
+  const specsLoading = ref(false)
+
+  // 获取管附件规格列表
+  const fetchPipeFittingSpecs = async () => {
+    if (!form.value.componentTypeId) {
+      pipeFittingSpecs.value = []
+      return
     }
-  } catch (error) {
-    console.error('获取管附件规格错误:', error)
-    ElMessage.error('网络错误，获取管附件规格失败')
-  } finally {
-    specsLoading.value = false
+    specsLoading.value = true
+    try {
+      const res = await axios.get('/api/PmcSpec/PipeFittingSpec', {
+        params: { 
+          componentTypeId: form.value.componentTypeId,
+          componentTypeName: form.value.partType // 兼容性保留
+        }
+      })
+      if (res.data.code === 200) {
+        pipeFittingSpecs.value = res.data.data || []
+      } else {
+        ElMessage.error(res.data.message || '获取管附件规格失败')
+      }
+    } catch (error) {
+      console.error('获取管附件规格错误:', error)
+      ElMessage.error('网络错误，获取管附件规格失败')
+    } finally {
+      specsLoading.value = false
+    }
   }
-}
 
 // NPD logic removed
 
@@ -215,13 +233,41 @@ const fetchPartTypes = async () => {
   }
 }
 
-// 监听部件类型变化，重置标准配置并重新获取规格列表
-watch(() => form.value.partType, (newPartType, oldPartType) => {
-  if (newPartType === oldPartType) return
+// 处理部件类型变更
+const handleComponentTypeChange = (val) => {
+  // 逻辑已移至 watch 统一处理
+}
+
+// 监听部件类型ID变化，重置标准配置并重新获取规格列表
+watch(() => form.value.componentTypeId, async (newId, oldId) => {
+  if (newId === oldId) return
+  
+  // 同步更新 partType 名称
+  const pt = partTypes.value.find(p => p.id === newId)
+  if (pt) {
+    form.value.partType = pt.componentTypeName
+  } else {
+    form.value.partType = ''
+  }
+
   form.value.standardNames = []
   form.value.standardConfigurations = []
-  if (newPartType) {
-    fetchPipeFittingSpecs()
+  
+  if (newId) {
+    await fetchPipeFittingSpecs()
+    
+    // 尝试从存储中加载已有配置 (基于 partType 名称)
+    if (form.value.partType && dialogVisible.value) {
+      const existingConfig = pipeSpecConfigStore.getConfigByPartType(form.value.partType)
+      
+      if (existingConfig) {
+        await nextTick()
+        form.value.standardNames = [...(existingConfig.standardNames || [])]
+        form.value.standardConfigurations = (existingConfig.standardConfigurations || []).map(config => ({
+          ...config
+        }))
+      }
+    }
   } else {
     pipeFittingSpecs.value = []
   }
@@ -233,7 +279,7 @@ const handleSubmit = async () => {
   
   try {
     // 首先验证部件类型是否已选择
-    if (!form.value.partType) {
+    if (!form.value.componentTypeId) {
       ElMessage.error('请选择部件类型')
       return
     }
@@ -245,6 +291,7 @@ const handleSubmit = async () => {
     
     // 准备提交数据
     const submitData = {
+      componentTypeId: form.value.componentTypeId, // 新增 ID
       partType: form.value.partType,
       // 传递完整配置
       configurations: form.value.standardConfigurations.map(config => {
@@ -276,6 +323,7 @@ const resetForm = () => {
   }
   form.value.standardNames = []
   form.value.standardConfigurations = []
+  form.value.componentTypeId = null
   form.value.partType = ''
   pipeFittingSpecs.value = []
 }
@@ -310,24 +358,22 @@ watch(dialogVisible, async (val) => {
     
     // 如果有初始配置，进行回填
     if (props.initialConfig) {
-      // 使用 nextTick 确保在 watch(partType) 的潜在干扰之后执行
-      // 注意：watch(partType) 也会在 partType 变化时触发并尝试从 Store 恢复数据
-      // 我们需要在那里之后再次覆盖数据
+      // 使用 nextTick 确保在 watch 的潜在干扰之后执行
       nextTick(async () => {
         const config = JSON.parse(JSON.stringify(props.initialConfig))
         
-        // 1. 设置部件类型
-        form.value.partType = config.partType
-        
-        // 2. 等待 watch(partType) 及其内部逻辑执行
-        // 由于 watch(partType) 内部有 nextTick，我们需要等待足够长的时间
-        await nextTick()
-        await nextTick()
-        
-        if (config.partType) {
-          // 确保标准列表已加载
-          await fetchPipeFittingSpecs()
+        // 1. 设置部件类型 ID
+        if (config.componentTypeId) {
+          form.value.componentTypeId = config.componentTypeId
+        } else if (config.partType) {
+          // 如果只有名称，尝试查找 ID
+          const pt = partTypes.value.find(p => p.componentTypeName === config.partType)
+          if (pt) form.value.componentTypeId = pt.id
         }
+        
+        // 2. 等待 watch 及其内部逻辑执行
+        await nextTick()
+        await nextTick()
         
         // 3. 强制回填标准名称和配置
         // 优先使用配置中的 standardNames，如果没有则从 configurations 推导
@@ -352,27 +398,6 @@ watch(dialogVisible, async (val) => {
     } else {
       // 没有初始配置，执行重置
       resetForm()
-    }
-  }
-})
-
-// 监听部件类型变化，尝试从存储中加载已有配置
-watch(() => form.value.partType, async (newPartType) => {
-  if (newPartType && dialogVisible.value) {
-    // 尝试从存储中获取该部件类型的已有配置
-    const existingConfig = pipeSpecConfigStore.getConfigByPartType(newPartType)
-    
-    if (existingConfig) {
-      // 如果存在已有配置，恢复到表单中
-      await nextTick()
-      
-      // 恢复标准选择
-      form.value.standardNames = [...(existingConfig.standardNames || [])]
-      
-      // 恢复标准配置
-      form.value.standardConfigurations = (existingConfig.standardConfigurations || []).map(config => ({
-        ...config
-      }))
     }
   }
 })

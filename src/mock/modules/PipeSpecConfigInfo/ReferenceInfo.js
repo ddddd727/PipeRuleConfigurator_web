@@ -199,23 +199,65 @@ Mock.mock(/\/api\/pipe-spec\/fitting-config/, 'get', (options) => {
   }
 })
 
+// // 接受审核
+// Mock.mock(/\/api\/PmcSpec\/AcceptReview/, 'post', (options) => {
+//   const body = JSON.parse(options.body)
+//   return {
+//     code: 200,
+//     msg: '审核提交成功',
+//     data: {
+//       pmcCode: body.pmcCode,
+//       status: 'approved'
+//     }
+//   }
+// })
+
 // 4.6 获取管附件规格
-// 接口: /api/PmcSpec/PipeFittingSpec?componentTypeName=...
+// 接口: /api/PmcSpec/PipeFittingSpec?componentTypeName=...&componentTypeId=...
 Mock.mock(/\/api\/PmcSpec\/PipeFittingSpec/, 'get', (options) => {
-  // 解析查询参数 componentTypeName
+  // 解析查询参数
   let componentTypeName = null
-  if (options.url && options.url.includes('componentTypeName=')) {
-    const match = options.url.match(/componentTypeName=([^&]+)/)
-    componentTypeName = match ? decodeURIComponent(match[1]) : null
+  let componentTypeId = null
+  
+  if (options.url) {
+    const typeNameMatch = options.url.match(/componentTypeName=([^&]+)/)
+    componentTypeName = typeNameMatch ? decodeURIComponent(typeNameMatch[1]) : null
+    
+    const typeIdMatch = options.url.match(/componentTypeId=([^&]+)/)
+    componentTypeId = typeIdMatch ? parseInt(typeIdMatch[1]) : null
+  }
+
+  // 模拟部件类型数据，用于 ID 到 Name 的映射
+  const componentTypesData = [
+    { id: 1, componentTypeName: 'Pipe' },
+    { id: 2, componentTypeName: 'Bend' },
+    { id: 3, componentTypeName: 'Elbow' },
+    { id: 4, componentTypeName: 'Flange' },
+    { id: 5, componentTypeName: 'Tee' },
+    { id: 6, componentTypeName: 'Red' },
+    { id: 7, componentTypeName: 'Sleeve' },
+    { id: 8, componentTypeName: 'Bosses' },
+    { id: 9, componentTypeName: 'Saddles' },
+    { id: 10, componentTypeName: 'Caps' },
+    { id: 11, componentTypeName: 'Overpass' },
+    { id: 12, componentTypeName: 'BlindFlange' },
+    { id: 13, componentTypeName: 'Accessories' },
+    { id: 14, componentTypeName: 'Bolt' },
+    { id: 15, componentTypeName: 'Gasket' },
+    { id: 16, componentTypeName: 'Joints' },
+    { id: 17, componentTypeName: 'Nut' },
+    { id: 18, componentTypeName: 'Washer' }
+  ]
+
+  // 如果提供了 componentTypeId，优先使用 ID 查找对应的 Name
+  if (componentTypeId) {
+    const componentType = componentTypesData.find(ct => ct.id === componentTypeId)
+    if (componentType) {
+      componentTypeName = componentType.componentTypeName
+    }
   }
 
   // 复用 standardFilesByType 数据结构 (模拟数据库中的标准)
-  // 注意：这里的数据必须与 API 契约中的 PipeFittingSpec 类型一致
-  // interface PipeFittingSpec {
-  //   standardName: string;     // 标准名称
-  //   materialList: string[];   // 材料列表
-  // }
-  
   const standardFilesByType = {
     'Pipe': [
       { id: 1, code: 'GB/T 8163-2018' },

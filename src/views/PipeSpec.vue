@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, reactive, onUnmounted } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, Setting, Plus, Ship } from '@element-plus/icons-vue'
@@ -39,6 +39,76 @@ const {
   handleCellClick
 } = useNpdTable()
 
+// 右键菜单相关状态
+const contextMenuVisible = ref(false)
+const contextMenuPosition = reactive({ x: 0, y: 0 })
+const contextMenuTargetNode = ref(null)
+
+// 计算属性：是否允许提交审核
+const canSubmitReview = computed(() => {
+  return contextMenuTargetNode.value && contextMenuTargetNode.value.status === 'review'
+})
+
+// 关闭右键菜单
+const closeContextMenu = () => {
+  contextMenuVisible.value = false
+}
+
+// 处理树节点右键点击
+const handleNodeContextMenu = (event, data, node, component) => {
+  // 仅对叶子节点（PMC编码）且有状态的节点显示菜单
+  if (!data.status) {
+    return
+  }
+  
+  // 阻止默认浏览器菜单
+  event.preventDefault()
+  
+  contextMenuTargetNode.value = data
+  contextMenuPosition.x = event.clientX
+  contextMenuPosition.y = event.clientY
+  contextMenuVisible.value = true
+}
+
+// 提交审核
+const handleSubmitReview = async () => {
+  if (!canSubmitReview.value) return
+  
+  const nodeData = contextMenuTargetNode.value
+  
+  try {
+    // 调用审核接口
+    const res = await axios.post('/api/PmcSpec/AcceptReview', {
+      pmcCode: nodeData.label,
+      currentStatus: nodeData.status,
+      shipType: nodeData.shipType,
+      shipNumber: nodeData.shipNumber
+    })
+    
+    if (res.data.code === 200) {
+      ElMessage.success('审核提交成功')
+      // 更新节点状态
+      nodeData.status = res.data.data.status || 'approved'
+      // 关闭菜单
+      closeContextMenu()
+    } else {
+      ElMessage.error(res.data.msg || '审核提交失败')
+    }
+  } catch (error) {
+    console.error('提交审核错误:', error)
+    ElMessage.error('网络错误，提交审核失败')
+  }
+}
+
+// 监听全局点击以关闭菜单
+onMounted(() => {
+  window.addEventListener('click', closeContextMenu)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('click', closeContextMenu)
+})
+
 const preferredRule = ref(null)
 
 const {
@@ -59,6 +129,7 @@ watch(configurations, (newConfigs) => {
   pipeSpecConfigStore.clearAll()
   configButtons.value.forEach(btn => {
     btn.type = ''
+    btn.typeId = null // 新增：重置 ID
     btn.configResult = ''
     btn.configData = null
   })
@@ -67,9 +138,10 @@ watch(configurations, (newConfigs) => {
     newConfigs.forEach((config, index) => {
       // 构造符合前端存储结构的数据
       const configData = {
+        componentTypeId: config.componentTypeId, // 新增：存储 componentTypeId
         partType: config.componentType,
-        standardFileIds: [], 
-        standardFileConfigurations: [],
+        standardNames: [], 
+        standardConfigurations: [],
         configurations: []
       }
       
@@ -78,6 +150,13 @@ watch(configurations, (newConfigs) => {
          configData.configurations = config.fullConfig.standardFileConfigs.map(s => ({
              standardFileName: s.standardFile, // 对应 API 的 standardFile (名称)
              materialName: s.material          // 对应 API 的 material (名称)
+         }))
+         
+         // 同时填充标准配置和标准名称，以便表单回显
+         configData.standardNames = config.fullConfig.standardFileConfigs.map(s => s.standardFile)
+         configData.standardConfigurations = config.fullConfig.standardFileConfigs.map(s => ({
+             standardName: s.standardFile,
+             materialName: s.material
          }))
       }
       
@@ -88,7 +167,7 @@ watch(configurations, (newConfigs) => {
       // 确保有足够的按钮
       if (index >= configButtons.value.length) {
         const newId = Math.max(...configButtons.value.map(btn => btn.id)) + 1
-        configButtons.value.push({ id: newId, type: '', configResult: '' })
+        configButtons.value.push({ id: newId, type: '', typeId: null, configResult: '' })
       }
       
       // 找到第 index 个按钮并更新
@@ -144,10 +223,10 @@ const toggleSidebar = () => {
 
 // 配置按钮列表
 const configButtons = ref([
-  { id: 1, type: '', configResult: '', configData: null },
-  { id: 2, type: '', configResult: '', configData: null },
-  { id: 3, type: '', configResult: '', configData: null },
-  { id: 4, type: '', configResult: '', configData: null }
+  { id: 1, type: '', typeId: null, configResult: '', configData: null },
+  { id: 2, type: '', typeId: null, configResult: '', configData: null },
+  { id: 3, type: '', typeId: null, configResult: '', configData: null },
+  { id: 4, type: '', typeId: null, configResult: '', configData: null }
 ])
 
 // 当前选中的按钮ID
@@ -172,11 +251,15 @@ const currentButtonLabel = ref('')
 const handleConfirm = (data) => {
   // 获取当前按钮的原有配置
   const currentButton = configButtons.value.find(btn => btn.id === currentButtonId.value)
-  const isCurrentButtonReconfig = currentButton && currentButton.type === data.partType && currentButton.configResult
+  // 使用 componentTypeId 判断是否是对当前按钮的重新配置
+  const isCurrentButtonReconfig = currentButton && 
+                                  currentButton.typeId === data.componentTypeId && 
+                                  currentButton.configResult
   
   // 检查部件类型是否已配置（排除当前正在编辑的按钮）
+  // 使用 componentTypeId 进行匹配，更准确
   const existingButton = configButtons.value.find(btn => {
-    return btn.type === data.partType && 
+    return btn.typeId === data.componentTypeId && 
            btn.configResult && 
            btn.id !== currentButtonId.value
   })
@@ -196,10 +279,11 @@ const handleConfirm = (data) => {
       // 用户确认重新配置
       const existingButtonIndex = configButtons.value.findIndex(btn => btn.id === existingButton.id)
       if (existingButtonIndex !== -1) {
-        // 更新存储中的配置
-        pipeSpecConfigStore.updateConfigByPartType(data.partType, {
-          standardFileIds: data.standardFileIds || [],
-          standardFileConfigurations: data.standardFileConfigurations || [],
+        // 更新存储中的配置 - 使用 ID 更新
+        pipeSpecConfigStore.updateConfigByComponentTypeId(data.componentTypeId, {
+          partType: data.partType, // 确保名称也更新
+          standardNames: data.standardNames || [],
+          standardConfigurations: data.standardConfigurations || [],
           configurations: data.configurations
         })
         
@@ -211,10 +295,11 @@ const handleConfirm = (data) => {
         if (currentButtonIndex !== -1 && currentButtonId.value !== existingButton.id) {
           // 如果当前按钮有配置数据，从存储中删除
           const currentButton = configButtons.value[currentButtonIndex]
-          if (currentButton.type && currentButton.configData && currentButton.type !== data.partType) {
-            pipeSpecConfigStore.deleteConfigByPartType(currentButton.type)
+          if (currentButton.typeId && currentButton.configData && currentButton.typeId !== data.componentTypeId) {
+            pipeSpecConfigStore.deleteConfigByComponentTypeId(currentButton.typeId)
           }
           configButtons.value[currentButtonIndex].type = ''
+          configButtons.value[currentButtonIndex].typeId = null
           configButtons.value[currentButtonIndex].configResult = ''
           configButtons.value[currentButtonIndex].configData = null
         }
@@ -231,17 +316,19 @@ const handleConfirm = (data) => {
     // 当前按钮是第一次配置或重新配置自己
     if (isCurrentButtonReconfig) {
       // 当前按钮重新配置，更新存储
-      pipeSpecConfigStore.updateConfigByPartType(data.partType, {
-        standardFileIds: data.standardFileIds || [],
-        standardFileConfigurations: data.standardFileConfigurations || [],
+      pipeSpecConfigStore.updateConfigByComponentTypeId(data.componentTypeId, {
+        partType: data.partType,
+        standardNames: data.standardNames || [],
+        standardConfigurations: data.standardConfigurations || [],
         configurations: data.configurations
       })
     } else {
       // 全新配置，添加到存储
       pipeSpecConfigStore.addConfig({
+        componentTypeId: data.componentTypeId, // 新增 ID
         partType: data.partType,
-        standardFileIds: data.standardFileIds || [],
-        standardFileConfigurations: data.standardFileConfigurations || [],
+        standardNames: data.standardNames || [],
+        standardConfigurations: data.standardConfigurations || [],
         configurations: data.configurations
       })
     }
@@ -267,11 +354,13 @@ const updateConfigButton = (data, buttonId) => {
     const buttonIndex = configButtons.value.findIndex(btn => btn.id === buttonId)
     if (buttonIndex !== -1) {
       configButtons.value[buttonIndex].type = data.partType
+      configButtons.value[buttonIndex].typeId = data.componentTypeId // 新增：存储 ID
       configButtons.value[buttonIndex].configResult = configStr
       
       // 将按钮ID与配置存储中的ID关联
       // 存储完整的配置数据到按钮对象中，方便后续使用
       configButtons.value[buttonIndex].configData = {
+        componentTypeId: data.componentTypeId, // 新增：存储 ID
         partType: data.partType,
         standardNames: data.standardNames || [],
         standardConfigurations: data.standardConfigurations || [],
@@ -282,7 +371,7 @@ const updateConfigButton = (data, buttonId) => {
       const hasEmptyButton = configButtons.value.some(btn => !btn.type && !btn.configResult)
       if (!hasEmptyButton) {
         const newId = Math.max(...configButtons.value.map(btn => btn.id)) + 1
-        configButtons.value.push({ id: newId, type: '', configResult: '' })
+        configButtons.value.push({ id: newId, type: '', typeId: null, configResult: '' })
       }
     }
   }
@@ -364,7 +453,9 @@ const handleSaveSpecification = async () => {
       pmcCode: currentNode.value.label || '',
       configurations: configuredButtons.map(btn => {
         // 优先使用按钮中存储的完整配置数据
-        const fullConfigData = btn.configData || allStoredConfigs.find(config => config.partType === btn.type)
+        const fullConfigData = btn.configData || 
+                               allStoredConfigs.find(config => config.componentTypeId === btn.typeId) || 
+                               allStoredConfigs.find(config => config.partType === btn.type)
         
         // 映射 fullConfigData 到 contract 的 ComponentFullConfiguration 结构
         // standardFileConfigs: Array<{ standardFile, material }>
@@ -374,6 +465,7 @@ const handleSaveSpecification = async () => {
         })) : []
 
         return {
+          componentTypeId: btn.typeId, // 新增：传递 componentTypeId
           componentType: btn.type, // 对应 contract 中的 componentType
           configResult: btn.configResult,
           standards: standardFileConfigs // 对应 contract 中的 standards
@@ -419,6 +511,7 @@ const clearAllStoredConfigs = () => {
   // 同时清空按钮配置
   configButtons.value.forEach(btn => {
     btn.type = ''
+    btn.typeId = null
     btn.configResult = ''
     btn.configData = null
   })
@@ -498,6 +591,7 @@ const clearAllStoredConfigs = () => {
             :highlight-current="true"
             :filter-node-method="filterNode"
             @node-click="handleNodeClick"
+            @node-contextmenu="handleNodeContextMenu"
             v-loading="treeLoading">
             <template #default="{ node, data }">
               <div class="custom-tree-node">
@@ -631,10 +725,58 @@ const clearAllStoredConfigs = () => {
       :pmcCode="currentNode.label"
       template-id="Pipe-Spec"
     />
+    
+    <!-- 右键菜单 -->
+    <div 
+      v-show="contextMenuVisible"
+      class="context-menu"
+      :style="{ top: contextMenuPosition.y + 'px', left: contextMenuPosition.x + 'px' }"
+      @click.stop
+    >
+      <div 
+        class="context-menu-item" 
+        :class="{ disabled: !canSubmitReview }"
+        @click="handleSubmitReview"
+        title="仅待审核状态可提交"
+      >
+        提交审核
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* 右键菜单样式 */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,.1);
+  border-radius: 4px;
+  padding: 5px 0;
+  min-width: 120px;
+}
+
+.context-menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #606266;
+  transition: all 0.2s;
+}
+
+.context-menu-item:hover:not(.disabled) {
+  background-color: #f5f7fa;
+  color: #409eff;
+}
+
+.context-menu-item.disabled {
+  color: #c0c4cc;
+  cursor: not-allowed;
+  background-color: #f5f7fa;
+}
+
 /* 
  * 样式结构概览：
  * --------------------------------------------------------------------------
