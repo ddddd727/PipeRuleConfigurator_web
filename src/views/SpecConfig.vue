@@ -460,12 +460,38 @@ const executeSave = async (type, ruleName, selectedData) => {
         
     if (ok) {
       ElMessage.success('保存成功')
+      resetRightPane(type)
     } else {
       ElMessage.error(res.data?.message || res.data?.msg || '保存失败')
     }
   } catch (error) {
      console.error(error)
      ElMessage.error('请求失败: ' + (error.message || '未知错误'))
+  }
+}
+
+const resetRightPane = (type) => {
+  if (type === 'b1b2b3d') {
+    if (resultTableRef.value) {
+      resultTableRef.value.clearSelection()
+    }
+    resultData.value = []
+    resultSelection.value = []
+    selectedRuleB1B2B3D.value = ''
+  } else if (type === 'c1c2') {
+    if (resultC1C2TableRef.value) {
+      resultC1C2TableRef.value.clearSelection()
+    }
+    resultC1C2Data.value = []
+    resultC1C2Selection.value = []
+    selectedRuleC1C2.value = ''
+  } else if (type === 'limit') {
+    if (resultLimitTableRef.value) {
+      resultLimitTableRef.value.clearSelection()
+    }
+    resultLimitData.value = []
+    resultLimitSelection.value = []
+    selectedRuleLimit.value = ''
   }
 }
 
