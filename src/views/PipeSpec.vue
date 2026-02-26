@@ -13,6 +13,7 @@ import { usePmcTree } from '@/composables/usePmcTree'
 import { usePmcDetails } from '@/composables/usePmcDetails'
 import { useNpdTable } from '@/composables/useNpdTable'
 import { usePreferredRule } from '@/composables/usePreferredRule'
+import { usePmcVersions } from '@/composables/usePmcVersions'
 
 // 树形数据 / 规则 / 表格 / 表单 逻辑
 const {
@@ -122,6 +123,102 @@ const {
   preferredRule,
   clearDimensionData
 })
+
+const {
+  versionList,
+  loadingVersions,
+  currentVersionId,
+  formatDate,
+  fetchVersions,
+  loadVersion,
+  revertVersion
+} = usePmcVersions()
+
+// 监听PMC编码变化，获取版本列表
+watch(() => currentNode.value.label, async (newVal) => {
+  if (newVal && newVal.length === 7) {
+    // 重置版本选择
+    currentVersionId.value = null
+    // 获取版本列表
+    await fetchVersions(newVal, currentShipClassName.value, currentShipNumberName.value)
+  } else {
+    versionList.value = []
+    currentVersionId.value = null
+  }
+})
+
+// 处理版本切换
+const handleVersionChange = async (versionId) => {
+  if (!versionId) {
+    // 如果清空选择，重新加载当前最新数据
+    if (currentNode.value.label) {
+      await fetchPmcCodeDetails(currentNode.value.label)
+    }
+    return
+  }
+
+  const data = await loadVersion(currentNode.value.label, versionId)
+  if (data) {
+    // 使用版本数据更新表单和配置
+    const baseInfo = data.baseInfo || {}
+    
+    formData.value = {
+      service: '',
+      pipingMaterialClass: baseInfo.pmcCode || currentNode.value.label,
+      pipe: baseInfo.pipeStandard || '',
+      material: baseInfo.materialGrade || '',
+      pressureClass: baseInfo.pressureRating || '',
+      wallThickness: baseInfo.wallThickness || ''
+    }
+    
+    configurations.value = data.configurations || []
+    
+    // 如果有必要，刷新尺寸数据
+    if (formData.value.pipe && formData.value.wallThickness) {
+      await fetchDimensionData(
+        formData.value.pipe,
+        formData.value.wallThickness,
+        preferredRule.value
+      )
+    }
+    
+    ElMessage.info(`已加载版本: ${data.version}`)
+  }
+}
+
+// 处理版本回退
+const handleRevert = async () => {
+  if (!currentVersionId.value) return
+  
+  try {
+    await ElMessageBox.confirm(
+      '确定要将当前配置回退到此版本吗？此操作将创建一个新的历史版本。',
+      '确认回退',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const success = await revertVersion(
+      currentNode.value.label, 
+      currentVersionId.value,
+      currentShipClassName.value,
+      currentShipNumberName.value
+    )
+    
+    if (success) {
+      // 回退成功后，重置为当前版本（即最新生成的版本）
+      currentVersionId.value = null 
+      await fetchPmcCodeDetails(currentNode.value.label)
+      // 刷新版本列表
+      await fetchVersions(currentNode.value.label, currentShipClassName.value, currentShipNumberName.value)
+    }
+  } catch (e) {
+    // 用户取消
+  }
+}
 
 // 监听从后端获取的配置信息，更新界面
 watch(configurations, (newConfigs) => {
@@ -478,6 +575,10 @@ const handleSaveSpecification = async () => {
     
     if (res.data.code === 200) {
       ElMessage.success('规格书保存成功！')
+      // 刷新版本列表
+      if (currentNode.value.label) {
+        await fetchVersions(currentNode.value.label, currentShipClassName.value, currentShipNumberName.value)
+      }
     } else {
       ElMessage.error(res.data.msg || '规格书保存失败')
     }
@@ -641,8 +742,41 @@ const clearAllStoredConfigs = () => {
                 <el-icon><Search /></el-icon>
               </template>
             </el-input> -->
+            
+            <!-- 版本管理区域 -->
+            <div class="version-control" v-if="currentNode.label && currentNode.label.length === 7" style="display: inline-flex; align-items: center; margin-right: 10px;">
+              <el-select
+                v-model="currentVersionId"
+                placeholder="历史版本"
+                @change="handleVersionChange"
+                style="width: 220px; margin-right: 10px;"
+                clearable
+                :loading="loadingVersions"
+              >
+                <el-option
+                  v-for="version in versionList"
+                  :key="version.id"
+                  :label="`${version.version} - ${formatDate(version.createdAt)}`"
+                  :value="version.id"
+                >
+                  <span style="float: left">{{ version.version }}</span>
+                  <span style="float: right; color: var(--el-text-color-secondary); font-size: 13px; margin-left: 10px;">
+                    {{ formatDate(version.createdAt) }}
+                  </span>
+                </el-option>
+              </el-select>
+
+              <el-button
+                v-if="currentVersionId"
+                type="warning"
+                @click="handleRevert"
+              >
+                恢复此版本
+              </el-button>
+            </div>
+
             <!-- 辅助按钮 -->
-            <el-button type="success"  @click="handleSaveSpecification">保存规格书</el-button>
+            <el-button type="success"  @click="handleSaveSpecification" :disabled="!!currentVersionId">保存规格书</el-button>
             <!-- 主操作 -->
             <el-button type="primary"  @click="handleGenerateSpecification">生成规格书</el-button>
           </div>
