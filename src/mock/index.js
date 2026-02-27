@@ -213,7 +213,168 @@ export const db = {
       'shortcode|1': ['管道', '阀门', '法兰', '管件', '仪表', '设备']
     }]
   },
+
+  // 基础库 mock 数据
+  'library-tree': {
+    data: [
+      {
+        label: '01 管材',
+        children: [
+          { label: '不锈钢管', children: [{ label: 'GB/T 14976-2012' }, { label: '双相不锈钢管' }] },
+          { label: '铜管' },
+          { label: '无缝钢管' },
+          { label: '有缝钢管' }
+        ]
+      },
+      {
+        label: '02 弯头',
+        children: [
+          { label: '承插弯头' },
+          { label: '对焊弯头' },
+          { label: '排气管虾壳弯' }
+        ]
+      },
+      { label: '03 异径' },
+      { label: '04 法兰' },
+      { label: '05 三通' },
+      { label: '06 垫片' },
+      { label: '07 紧固件' },
+      { label: '08 阀附件' },
+      { label: '09 漏水口' },
+      { label: '10 漏油口' },
+      { label: '11 套管', children: [
+        { 
+          label: '连接套管', 
+          children: [
+            { label: 'Q/SWS 34-010-2021 ConnectionSleeve' },
+            { label: 'Q/SWS 34-071-2021' },
+            { label: 'Q/SWS 34-077-2021' }
+          ]
+        },
+        { label: '单头套管' },
+        { label: '保护套管' },
+        { label: '合拢套管' },
+        { label: '承插插头' },
+        { label: '直通接头' }
+      ]},
+      { label: '12 设备' },
+      { label: '13 膨胀节' },
+      { label: '14 焊接座' },
+      { label: '15 通岸接头' }
+    ]
+  },
+  'codelist-tree': {
+    data: [
+      {
+        label: 'Allcodelist',
+        children: [
+          { label: 'BoltingRequirements' },
+          { label: 'BoltOption' },
+          { label: 'BoltType' },
+          { label: 'CoatingType' },
+          { label: 'CommodityOption' },
+          { label: 'ControlPointSubType' },
+          { label: 'ControlPointType' },
+          { label: 'EndPreparation' },
+          { label: 'EndStandard' },
+          { label: 'FabricationType' },
+          { label: 'FlowDirection' },
+          { label: 'GasketOption' },
+          { label: 'GeometricIndustryStandard' },
+          { label: 'MaterialsGrade' },
+          { label: 'PipingCommodityType' },
+          { label: 'PressureRating' },
+          { label: 'ScheduleThickness' }
+        ]
+      }
+    ]
+  },
+  'library-component-details': {
+    ccCode: 'PCSSA23',
+    wallThickness: 'Sch.40',
+    material: '20#',
+    partClassName: 'ConnectionSleeve',
+    geometryCategory: 'Linear, full size',
+    partCategory: 'CPL',
+    symbolMethod: 'Coupling,Ing',
+    userClassName: 'ConnectionSleeve'
+  },
+  'library-table-data': [
+    { 
+      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '10mm', port2Size: '10mm',
+      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.1,
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A5B37X11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA27*4*50 20#钢'
+    },
+    { 
+      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '15mm', port2Size: '15mm',
+      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.15,
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A6B55X11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA32*4.5*50 20#钢'
+    },
+    { 
+      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '20mm', port2Size: '20mm',
+      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.2,
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A7B77X11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA38*5*50 20#钢'
+    },
+    { 
+      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '25mm', port2Size: '25mm',
+      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.31,
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A9B88X11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA48*6*50 20#钢'
+    },
+    { 
+      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '32mm', port2Size: '32mm',
+      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.4,
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23AAB99X11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA57*6.5*50 20#钢'
+    },
+    { 
+      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '40mm', port2Size: '40mm',
+      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.49,
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23ABBAAX11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA63.5*7*50 20#钢'
+    },
+    { 
+      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '50mm', port2Size: '50mm',
+      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.6,
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23ABBBBX11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA76*7*50 20#钢'
+    },
+    { 
+      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '65mm', port2Size: '65mm',
+      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.91,
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23AEBCCX11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA95*8.5*50 20#钢'
+    },
+    { 
+      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '80mm', port2Size: '80mm',
+      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 2.1,
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23AJDDDX11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA114*11*75 20#钢'
+    }
+  ],
+  'codelist-table-data': [
+    { shortDesc: 'Undefined', longDesc: 'Undefined', codeNum: 0 },
+    { shortDesc: 'Out', longDesc: 'Flow leaves this port', codeNum: 1 },
+    { shortDesc: 'In', longDesc: 'Flow enters this port', codeNum: 2 },
+    { shortDesc: 'Bi-directional', longDesc: 'Flow may enter or leave this port', codeNum: 3 },
+    { shortDesc: 'No Flow', longDesc: 'No flow at this port', codeNum: 4 }
+  ]
 }
+
+// 基础库相关接口
+Mock.mock(/\/api\/library\/tree/, 'get', () => {
+  return { code: 200, data: db['library-tree'].data, message: 'success' }
+})
+
+Mock.mock(/\/api\/library\/codelist-tree/, 'get', () => {
+  return { code: 200, data: db['codelist-tree'].data, message: 'success' }
+})
+
+Mock.mock(/\/api\/library\/component-details/, 'get', () => {
+  return { code: 200, data: db['library-component-details'], message: 'success' }
+})
+
+Mock.mock(/\/api\/library\/table-data/, 'get', () => {
+  return { code: 200, data: db['library-table-data'], message: 'success' }
+})
+
+Mock.mock(/\/api\/library\/codelist-table-data/, 'get', () => {
+  return { code: 200, data: db['codelist-table-data'], message: 'success' }
+})
 
 // 拦截请求
 Mock.mock(/\/api\/dict\/[\w-]+/, 'get', (options) => {
