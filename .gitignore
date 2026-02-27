@@ -34,7 +34,3 @@ coverage
 
 # Vitest
 __screenshots__/
-src/api/library.js
-src/mock/index.js
-src/router/modules/library.js
-src/views/BasicLibrary.vue
