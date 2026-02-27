@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, computed,reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -21,6 +21,15 @@ const selectedRows = ref([])
 const dataSnapshot = ref(null)
 const optionsMap = ref({}) 
 const loadingOptions = ref(false)
+
+const addColVisible = ref(false)
+const addColForm = reactive({
+  title: '',
+  uiType: 'Input',
+  options: '', // 逗号分隔字符串
+  isRequired: false
+})
+const addingCol = ref(false)
 
 // --- 辅助函数 ---
 const mapUiType = (backendUiType) => {
@@ -215,21 +224,23 @@ const fetchData = async () => {
            smartWidth = 80
         }
 
+        if (col.options && Array.isArray(col.options) && col.options.length > 0) {
+           optionsMap.value[finalProp] = col.options.map(opt => ({ label: opt, value: opt }))
+        }
 
         return {
-         ...col,
-         prop: finalProp,
-         label: col.Title || col.DisplayName || col.label || '未命名',
+          ...col,
+          prop: finalProp,
+          label: col.Title || col.DisplayName || col.label || '未命名',
           type: mapUiType(col.uiType || col.UiType), 
           show: col.show !== undefined ? col.show : (col.IsHidden === true ? false : true),
-        isReadOnly: col.isReadOnly !== undefined ? col.isReadOnly : col.IsReadOnly,
-    
-    // 🟢 [修复] 兼容后端可能返回的 IsRequired 字段
-        required: col.required !== undefined ? col.required : (col.IsRequired || false),
-    
-    dataSource: col.dataSource || col.DataSource,
-    width: smartWidth 
-  }
+          isReadOnly: col.isReadOnly !== undefined ? col.isReadOnly : col.IsReadOnly,
+          required: col.required !== undefined ? col.required : (col.IsRequired || false),
+          dataSource: col.dataSource || col.DataSource,
+          width: smartWidth,
+          // ✅ [新增] 传递 options 属性，方便后续判断
+          staticOptions: col.options || col.Options 
+        }
       })
 
       tableConfig.value = {
@@ -391,8 +402,7 @@ const handleBatchDelete = () => {
 }
 
 // --- 6. 保存 (含唯一性校验) ---
-// --- 6. 保存 (修复 PUT 请求 ID 为 undefined 的问题) ---
-// --- 6. 保存 (含必填校验与唯一性校验) ---
+
 const handleSave = async () => {
   const currentList = tableConfig.value.list || []
   const columns = tableConfig.value.columns || []
@@ -489,6 +499,41 @@ const handleSave = async () => {
   }
 }
 
+const openAddColumnDialog = () => {
+  // 重置表单
+  addColForm.title = ''
+  addColForm.uiType = 'Input'
+  addColForm.options = ''
+  addColForm.isRequired = false
+  addColVisible.value = true
+}
+const submitAddColumn = async () => {
+  if (!addColForm.title) return ElMessage.warning('请输入列名称')
+  if (addColForm.uiType === 'Select' && !addColForm.options) return ElMessage.warning('下拉框必须填写选项')
+
+  addingCol.value = true
+  try {
+    // 调用我们在后端新写的接口
+    await axios.post(`/api/dict-config/columns/${props.dictId}`, {
+      title: addColForm.title,
+      uiType: addColForm.uiType,
+      isRequired: addColForm.isRequired,
+      options: addColForm.options // 字符串 "A,B,C"
+    })
+
+    ElMessage.success('列添加成功')
+    addColVisible.value = false
+    
+    // 刷新整个表格，获取新列配置
+    await fetchData()
+    
+  } catch (error) {
+    console.error(error)
+    ElMessage.error(error.response?.data?.message || '添加失败')
+  } finally {
+    addingCol.value = false
+  }
+}
 const displayData = computed(() => {
   const rawData = tableConfig.value.list || [] 
   const keyword = searchKeyword.value.trim().toLowerCase()
@@ -515,7 +560,8 @@ const displayData = computed(() => {
         </el-button>
 
         <template v-if="isEdit">
-          <el-button type="primary" @click="handleAddRow">新增行</el-button>
+          <el-button type="primary" @click="handleAddRow" icon="Plus">新增行</el-button>
+          <el-button type="primary" @click="openAddColumnDialog" icon="Plus">新增列</el-button>
           <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
             批量删除 ({{ selectedRows.length }})
           </el-button>
@@ -618,6 +664,32 @@ const displayData = computed(() => {
         </el-table-column>
       </template>
     </el-table>
+    <el-dialog v-model="addColVisible" title="添加自定义列" width="400px" append-to-body>
+      <el-form label-position="top">
+        <el-form-item label="列名称 (中文标题)">
+          <el-input v-model="addColForm.title" placeholder="例如：紧急程度" />
+        </el-form-item>
+        <el-form-item label="数据类型">
+          <el-select v-model="addColForm.uiType" style="width: 100%;">
+            <el-option label="文本框 (Input)" value="Input" />
+            <el-option label="下拉框 (Select)" value="Select" />
+            <el-option label="开关 (Switch)" value="Switch" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="addColForm.uiType === 'Select'" label="选项列表 (用逗号分隔)">
+          <el-input v-model="addColForm.options" placeholder="例如：高,中,低" />
+        </el-form-item>
+        <el-form-item>
+          <el-checkbox v-model="addColForm.isRequired">是否必填</el-checkbox>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="addColVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitAddColumn" :loading="addingCol">确定添加</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
