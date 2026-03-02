@@ -9,6 +9,7 @@ const props = defineProps({
   dictId: { type: String, required: true }
 })
 
+const tableKey = ref(0)
 const route = useRoute()
 const { initSnapshot, isModified } = useDirtyData()
 
@@ -194,8 +195,8 @@ const fetchData = async () => {
   optionsMap.value = {} 
 
   try {
-    const res = await axios.get(`/api/Dict/${dictType}`)
-    const backendData = res.data.data || res.data 
+    const res = await axios.get(`/api/Dict/${dictType}?_t=${Date.now()}`)
+    const backendData = res.data.data || res.data
     
     if (backendData.rows || backendData.columns) {
       const rawRows = backendData.rows || [] 
@@ -213,12 +214,11 @@ const fetchData = async () => {
       
       }
 
+      // 1. 原有的列映射逻辑 (保持不变)
       const mappedColumns = (backendData.columns || []).map(col => {
         let finalProp = col.prop || col.DbField
         if (useCamelCase && finalProp) finalProp = toCamelCase(finalProp)
 
-        // 🟢 [新增] 智能宽度逻辑
-        // 如果后端没指定宽度，且列名是 id，则默认给 60px
         let smartWidth = col.width
         if (!smartWidth && finalProp && finalProp.toLowerCase() === 'id') {
            smartWidth = 80
@@ -238,16 +238,30 @@ const fetchData = async () => {
           required: col.required !== undefined ? col.required : (col.IsRequired || false),
           dataSource: col.dataSource || col.DataSource,
           width: smartWidth,
-          // ✅ [新增] 传递 options 属性，方便后续判断
           staticOptions: col.options || col.Options 
         }
       })
 
+      // 🌟🌟🌟 新增的核心逻辑：印刷空模板 & 盖章合并 🌟🌟🌟
+      const baseRowTemplate = mappedColumns.reduce((acc, col) => {
+        acc[col.prop] = null // 让所有列（包括未来的新增列）都默认有一个 null 坑位
+        return acc
+      }, {})
+
+      const formattedRows = rawRows.map(row => ({
+        ...baseRowTemplate,  // 底层铺上全是 null 的空模板
+        ...row               // 表层盖上后端返回的真实数据
+      }))
+      // 🌟🌟🌟 新增结束 🌟🌟🌟
+
+      // 2. 赋值给表格配置（注意 list 用的是 formattedRows）
       tableConfig.value = {
         title: backendData.DisplayName || backendData.displayName || dictType, 
         columns: mappedColumns,
-        list: rawRows
+        list: formattedRows
       }
+
+      tableKey.value++
       
       dataSnapshot.value = JSON.parse(JSON.stringify(tableConfig.value))
       initSnapshot(tableConfig.value.list) 
@@ -331,28 +345,32 @@ const handleSelectionChange = (val) => { selectedRows.value = val }
 
 const handleAddRow = () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
+  
+  // 1. 核心标记：打上 _isNew 标记，告诉保存接口这是新数据
   const newRow = { _isNew: true }
   
-  // 🟢 新增逻辑：自动计算最大 ID (Max + 1)
-  let nextId = 1 // 默认从 1 开始
-  // 找到主键列
+  // 2. 🟢 核心算法：寻找当前 ID 序列中的“最小空缺值”
+  let nextId = 1 // 默认从 1 开始试探
   const pkCol = tableConfig.value.columns.find(col => col.isPrimaryKey)
   
   if (pkCol) {
-    // 提取现有行中的 ID 列表
+    // 提取当前表格里的所有合法正整数 ID，并放入 Set 中（查询速度 O(1)）
     const existingIds = tableConfig.value.list
-      .map(r => Number(r[pkCol.prop])) // 转为数字
-      .filter(n => !isNaN(n))         // 过滤非法值
+      .map(r => Number(r[pkCol.prop])) 
+      .filter(n => !isNaN(n) && n > 0) 
       
-    if (existingIds.length > 0) {
-      nextId = Math.max(...existingIds) + 1
+    const idSet = new Set(existingIds)
+    
+    // 从 1 开始往上数，只要集合里有这个数字，就看下一个，直到找到第一个没有的！
+    while (idSet.has(nextId)) {
+      nextId++
     }
   }
 
+  // 3. 遍历列配置，填充这个算出来的“完美填缝 ID”和其他空坑位
   tableConfig.value.columns.forEach(col => {
     if (col.isPrimaryKey) {
-        // 🟢 修改：赋值为计算出的 nextId，而不是 0
-        newRow[col.prop] = nextId 
+        newRow[col.prop] = nextId // 👈 填入填缝 ID
     } else if (col.type === 'switch') {
         newRow[col.prop] = false 
     } else {
@@ -360,7 +378,10 @@ const handleAddRow = () => {
     }
   })
   
+  // 4. 插入到表格中
   tableConfig.value.list.push(newRow)
+  
+  // 5. 滚动到底部
   setTimeout(() => {
     const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap')
     if(tableBody) tableBody.scrollTop = tableBody.scrollHeight
@@ -523,9 +544,14 @@ const submitAddColumn = async () => {
 
     ElMessage.success('列添加成功')
     addColVisible.value = false
-    
+
+    const wasEdit = isEdit.value
+    await new Promise(resolve => setTimeout(resolve, 800))
     // 刷新整个表格，获取新列配置
     await fetchData()
+    if (wasEdit) {
+      await toggleEdit() // 完美复用 toggleEdit，它会自动帮你把新列的 options 拉取下来并进入编辑态
+    }
     
   } catch (error) {
     console.error(error)
@@ -572,6 +598,7 @@ const displayData = computed(() => {
     </div>
 
     <el-table 
+      :key="tableKey"
       :data="displayData" 
       border 
       stripe
@@ -608,44 +635,51 @@ const displayData = computed(() => {
                  class="dirty-cell-wrapper"
                  :class="{ 'is-modified': isModified(scope.row, col.prop) }"
             >
-              <template v-if="!col.isReadOnly">
-                <el-select 
-                  v-if="col.type === 'select'" 
-                  v-model="scope.row[col.prop]" 
-                  placeholder="请选择" 
-                  size="small"
-                  filterable
-                  @change="(val) => handleSelectChange(val, scope.row, col)"
-                >
-                  <el-option
-                    v-for="opt in getVisibleOptions(col, scope.row)"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
-                </el-select>
-
-                <el-switch
-                  v-else-if="col.type === 'switch'"
-                  v-model="scope.row[col.prop]"
-                  inline-prompt
-                  active-text="是"
-                  inactive-text="否"
-                />
-                
-                <el-input 
-                  v-else 
-                  v-model="scope.row[col.prop]" 
-                  size="small" 
-                />
-              </template>
-              
-              <span v-else style="color: #909399; cursor: not-allowed;">
-                 <el-tag v-if="col.type === 'switch'" type="info" size="small" effect="plain">
-                    {{ scope.row[col.prop] ? '是' : '否' }}
-                 </el-tag>
-                 <span v-else>{{ scope.row[col.prop] }}</span>
+              <span v-if="col.isPrimaryKey && scope.row._isNew" style="color: #67c23a; font-weight: bold; padding: 0 10px; display: flex; align-items: center;">
+                {{ scope.row[col.prop] }}
+                <el-tag size="small" type="success" effect="plain" style="margin-left: 6px; padding: 0 4px; height: 18px; line-height: 16px;">新</el-tag>
               </span>
+
+              <template v-else>
+                <template v-if="!col.isReadOnly">
+                  <el-select 
+                    v-if="col.type === 'select'" 
+                    v-model="scope.row[col.prop]" 
+                    placeholder="请选择" 
+                    size="small"
+                    filterable
+                    @change="(val) => handleSelectChange(val, scope.row, col)"
+                  >
+                    <el-option
+                      v-for="opt in getVisibleOptions(col, scope.row)"
+                      :key="opt.value"
+                      :label="opt.label"
+                      :value="opt.value"
+                    />
+                  </el-select>
+
+                  <el-switch
+                    v-else-if="col.type === 'switch'"
+                    v-model="scope.row[col.prop]"
+                    inline-prompt
+                    active-text="是"
+                    inactive-text="否"
+                  />
+                  
+                  <el-input 
+                    v-else 
+                    v-model="scope.row[col.prop]" 
+                    size="small" 
+                  />
+                </template>
+                
+                <span v-else style="color: #909399; cursor: not-allowed;">
+                   <el-tag v-if="col.type === 'switch'" type="info" size="small" effect="plain">
+                      {{ scope.row[col.prop] ? '是' : '否' }}
+                   </el-tag>
+                   <span v-else>{{ scope.row[col.prop] }}</span>
+                </span>
+              </template>
 
               <div v-if="!col.isReadOnly && isModified(scope.row, col.prop)" class="dirty-marker"></div>
             </div>
