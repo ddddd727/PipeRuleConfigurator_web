@@ -27,7 +27,7 @@
               :data="treeData"
               :props="defaultProps"
               :filter-node-method="filterNode"
-              node-key="label"
+              node-key="id"
               highlight-current
               @node-click="handleNodeClick"
             >
@@ -113,54 +113,29 @@
               </template>
               
               <div class="info-form-container">
-                <el-form :model="componentDetails" label-width="130px" class="info-form">
+                <el-form :model="componentDetails" label-width="140px" class="info-form">
                   <el-row :gutter="20">
-                    <el-col :span="6">
-                      <el-form-item label="CC码：">
-                        <el-select v-model="componentDetails.ccCode" style="width: 100%;">
-                          <el-option label="PCSSA23" value="PCSSA23" />
-                        </el-select>
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="6">
-                      <el-form-item label="壁厚：">
-                        <el-select v-model="componentDetails.wallThickness" style="width: 100%;">
-                          <el-option label="Sch.40" value="Sch.40" />
-                        </el-select>
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="6">
-                      <el-form-item label="材料：">
-                        <el-select v-model="componentDetails.material" style="width: 100%;">
-                          <el-option label="20#" value="20#" />
-                        </el-select>
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="6">
-                      <el-form-item label="PartClassName：">
-                        <el-input v-model="componentDetails.partClassName" readonly />
+                    <el-col v-for="item in firstRowItems" :key="item.key" :span="6">
+                      <el-form-item :label="item.label + '：'">
+                        <template v-if="item.type === 'filter'">
+                          <el-select 
+                            :model-value="filterForm[item.modelKey]" 
+                            @update:model-value="val => filterForm[item.modelKey] = val"
+                            style="width: 100%;"
+                          >
+                            <el-option v-for="opt in item.options" :key="opt" :label="opt" :value="opt" />
+                          </el-select>
+                        </template>
+                        <template v-else>
+                          <el-input v-model="componentDetails[item.key]" readonly />
+                        </template>
                       </el-form-item>
                     </el-col>
                   </el-row>
                   <el-row :gutter="20">
-                    <el-col :span="6">
-                      <el-form-item label="几何类别：">
-                        <el-input v-model="componentDetails.geometryCategory" readonly />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="6">
-                      <el-form-item label="部件分类：">
-                        <el-input v-model="componentDetails.partCategory" readonly />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="6">
-                      <el-form-item label="Symbol方法：">
-                        <el-input v-model="componentDetails.symbolMethod" readonly />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="6">
-                      <el-form-item label="UserClassName：">
-                        <el-input v-model="componentDetails.userClassName" readonly />
+                    <el-col :span="6" v-for="field in remainingDetailsFields" :key="field.key">
+                      <el-form-item :label="field.label + '：'">
+                        <el-input v-model="componentDetails[field.key]" readonly />
                       </el-form-item>
                     </el-col>
                   </el-row>
@@ -183,23 +158,22 @@
                     height="100%"
                     :row-class-name="tableRowClassName"
                     @row-click="handleRowClick"
+                    @selection-change="handleCommonSelectionChange"
                   >
-                    <el-table-column type="selection" width="55" :selectable="checkSelectable" />
-                    <el-table-column prop="ccCode" label="CC码" width="120" />
-                    <el-table-column prop="endStd1" label="端面标准1" min-width="180" />
-                    <el-table-column prop="endStd2" label="端面标准2" min-width="180" />
-                    <el-table-column prop="connType1" label="端面连接形式1" width="140" />
-                    <el-table-column prop="connType2" label="端面连接形式2" width="140" />
-                    <el-table-column prop="port1Size" label="端口1通径" width="120" />
-                    <el-table-column prop="port2Size" label="端口2通径" width="120" />
-                    <el-table-column prop="wallThickness1" label="壁厚1" width="100" />
-                    <el-table-column prop="wallThickness2" label="壁厚2" width="100" />
-                    <el-table-column prop="flowDirection1" label="流向1" width="100" />
-                    <el-table-column prop="flowDirection2" label="流向2" width="100" />
+                    <el-table-column type="selection" width="55" />
+                    <el-table-column
+                      v-for="col in visibleCommonColumns"
+                      :key="col.prop"
+                      :prop="col.prop"
+                      :label="col.label"
+                      :width="col.width"
+                      :min-width="col.minWidth"
+                      show-overflow-tooltip
+                    />
                   </el-table>
                 </div>
               </el-tab-pane>
-              <el-tab-pane label="外形重量重心描述" name="appearance">
+              <el-tab-pane v-if="showAppearanceGroup" label="外形重量重心描述" name="appearance">
                 <div class="table-wrapper">
                   <el-table 
                     ref="appearanceTableRef"
@@ -209,21 +183,18 @@
                     height="100%"
                     :row-class-name="tableRowClassName"
                     @row-click="handleAppearanceRowClick"
+                    @selection-change="handleAppearanceSelectionChange"
                   >
-                    <el-table-column type="selection" width="55" :selectable="checkSelectable" />
-                    <el-table-column prop="ccCode" label="CC码" width="120" />
-                    <el-table-column prop="connType1" label="端面连接形式1" width="140" />
-                    <el-table-column prop="connType2" label="端面连接形式2" width="140" />
-                    <el-table-column prop="port1Size" label="端口1通径" width="120" />
-                    <el-table-column prop="port2Size" label="端口2通径" width="120" />
-                    <el-table-column prop="wallThickness1" label="壁厚1" width="100" />
-                    <el-table-column prop="wallThickness2" label="壁厚2" width="100" />
-                    <el-table-column prop="weight" label="重量" width="100" />
-                    <el-table-column prop="dryCogX" label="DryCogX" width="100" />
-                    <el-table-column prop="dryCogY" label="DryCogY" width="100" />
-                    <el-table-column prop="dryCogZ" label="DryCogZ" width="100" />
-                    <el-table-column prop="materialCode" label="物资编码" width="180" />
-                    <el-table-column prop="materialDesc" label="物资描述" min-width="400" show-overflow-tooltip />
+                    <el-table-column type="selection" width="55" />
+                    <el-table-column
+                      v-for="col in visibleAppearanceColumns"
+                      :key="col.prop"
+                      :prop="col.prop"
+                      :label="col.label"
+                      :width="col.width"
+                      :min-width="col.minWidth"
+                      show-overflow-tooltip
+                    />
                   </el-table>
                 </div>
               </el-tab-pane>
@@ -231,13 +202,13 @@
               <!-- 公用端面数据 tab 页的按钮 -->
               <div class="tab-header-actions" v-if="activeTab === 'common'">
                 <el-button type="primary" :icon="Plus" @click="handleAdd">新增</el-button>
-                <el-button type="danger" :icon="CircleClose" @click="handleDisable">禁用</el-button>
+                <el-button :type="statusButtonType" :icon="statusButtonIcon" @click="handleToggleStatus">{{ statusButtonText }}</el-button>
                 <el-button type="warning" :icon="Edit">修改</el-button>
               </div>
               <!-- 外形重量重心描述 tab 页的按钮 -->
-              <div class="tab-header-actions" v-if="activeTab === 'appearance'">
+              <div class="tab-header-actions" v-if="activeTab === 'appearance' && showAppearanceGroup">
                 <el-button type="primary" :icon="Plus" @click="handleAdd">新增</el-button>
-                <el-button type="danger" :icon="CircleClose" @click="handleDisable">禁用</el-button>
+                <el-button :type="statusButtonType" :icon="statusButtonIcon" @click="handleToggleStatus">{{ statusButtonText }}</el-button>
                 <el-button type="warning" :icon="Edit">修改</el-button>
               </div>
             </div>
@@ -449,9 +420,9 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { 
   Search, Plus, FolderAdd, Folder, Document, 
-  Upload, Download, CircleClose, Edit, Menu, CopyDocument 
+  Upload, Download, CircleClose, Edit, Menu, CopyDocument, RefreshLeft
 } from '@element-plus/icons-vue'
-import { getLibraryTree, getCodelistTree, getComponentDetails, getTableData, getCodelistTableData, disableRows } from '@/api/library'
+import { getLibraryTree, getCodelistTree, getComponentFullData, getCodelistTableData, disableRows, enableRows } from '@/api/library'
 
 const route = useRoute()
 const filterText = ref('')
@@ -462,12 +433,27 @@ const activeTab = ref('common')
 const treeData = ref([])
 const componentDetails = ref({})
 // const tableData = ref([]) // Removed shared tableData
+const selectedCategory = ref('')
+const commonColumns = ref([])
+const appearanceColumns = ref([])
 const commonData = ref([])
 const appearanceData = ref([])
+const filterOptions = ref({
+  ccCodes: [],
+  scheduleThicknesses: [],
+  materialGrades: []
+})
+const filterForm = ref({
+  ccCode: '/',
+  scheduleThickness: '/',
+  materialGrade: '/'
+})
 const codelistTableData = ref([])
 const commonTableRef = ref(null)
 const appearanceTableRef = ref(null)
 const codelistTableRef = ref(null)
+const commonSelection = ref([])
+const appearanceSelection = ref([])
 
 const addDialogVisible = ref(false)
 const addForm = ref({
@@ -505,19 +491,40 @@ const defaultProps = {
   label: 'label',
 }
 
+// 递归处理树节点，添加唯一ID和继承的category
+const processTreeData = (nodes, parentPath = '', parentCategory = '') => {
+  return nodes.map(node => {
+    // 构建唯一路径ID，格式：Parent-Child-Grandchild
+    const currentPath = parentPath ? `${parentPath}-${node.label}` : node.label
+    // 继承 category
+    const currentCategory = node.category || parentCategory
+    
+    const newNode = {
+      ...node,
+      id: currentPath, // 使用全路径作为唯一ID
+      fullPath: currentPath,
+      category: currentCategory
+    }
+    if (node.children) {
+      newNode.children = processTreeData(node.children, currentPath, currentCategory)
+    }
+    return newNode
+  })
+}
+
 // 初始化加载目录树
 const loadTreeData = async () => {
   if (isPipeProfessional.value) {
     try {
       const data = await getLibraryTree()
-      treeData.value = data
+      treeData.value = processTreeData(data)
     } catch (error) {
       console.error('加载目录树失败:', error)
     }
   } else if (isCodelistLibrary.value) {
     try {
       const data = await getCodelistTree()
-      treeData.value = data
+      treeData.value = processTreeData(data)
     } catch (error) {
       console.error('加载Codelist目录树失败:', error)
     }
@@ -542,19 +549,257 @@ const filterNode = (value, data) => {
   return data.label.includes(value)
 }
 
-const handleNodeClick = async (data) => {
+// 字段映射表
+const fieldLabels = {
+  IndustryCommodityCode: 'CC码',
+  ScheduleThickness: '壁厚',
+  CommodityType: '部件分类',
+  GeometricIndustryStandard: '标准号',
+  MaterialGrade: '材料',
+  GeometryType: '几何类别',
+  BentAngle: '弯曲角度',
+  PartDataBasis: '部分数据库',
+  PartClassName: 'PartClassName',
+  UserClassName: 'UserClassName',
+  BoltType: '螺栓类型',
+  NominalDiameterFrom: '公称直径起始',
+  NominalDiameterTo: '公称直径结束',
+  NominalDiameter: '公称直径',
+  NpdUnitType: '通径单位类型',
+  GasketType: '垫片类型',
+  ThicknessFor3DModel: '3D模型壁厚',
+  ProcurementThickness: '采购壁厚',
+  GasketOutsideDiameter: '垫片外径',
+  GasketInsideDiameter: '垫片内径',
+  FlangeFacing: '法兰密封面',
+  NutType: '螺母类型',
+  NutHeight: '螺母高度',
+  WasherType: '垫圈类型',
+  WasherThickness: '垫圈厚度'
+}
+
+// 需要隐藏的字段
+const hiddenFields = ['GeometricIndustryStandard', 'GeometricindustryStandard']
+const baseFilterFields = new Set(['IndustryCommodityCode', 'ScheduleThickness', 'MaterialGrade'])
+
+const componentDetailsFields = computed(() => {
+  if (!componentDetails.value) return []
+  return Object.keys(componentDetails.value)
+    .filter(key => !hiddenFields.includes(key) && !baseFilterFields.has(key) && fieldLabels[key])
+    .map(key => ({
+      key,
+      label: fieldLabels[key] || key,
+      value: componentDetails.value[key]
+    }))
+})
+
+const normalizeOptionList = (list) => {
+  const normalized = (list || [])
+    .map(v => (v === null || v === undefined) ? '' : String(v).trim())
+    .filter(v => v.length > 0 && v !== '/')
+  return ['/', ...Array.from(new Set(normalized))]
+}
+
+const ccCodeOptions = computed(() => normalizeOptionList(filterOptions.value.ccCodes))
+const scheduleThicknessOptions = computed(() => normalizeOptionList(filterOptions.value.scheduleThicknesses))
+const materialGradeOptions = computed(() => normalizeOptionList(filterOptions.value.materialGrades))
+
+const hasCcCodeFilter = computed(() => ccCodeOptions.value.length > 1)
+const hasScheduleThicknessFilter = computed(() => scheduleThicknessOptions.value.length > 1)
+const hasMaterialGradeFilter = computed(() => materialGradeOptions.value.length > 1)
+
+const firstRowItems = computed(() => {
+  const items = []
+  if (hasCcCodeFilter.value) {
+    items.push({
+      type: 'filter',
+      key: 'IndustryCommodityCode',
+      label: 'CC码',
+      modelKey: 'ccCode',
+      options: ccCodeOptions.value
+    })
+  }
+  if (hasScheduleThicknessFilter.value) {
+    items.push({
+      type: 'filter',
+      key: 'ScheduleThickness',
+      label: '壁厚',
+      modelKey: 'scheduleThickness',
+      options: scheduleThicknessOptions.value
+    })
+  }
+  if (hasMaterialGradeFilter.value) {
+    items.push({
+      type: 'filter',
+      key: 'MaterialGrade',
+      label: '材料',
+      modelKey: 'materialGrade',
+      options: materialGradeOptions.value
+    })
+  }
+  const remainSlots = Math.max(0, 4 - items.length)
+  const extraFields = componentDetailsFields.value.slice(0, remainSlots).map(f => ({
+    type: 'field',
+    key: f.key,
+    label: f.label
+  }))
+  return [...items, ...extraFields]
+})
+
+const remainingDetailsFields = computed(() => {
+  const usedFieldKeys = new Set(firstRowItems.value.filter(i => i.type === 'field').map(i => i.key))
+  return componentDetailsFields.value.filter(f => !usedFieldKeys.has(f.key))
+})
+
+const showAppearanceGroup = computed(() => {
+  return selectedCategory.value === 'pipe' || selectedCategory.value === 'pipeComponent'
+})
+
+watch(showAppearanceGroup, (val) => {
+  if (!val && activeTab.value === 'appearance') {
+    activeTab.value = 'common'
+  }
+})
+
+const getFilterParams = () => {
+  const params = {}
+  if (filterForm.value.ccCode && filterForm.value.ccCode !== '/') params.ccCode = filterForm.value.ccCode
+  if (filterForm.value.scheduleThickness && filterForm.value.scheduleThickness !== '/') params.scheduleThickness = filterForm.value.scheduleThickness
+  if (filterForm.value.materialGrade && filterForm.value.materialGrade !== '/') params.materialGrade = filterForm.value.materialGrade
+  return params
+}
+
+const lastRequestContext = ref({ nodeLabel: '', category: '' })
+
+const loadFullData = async ({ nodeLabel, category, resetFilters = false }) => {
+  if (!nodeLabel) return
+  if (resetFilters) {
+    filterForm.value.ccCode = '/'
+    filterForm.value.scheduleThickness = '/'
+    filterForm.value.materialGrade = '/'
+  }
+  const res = await getComponentFullData(nodeLabel, category, getFilterParams())
+  selectedCategory.value = res?.category || category || ''
+  componentDetails.value = res?.base || {}
+  filterOptions.value = res?.filters || { ccCodes: [], scheduleThicknesses: [], materialGrades: [] }
+
+  const tableConfig = res?.table || {}
+  const groups = tableConfig?.groups || {}
+  commonColumns.value = groups?.common?.columns || []
+  commonData.value = JSON.parse(JSON.stringify(groups?.common?.data || []))
+  appearanceColumns.value = groups?.appearance?.columns || []
+  appearanceData.value = JSON.parse(JSON.stringify(groups?.appearance?.data || []))
+  if (!showAppearanceGroup.value) {
+    appearanceColumns.value = []
+    appearanceData.value = []
+  }
+}
+
+watch(
+  () => [filterForm.value.ccCode, filterForm.value.scheduleThickness, filterForm.value.materialGrade],
+  async () => {
+    if (!lastRequestContext.value.nodeLabel || !lastRequestContext.value.category) return
+    try {
+      await loadFullData({ nodeLabel: lastRequestContext.value.nodeLabel, category: lastRequestContext.value.category })
+    } catch (error) {
+      console.error('筛选加载失败:', error)
+      ElMessage.error('筛选加载失败')
+    }
+  }
+)
+
+const excludedTableFieldBases = new Set(['NpdUnitType', 'JsonData', 'GeometricIndustryStandard', 'GeometricindustryStandard'])
+
+const getPropBaseAndIndex = (prop) => {
+  const match = typeof prop === 'string' ? prop.match(/^(.*)\[(\d+)\]$/) : null
+  if (!match) return { base: prop, index: 0 }
+  return { base: match[1], index: Number(match[2]) }
+}
+
+const normalizeColumns = (columns) => {
+  const groups = new Map()
+  const baseOrder = []
+
+  ;(columns || []).forEach((col) => {
+    const prop = col?.prop
+    const { base, index } = getPropBaseAndIndex(prop)
+    if (!groups.has(base)) {
+      groups.set(base, [])
+      baseOrder.push(base)
+    }
+    groups.get(base).push({ ...col, __index: index })
+  })
+
+  return baseOrder.flatMap((base) => {
+    const cols = groups.get(base) || []
+    return cols.sort((a, b) => (a.__index || 0) - (b.__index || 0)).map(({ __index, ...rest }) => rest)
+  })
+}
+
+const isEmptyValue = (val) => {
+  if (val === null || val === undefined) return true
+  if (typeof val === 'string') return val.trim() === ''
+  return false
+}
+
+const isColumnAllEmpty = (prop, rows) => {
+  if (!prop) return true
+  if (!rows || rows.length === 0) return false
+  return rows.every((row) => isEmptyValue(row?.[prop]))
+}
+
+const getVisibleColumns = (columns, rows) => {
+  return normalizeColumns(columns)
+    .filter((col) => {
+      const prop = col?.prop
+      const { base } = getPropBaseAndIndex(prop)
+      return prop && !excludedTableFieldBases.has(base)
+    })
+    .filter((col) => !isColumnAllEmpty(col.prop, rows))
+    .map((col) => ({
+      ...col,
+      label: col.label || col.prop,
+      minWidth: col.minWidth || 140
+    }))
+}
+
+const visibleCommonColumns = computed(() => getVisibleColumns(commonColumns.value, commonData.value))
+const visibleAppearanceColumns = computed(() => getVisibleColumns(appearanceColumns.value, appearanceData.value))
+
+const currentSelection = computed(() => {
+  return activeTab.value === 'common' ? commonSelection.value : appearanceSelection.value
+})
+
+const isAllDisabled = computed(() => {
+  if (!currentSelection.value || currentSelection.value.length === 0) return false
+  return currentSelection.value.every(row => row.disabled)
+})
+
+const statusButtonText = computed(() => isAllDisabled.value ? '恢复' : '禁用')
+const statusButtonIcon = computed(() => isAllDisabled.value ? RefreshLeft : CircleClose)
+const statusButtonType = computed(() => isAllDisabled.value ? 'success' : 'danger')
+
+const handleNodeClick = async (data, node) => {
   if (!data.children) {
     selectedNode.value = data
     if (isPipeProfessional.value) {
       try {
-        const details = await getComponentDetails(data.label)
-        const table = await getTableData(data.label)
-        componentDetails.value = details
-        // Initialize both tables with deep copy to ensure independence
-        commonData.value = JSON.parse(JSON.stringify(table))
-        appearanceData.value = JSON.parse(JSON.stringify(table))
+        // 使用预处理好的唯一路径ID
+        const fullPath = data.fullPath || data.id
+        const category = data.category
+        lastRequestContext.value = { nodeLabel: fullPath, category }
+        await loadFullData({ nodeLabel: fullPath, category, resetFilters: true })
       } catch (error) {
         console.error('加载节点详情失败:', error)
+        selectedCategory.value = ''
+        filterOptions.value = { ccCodes: [], scheduleThicknesses: [], materialGrades: [] }
+        filterForm.value = { ccCode: '/', scheduleThickness: '/', materialGrade: '/' }
+        commonColumns.value = []
+        appearanceColumns.value = []
+        componentDetails.value = {}
+        commonData.value = []
+        appearanceData.value = []
+        ElMessage.error('加载节点详情失败')
       }
     } else if (isCodelistLibrary.value) {
       try {
@@ -567,6 +812,9 @@ const handleNodeClick = async (data) => {
     } else {
       // 其他专业暂无数据加载逻辑
       componentDetails.value = {}
+      selectedCategory.value = ''
+      commonColumns.value = []
+      appearanceColumns.value = []
       commonData.value = []
       appearanceData.value = []
     }
@@ -585,8 +833,12 @@ const handleCodelistRowClick = (row) => {
   codelistTableRef.value?.toggleRowSelection(row)
 }
 
-const checkSelectable = (row) => {
-  return !row.disabled
+const handleCommonSelectionChange = (selection) => {
+  commonSelection.value = selection
+}
+
+const handleAppearanceSelectionChange = (selection) => {
+  appearanceSelection.value = selection
 }
 
 const tableRowClassName = ({ row }) => {
@@ -596,34 +848,47 @@ const tableRowClassName = ({ row }) => {
   return ''
 }
 
-const handleDisable = async () => {
+const handleToggleStatus = async () => {
   let tableRef = null
+  let selection = []
+  
   if (activeTab.value === 'common') {
     tableRef = commonTableRef.value
+    selection = commonSelection.value
   } else {
     tableRef = appearanceTableRef.value
+    selection = appearanceSelection.value
   }
   
-  const selectedRows = tableRef?.getSelectionRows()
-  
-  if (!selectedRows || selectedRows.length === 0) {
-    ElMessage.warning('请先选择要禁用的行')
+  if (!selection || selection.length === 0) {
+    ElMessage.warning('请先选择要操作的行')
     return
   }
   
-  // 标记行为禁用并取消选择
-  selectedRows.forEach(row => {
-    row.disabled = true
-    tableRef.toggleRowSelection(row, false)
-  })
-  
-  try {
-    await disableRows(selectedRows)
-    ElMessage.success('禁用成功')
-  } catch (error) {
-    console.error('禁用失败:', error)
-    ElMessage.error('禁用失败')
+  if (isAllDisabled.value) {
+    // 恢复操作
+    try {
+      await enableRows(selection)
+      selection.forEach(row => row.disabled = false)
+      ElMessage.success('恢复成功')
+    } catch (error) {
+      console.error('恢复失败:', error)
+      ElMessage.error('恢复失败')
+    }
+  } else {
+    // 禁用操作
+    try {
+      await disableRows(selection)
+      selection.forEach(row => row.disabled = true)
+      ElMessage.success('禁用成功')
+    } catch (error) {
+      console.error('禁用失败:', error)
+      ElMessage.error('禁用失败')
+    }
   }
+  
+  // 清除选择状态
+  tableRef.clearSelection()
 }
 
 const handleAdd = () => {

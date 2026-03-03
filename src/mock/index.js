@@ -219,8 +219,9 @@ export const db = {
     data: [
       {
         label: '01 管材',
+        category: 'pipe',
         children: [
-          { label: '不锈钢管', children: [{ label: 'GB/T 14976-2012' }, { label: '双相不锈钢管' }] },
+          { label: '不锈钢管', children: [{ label: 'GB/T 14976-2012', children: [{ label: 'SeamlessPipe' }] }] },
           { label: '铜管' },
           { label: '无缝钢管' },
           { label: '有缝钢管' }
@@ -228,25 +229,72 @@ export const db = {
       },
       {
         label: '02 弯头',
-        children: [
-          { label: '承插弯头' },
+        category: 'pipeComponent',
+        children: [        
+          { 
+            label: '承插弯头' , 
+            children: [
+                { 
+                  label: 'Q/SWS 34-003.2-2021', 
+                  children: [
+                    { label: '45DegElbow' }
+                  ]
+                }
+              ]
+            },
           { label: '对焊弯头' },
           { label: '排气管虾壳弯' }
         ]
       },
-      { label: '03 异径' },
-      { label: '04 法兰' },
-      { label: '05 三通' },
-      { label: '06 垫片' },
-      { label: '07 紧固件' },
-      { label: '08 阀附件' },
-      { label: '09 漏水口' },
-      { label: '10 漏油口' },
-      { label: '11 套管', children: [
+      // { label: '03 异径' },
+      // { label: '04 法兰' },
+      // { label: '05 三通' },
+      { 
+        label: '06 垫片',
+        category: 'gasket',
+        children: [
+          { label: '金属缠绕垫片', children: [{ label: 'GB/T 4622.2', children: [{ label: 'SpiralWoundGasket' }] }] }
+        ]
+      },
+      { 
+        label: '07 紧固件',
+        children: [
+          { 
+            label: '螺栓', 
+            category: 'bolt',
+            children: [{ label: 'GB/T 5782', children: [{ label: 'HexBolt' }] }] 
+          },
+          { 
+            label: '螺母', 
+            category: 'nut',
+            children: [{ label: 'GB/T 6170', children: [{ label: 'HexNut' }] }] 
+          },
+          { 
+            label: '垫圈', 
+            category: 'washer',
+            children: [{ label: 'GB/T 97.1', children: [{ label: 'FlatWasher' }] }] 
+          }
+        ]
+      },
+      // { label: '08 阀附件' },
+      // { label: '09 漏水口' },
+      // { label: '10 漏油口' },
+      { label: '11 套管', category: 'pipeComponent', children: [
         { 
           label: '连接套管', 
           children: [
-            { label: 'Q/SWS 34-010-2021 ConnectionSleeve' },
+            { 
+              label: 'Q/SWS 34-010-2021', 
+              children: [
+                { label: 'ConnectionSleeve' }
+              ]
+            },
+            { 
+              label: 'Q/SWS 34-015-2021', 
+              children: [
+                { label: 'ConnectionSleeve' }
+              ]
+            },
             { label: 'Q/SWS 34-071-2021' },
             { label: 'Q/SWS 34-077-2021' }
           ]
@@ -257,10 +305,10 @@ export const db = {
         { label: '承插插头' },
         { label: '直通接头' }
       ]},
-      { label: '12 设备' },
-      { label: '13 膨胀节' },
-      { label: '14 焊接座' },
-      { label: '15 通岸接头' }
+      // { label: '12 设备' },
+      // { label: '13 膨胀节' },
+      // { label: '14 焊接座' },
+      // { label: '15 通岸接头' }
     ]
   },
   'codelist-tree': {
@@ -289,61 +337,128 @@ export const db = {
       }
     ]
   },
-  'library-component-details': {
-    ccCode: 'PCSSA23',
-    wallThickness: 'Sch.40',
-    material: '20#',
-    partClassName: 'ConnectionSleeve',
-    geometryCategory: 'Linear, full size',
-    partCategory: 'CPL',
-    symbolMethod: 'Coupling,Ing',
-    userClassName: 'ConnectionSleeve'
+  'library-component-details-sleeve': {
+    IndustryCommodityCode: 'PCSSA23',
+    ScheduleThickness: 'Sch.40',
+    CommodityType: 'CPL',
+    GeometryType: 'Linear, full size',
+    GeometricIndustryStandard: 'Q/SWS 34-010-2021', // Should be hidden
+    MaterialGrade: '20#',
+    PartClassName: 'ConnectionSleeve',
+    UserClassName: 'ConnectionSleeve',
+    PartDataBasis: 'Part Data Basis Value'
+    // No BentAngle for sleeve
   },
-  'library-table-data': [
+  'library-component-details-elbow': {
+    IndustryCommodityCode: 'PCSEL45',
+    ScheduleThickness: 'Sch.80',
+    CommodityType: 'ELB',
+    GeometryType: 'Turn, 45 degree',
+    GeometricIndustryStandard: 'Q/SWS 34-003.2-2021', // Should be hidden
+    MaterialGrade: '304SS',
+    BentAngle: '45',
+    PartClassName: '45DegElbow',
+    UserClassName: '45DegElbow',
+    PartDataBasis: 'Part Data Basis Value'
+  },
+  'library-component-details-pipe': {
+    IndustryCommodityCode: 'PIPE001', 
+    ScheduleThickness: 'Sch.40',
+    CommodityType: 'PIPE',
+    GeometricIndustryStandard: 'GB/T 14976-2012', // Should be hidden
+    MaterialGrade: '316L'
+  },
+  'library-component-details-bolt': {
+    IndustryCommodityCode: 'BOLT001',
+    GeometricIndustryStandard: 'GB/T 5782', // Should be hidden
+    MaterialGrade: 'A193 B7',
+    BoltType: 'Hex Head'
+  },
+  'library-component-details-gasket': {
+    IndustryCommodityCode: 'GASKET001',
+    NominalDiameterFrom: '10',
+    NominalDiameterTo: '200',
+    NominalDiameter: '100',
+    NpdUnitType: 'mm',
+    GeometricIndustryStandard: 'GB/T 4622.2', // Should be hidden
+    GasketType: 'Spiral Wound',
+    ThicknessFor3DModel: '4.5',
+    ProcurementThickness: '4.5',
+    MaterialGrade: '304SS',
+    GasketOutsideDiameter: '140',
+    GasketInsideDiameter: '110',
+    FlangeFacing: 'RF'
+  },
+  'library-component-details-nut': {
+    IndustryCommodityCode: 'NUT001',
+    GeometricIndustryStandard: 'GB/T 6170', // Should be hidden
+    MaterialGrade: 'A194 2H',
+    NutType: 'Hex Nut',
+    NutHeight: '12'
+  },
+  'library-component-details-washer': {
+    IndustryCommodityCode: 'WASHER001',
+    GeometricIndustryStandard: 'GB/T 97.1', // Should be hidden
+    MaterialGrade: '304SS',
+    WasherType: 'Flat Washer',
+    WasherThickness: '3'
+  },
+  'library-table-data-sleeve': [
     { 
-      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '10mm', port2Size: '10mm',
+      id: 1, ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '10mm', port2Size: '10mm',
       wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.1,
-      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A5B37X11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA27*4*50 20#钢'
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A5B37X11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA27*4*50 20#钢',
+      disabled: false
     },
     { 
-      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '15mm', port2Size: '15mm',
+      id: 2, ccCode: 'PCSSA24', endStd1: 'Q/SWS 34-010-2021-B', endStd2: 'Q/SWS 34-010-2021-B', connType1: 'SWE', connType2: 'SWE', port1Size: '15mm', port2Size: '15mm',
       wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.15,
-      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A6B55X11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA32*4.5*50 20#钢'
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A5B37X12', materialDesc: '连接套管 Q/SWS 34-010-2021 TA27*4*60 20#钢',
+      disabled: false
     },
     { 
-      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '20mm', port2Size: '20mm',
+      id: 3, ccCode: 'PCSSA25', endStd1: 'Q/SWS 34-010-2021-C', endStd2: 'Q/SWS 34-010-2021-C', connType1: 'SWE', connType2: 'SWE', port1Size: '20mm', port2Size: '20mm',
       wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.2,
-      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A7B77X11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA38*5*50 20#钢'
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A5B37X13', materialDesc: '连接套管 Q/SWS 34-010-2021 TA27*4*70 20#钢',
+      disabled: true // 模拟已禁用
     },
     { 
-      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '25mm', port2Size: '25mm',
-      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.31,
-      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A9B88X11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA48*6*50 20#钢'
+      id: 4, ccCode: 'PCSSA26', endStd1: 'Q/SWS 34-010-2021-D', endStd2: 'Q/SWS 34-010-2021-D', connType1: 'SWE', connType2: 'SWE', port1Size: '25mm', port2Size: '25mm',
+      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.25,
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A5B37X14', materialDesc: '连接套管 Q/SWS 34-010-2021 TA27*4*80 20#钢',
+      disabled: false
     },
     { 
-      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '32mm', port2Size: '32mm',
-      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.4,
-      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23AAB99X11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA57*6.5*50 20#钢'
+      id: 5, ccCode: 'PCSSA27', endStd1: 'Q/SWS 34-010-2021-E', endStd2: 'Q/SWS 34-010-2021-E', connType1: 'SWE', connType2: 'SWE', port1Size: '32mm', port2Size: '32mm',
+      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.3,
+      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23A5B37X15', materialDesc: '连接套管 Q/SWS 34-010-2021 TA27*4*90 20#钢',
+      disabled: false
+    }
+  ],
+  'library-table-data-elbow': [
+    { 
+      id: 11, ccCode: 'PCSEL45', endStd1: 'Q/SWS 34-003.2-2021', endStd2: 'Q/SWS 34-003.2-2021', connType1: 'BW', connType2: 'BW', port1Size: '50mm', port2Size: '50mm',
+      wallThickness1: 'Sch.80', wallThickness2: 'Sch.80', flowDirection1: 'Bi', flowDirection2: 'Bi', weight: 1.2,
+      dryCogX: 10, dryCogY: 5, dryCogZ: 0, materialCode: 'ELB45-001', materialDesc: '45度承插弯头 Q/SWS 34-003.2-2021',
+      disabled: false
     },
     { 
-      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '40mm', port2Size: '40mm',
-      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.49,
-      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23ABBAAX11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA63.5*7*50 20#钢'
+      id: 12, ccCode: 'PCSEL46', endStd1: 'Q/SWS 34-003.2-2021', endStd2: 'Q/SWS 34-003.2-2021', connType1: 'BW', connType2: 'BW', port1Size: '65mm', port2Size: '65mm',
+      wallThickness1: 'Sch.80', wallThickness2: 'Sch.80', flowDirection1: 'Bi', flowDirection2: 'Bi', weight: 1.5,
+      dryCogX: 12, dryCogY: 6, dryCogZ: 0, materialCode: 'ELB45-002', materialDesc: '45度承插弯头 Q/SWS 34-003.2-2021',
+      disabled: false
     },
     { 
-      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '50mm', port2Size: '50mm',
-      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.6,
-      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23ABBBBX11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA76*7*50 20#钢'
+      id: 13, ccCode: 'PCSEL47', endStd1: 'Q/SWS 34-003.2-2021', endStd2: 'Q/SWS 34-003.2-2021', connType1: 'BW', connType2: 'BW', port1Size: '80mm', port2Size: '80mm',
+      wallThickness1: 'Sch.80', wallThickness2: 'Sch.80', flowDirection1: 'Bi', flowDirection2: 'Bi', weight: 2.0,
+      dryCogX: 15, dryCogY: 8, dryCogZ: 0, materialCode: 'ELB45-003', materialDesc: '45度承插弯头 Q/SWS 34-003.2-2021',
+      disabled: true
     },
     { 
-      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '65mm', port2Size: '65mm',
-      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 0.91,
-      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23AEBCCX11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA95*8.5*50 20#钢'
-    },
-    { 
-      ccCode: 'PCSSA23', endStd1: 'Q/SWS 34-010-2021-A', endStd2: 'Q/SWS 34-010-2021-A', connType1: 'SWE', connType2: 'SWE', port1Size: '80mm', port2Size: '80mm',
-      wallThickness1: 'Sch.40', wallThickness2: 'Sch.40', flowDirection1: 'In', flowDirection2: 'Out', weight: 2.1,
-      dryCogX: 0, dryCogY: 0, dryCogZ: 0, materialCode: 'SPSSS23AJDDDX11', materialDesc: '连接套管 Q/SWS 34-010-2021 TA114*11*75 20#钢'
+      id: 14, ccCode: 'PCSEL48', endStd1: 'Q/SWS 34-003.2-2021', endStd2: 'Q/SWS 34-003.2-2021', connType1: 'BW', connType2: 'BW', port1Size: '100mm', port2Size: '100mm',
+      wallThickness1: 'Sch.80', wallThickness2: 'Sch.80', flowDirection1: 'Bi', flowDirection2: 'Bi', weight: 3.5,
+      dryCogX: 20, dryCogY: 10, dryCogZ: 0, materialCode: 'ELB45-004', materialDesc: '45度承插弯头 Q/SWS 34-003.2-2021',
+      disabled: false
     }
   ],
   'codelist-table-data': [
@@ -364,13 +479,784 @@ Mock.mock(/\/api\/library\/codelist-tree/, 'get', () => {
   return { code: 200, data: db['codelist-tree'].data, message: 'success' }
 })
 
-Mock.mock(/\/api\/library\/component-details/, 'get', () => {
-  return { code: 200, data: db['library-component-details'], message: 'success' }
-})
+Mock.mock(/\/api\/library\/component-details/, 'get', (options) => {
+  const url = new URL(options.url, 'http://localhost')
+  const nodeLabel = url.searchParams.get('nodeLabel')
+  const category = url.searchParams.get('category')
+   
+  if (category === 'pipe') {
+    return { code: 200, data: db['library-component-details-pipe'], message: 'success' }
+  } else if (category === 'bolt') {
+    return { code: 200, data: db['library-component-details-bolt'], message: 'success' }
+  } else if (category === 'gasket') {
+    return { code: 200, data: db['library-component-details-gasket'], message: 'success' }
+  } else if (category === 'nut') {
+    return { code: 200, data: db['library-component-details-nut'], message: 'success' }
+  } else if (category === 'washer') {
+    return { code: 200, data: db['library-component-details-washer'], message: 'success' }
+  } else if (category === 'pipeComponent') {
+    if (nodeLabel && nodeLabel.includes('45DegElbow')) {
+      return { code: 200, data: db['library-component-details-elbow'], message: 'success' }
+    } else {
+      return { code: 200, data: db['library-component-details-sleeve'], message: 'success' }
+    }
+  } else {
+     // Fallback
+     return { code: 200, data: {}, message: 'success' }
+  }
+ })
+ 
+ Mock.mock(/\/api\/library\/component-full-data/, 'get', (options) => {
+   const url = new URL(options.url, 'http://localhost')
+   const nodeLabel = url.searchParams.get('nodeLabel')
+   const category = url.searchParams.get('category') || ''
+   const ccCode = url.searchParams.get('ccCode')
+   const scheduleThickness = url.searchParams.get('scheduleThickness')
+   const materialGrade = url.searchParams.get('materialGrade')
+ 
+   let base = {}
+   if (category === 'pipe') {
+     base = db['library-component-details-pipe']
+   } else if (category === 'bolt') {
+     base = db['library-component-details-bolt']
+   } else if (category === 'gasket') {
+     base = db['library-component-details-gasket']
+   } else if (category === 'nut') {
+     base = db['library-component-details-nut']
+   } else if (category === 'washer') {
+     base = db['library-component-details-washer']
+   } else if (category === 'pipeComponent') {
+     base = nodeLabel && nodeLabel.includes('45DegElbow') ? db['library-component-details-elbow'] : db['library-component-details-sleeve']
+   }
+ 
+   const commonColumns = [
+     { prop: 'IndustryCommodityCode', label: 'CC码' },
+     { prop: 'NPD[1]', label: '端口1通径' },
+     { prop: 'NpdUnitType[1]', label: '端口1通径单位' },
+     { prop: 'PressureRating[1]', label: '压力1' },
+     { prop: 'EndPreparation[1]', label: '端面连接形式1' },
+     { prop: 'EndStandard[1]', label: '端面标准1' },
+     { prop: 'ScheduleThickness[1]', label: '壁厚1' },
+     { prop: 'FlowDirection[1]', label: '流向1' },
+     { prop: 'NPD[2]', label: '端口2通径' },
+     { prop: 'NpdUnitType[2]', label: '端口2通径单位' },
+     { prop: 'PressureRating[2]', label: '压力2' },
+     { prop: 'EndPreparation[2]', label: '端面连接形式2' },
+     { prop: 'EndStandard[2]', label: '端面标准2' },
+     { prop: 'ScheduleThickness[2]', label: '壁厚2' },
+     { prop: 'FlowDirection[2]', label: '流向2' },
+     { prop: 'GeometricIndustryStandard', label: '几何工业标准' }
+   ]
+ 
+   const pipeComponentAppearanceColumns = [
+     { prop: 'IndustryCommodityCode', label: 'CC码' },
+     { prop: 'NPD[1]', label: '端口1通径' },
+     { prop: 'NpdUnitType[1]', label: 'NpdUnitType[1]' },
+     { prop: 'EndPreparation[1]', label: '端面连接形式1' },
+     { prop: 'ScheduleThickness[1]', label: '壁厚1' },
+     { prop: 'NPD[2]', label: '端口2通径' },
+     { prop: 'NpdUnitType[2]', label: 'NpdUnitType[2]' },
+     { prop: 'EndPreparation[2]', label: '端面连接形式2' },
+     { prop: 'ScheduleThickness[2]', label: '壁厚2' },
+     { prop: 'DryWeight', label: '重量' },
+     { prop: 'DryCogX', label: 'DryCogX' },
+     { prop: 'DryCogY', label: 'DryCogY' },
+     { prop: 'DryCogZ', label: 'DryCogZ' },
+     { prop: 'PartDescription', label: '物资描述' },
+     { prop: 'MaterialsMgmtIdent', label: '物资编码' },
+     { prop: 'GeometricIndustryStandard', label: '几何工业标准' },
+     { prop: 'BendRadius', label: '弯曲半径' },
+     { prop: 'JsonData', label: 'JsonData' }
+   ]
+ 
+   const pipeAppearanceColumns = [
+     { prop: 'IndustryCommodityCode', label: 'CC码' },
+     { prop: 'NPD[1]', label: '端口1通径' },
+     { prop: 'NpdUnitType[1]', label: '端口1通径单位' },
+     { prop: 'EndPreparation[1]', label: '端面连接形式1' },
+     { prop: 'ScheduleThickness[1]', label: '壁厚1' },
+     { prop: 'NPD[2]', label: '端口2通径' },
+     { prop: 'NpdUnitType[2]', label: '端口2通径单位' },
+     { prop: 'EndPreparation[2]', label: '端面连接形式2' },
+     { prop: 'ScheduleThickness[2]', label: '壁厚2' },
+     { prop: 'Density', label: '密度' },
+     { prop: 'PurchaseLength', label: '采购长度' },
+     { prop: 'MinimumPipeLength', label: '最小管长' },
+     { prop: 'MaximumPipeLength', label: '最大管长' },
+     { prop: 'WeightPerUnitLength', label: '单位长度重量' },
+     { prop: 'PartDescription', label: '物资描述' },
+     { prop: 'MaterialsMgmtIdent', label: '物资编码' },
+     { prop: 'GeometricIndustryStandard', label: '几何工业标准' },
+     { prop: 'JsonData', label: 'JsonData' }
+   ]
+ 
+   const commonRowsByCategory = {
+     pipe: [
+       {
+         IndustryCommodityCode: 'PIPE001',
+         MaterialGrade: '316L',
+         'NPD[1]': '100',
+         'NpdUnitType[1]': 'mm',
+         'PressureRating[1]': 'PN16',
+         'EndPreparation[1]': 'BW',
+         'EndStandard[1]': 'GB/T 14976-2012',
+         'ScheduleThickness[1]': 'Sch.40',
+         'FlowDirection[1]': 'Bi',
+         'NPD[2]': '100',
+         'NpdUnitType[2]': 'mm',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': 'BW',
+         'EndStandard[2]': 'GB/T 14976-2012',
+         'ScheduleThickness[2]': 'Sch.40',
+         'FlowDirection[2]': 'Bi',
+         GeometricIndustryStandard: 'GB/T 14976-2012'
+       },
+       {
+         IndustryCommodityCode: 'PIPE002',
+         MaterialGrade: '304SS',
+         'NPD[1]': '150',
+         'NpdUnitType[1]': 'mm',
+         'PressureRating[1]': 'PN25',
+         'EndPreparation[1]': 'BW',
+         'EndStandard[1]': 'GB/T 14976-2012',
+         'ScheduleThickness[1]': 'Sch.80',
+         'FlowDirection[1]': 'Bi',
+         'NPD[2]': '150',
+         'NpdUnitType[2]': 'mm',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': 'BW',
+         'EndStandard[2]': 'GB/T 14976-2012',
+         'ScheduleThickness[2]': 'Sch.80',
+         'FlowDirection[2]': 'Bi',
+         GeometricIndustryStandard: 'GB/T 14976-2012'
+       }
+     ],
+     pipeComponent: [
+       {
+         IndustryCommodityCode: nodeLabel && nodeLabel.includes('45DegElbow') ? 'PCELB45-001' : 'PCSLEEV-001',
+         MaterialGrade: nodeLabel && nodeLabel.includes('45DegElbow') ? '304SS' : '20#',
+         'NPD[1]': '50',
+         'NpdUnitType[1]': 'mm',
+         'PressureRating[1]': 'PN16',
+         'EndPreparation[1]': 'SW',
+         'EndStandard[1]': 'Q/SWS',
+         'ScheduleThickness[1]': 'Sch.40',
+         'FlowDirection[1]': 'Bi',
+         'NPD[2]': '50',
+         'NpdUnitType[2]': 'mm',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': 'SW',
+         'EndStandard[2]': 'Q/SWS',
+         'ScheduleThickness[2]': 'Sch.40',
+         'FlowDirection[2]': 'Bi',
+         GeometricIndustryStandard: nodeLabel && nodeLabel.includes('45DegElbow') ? 'Q/SWS 34-003.2-2021' : 'Q/SWS 34-010-2021'
+       },
+       {
+         IndustryCommodityCode: nodeLabel && nodeLabel.includes('45DegElbow') ? 'PCELB45-002' : 'PCSLEEV-002',
+         MaterialGrade: nodeLabel && nodeLabel.includes('45DegElbow') ? '304SS' : '20#',
+         'NPD[1]': '65',
+         'NpdUnitType[1]': 'mm',
+         'PressureRating[1]': 'PN16',
+         'EndPreparation[1]': 'SW',
+         'EndStandard[1]': 'Q/SWS',
+         'ScheduleThickness[1]': 'Sch.40',
+         'FlowDirection[1]': 'Bi',
+         'NPD[2]': '65',
+         'NpdUnitType[2]': 'mm',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': 'SW',
+         'EndStandard[2]': 'Q/SWS',
+         'ScheduleThickness[2]': 'Sch.40',
+         'FlowDirection[2]': 'Bi',
+         GeometricIndustryStandard: nodeLabel && nodeLabel.includes('45DegElbow') ? 'Q/SWS 34-003.2-2021' : 'Q/SWS 34-010-2021'
+       }
+     ],
+     bolt: [
+       {
+         IndustryCommodityCode: 'BOLT001',
+         MaterialGrade: 'A193 B7',
+         'NPD[1]': '',
+         'NpdUnitType[1]': '',
+         'PressureRating[1]': '',
+         'EndPreparation[1]': '',
+         'EndStandard[1]': '',
+         'ScheduleThickness[1]': '',
+         'FlowDirection[1]': '',
+         'NPD[2]': '',
+         'NpdUnitType[2]': '',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': '',
+         'EndStandard[2]': '',
+         'ScheduleThickness[2]': '',
+         'FlowDirection[2]': '',
+         GeometricIndustryStandard: 'GB/T 5782'
+       }
+     ],
+     gasket: [
+       {
+         IndustryCommodityCode: 'GASKET001',
+         MaterialGrade: '304SS',
+         'NPD[1]': '100',
+         'NpdUnitType[1]': 'mm',
+         'PressureRating[1]': '',
+         'EndPreparation[1]': '',
+         'EndStandard[1]': '',
+         'ScheduleThickness[1]': '',
+         'FlowDirection[1]': '',
+         'NPD[2]': '',
+         'NpdUnitType[2]': '',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': '',
+         'EndStandard[2]': '',
+         'ScheduleThickness[2]': '',
+         'FlowDirection[2]': '',
+         GeometricIndustryStandard: 'GB/T 4622.2'
+       }
+     ],
+     nut: [
+       {
+         IndustryCommodityCode: 'NUT001',
+         MaterialGrade: 'A194 2H',
+         'NPD[1]': '',
+         'NpdUnitType[1]': '',
+         'PressureRating[1]': '',
+         'EndPreparation[1]': '',
+         'EndStandard[1]': '',
+         'ScheduleThickness[1]': '',
+         'FlowDirection[1]': '',
+         'NPD[2]': '',
+         'NpdUnitType[2]': '',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': '',
+         'EndStandard[2]': '',
+         'ScheduleThickness[2]': '',
+         'FlowDirection[2]': '',
+         GeometricIndustryStandard: 'GB/T 6170'
+       }
+     ],
+     washer: [
+       {
+         IndustryCommodityCode: 'WASHER001',
+         MaterialGrade: '304SS',
+         'NPD[1]': '',
+         'NpdUnitType[1]': '',
+         'PressureRating[1]': '',
+         'EndPreparation[1]': '',
+         'EndStandard[1]': '',
+         'ScheduleThickness[1]': '',
+         'FlowDirection[1]': '',
+         'NPD[2]': '',
+         'NpdUnitType[2]': '',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': '',
+         'EndStandard[2]': '',
+         'ScheduleThickness[2]': '',
+         'FlowDirection[2]': '',
+         GeometricIndustryStandard: 'GB/T 97.1'
+       }
+     ]
+   }
+ 
+   const appearanceRowsByCategory = {
+     pipe: [
+       {
+         IndustryCommodityCode: 'PIPE001',
+         MaterialGrade: '316L',
+         'NPD[1]': '100',
+         'NpdUnitType[1]': 'mm',
+         'EndPreparation[1]': 'BW',
+         'ScheduleThickness[1]': 'Sch.40',
+         'NPD[2]': '100',
+         'NpdUnitType[2]': 'mm',
+         'EndPreparation[2]': 'BW',
+         'ScheduleThickness[2]': 'Sch.40',
+         Density: 7.85,
+         PurchaseLength: 12,
+         MinimumPipeLength: 6,
+         MaximumPipeLength: 12,
+         WeightPerUnitLength: 18.6,
+         PartDescription: '不锈钢管',
+         MaterialsMgmtIdent: 'MAT-PIPE-001',
+         GeometricIndustryStandard: 'GB/T 14976-2012',
+         JsonData: ''
+       },
+       {
+         IndustryCommodityCode: 'PIPE002',
+         MaterialGrade: '304SS',
+         'NPD[1]': '150',
+         'NpdUnitType[1]': 'mm',
+         'EndPreparation[1]': 'BW',
+         'ScheduleThickness[1]': 'Sch.80',
+         'NPD[2]': '150',
+         'NpdUnitType[2]': 'mm',
+         'EndPreparation[2]': 'BW',
+         'ScheduleThickness[2]': 'Sch.80',
+         Density: 7.85,
+         PurchaseLength: 12,
+         MinimumPipeLength: 6,
+         MaximumPipeLength: 12,
+         WeightPerUnitLength: 28.9,
+         PartDescription: '不锈钢管',
+         MaterialsMgmtIdent: 'MAT-PIPE-002',
+         GeometricIndustryStandard: 'GB/T 14976-2012',
+         JsonData: ''
+       }
+     ],
+     pipeComponent: [
+       {
+         IndustryCommodityCode: nodeLabel && nodeLabel.includes('45DegElbow') ? 'PCELB45-001' : 'PCSLEEV-001',
+         MaterialGrade: nodeLabel && nodeLabel.includes('45DegElbow') ? '304SS' : '20#',
+         'NPD[1]': '50',
+         'NpdUnitType[1]': 'mm',
+         'EndPreparation[1]': 'SW',
+         'ScheduleThickness[1]': 'Sch.40',
+         'NPD[2]': '50',
+         'NpdUnitType[2]': 'mm',
+         'EndPreparation[2]': 'SW',
+         'ScheduleThickness[2]': 'Sch.40',
+         DryWeight: nodeLabel && nodeLabel.includes('45DegElbow') ? 1.2 : 0.2,
+         DryCogX: 0,
+         DryCogY: 0,
+         DryCogZ: 0,
+         PartDescription: nodeLabel && nodeLabel.includes('45DegElbow') ? '45度承插弯头' : '连接套管',
+         MaterialsMgmtIdent: nodeLabel && nodeLabel.includes('45DegElbow') ? 'MAT-ELB-001' : 'MAT-SLEEV-001',
+         GeometricIndustryStandard: nodeLabel && nodeLabel.includes('45DegElbow') ? 'Q/SWS 34-003.2-2021' : 'Q/SWS 34-010-2021',
+         BendRadius: nodeLabel && nodeLabel.includes('45DegElbow') ? 1.5 : '',
+         JsonData: ''
+       },
+       {
+         IndustryCommodityCode: nodeLabel && nodeLabel.includes('45DegElbow') ? 'PCELB45-002' : 'PCSLEEV-002',
+         MaterialGrade: nodeLabel && nodeLabel.includes('45DegElbow') ? '304SS' : '20#',
+         'NPD[1]': '65',
+         'NpdUnitType[1]': 'mm',
+         'EndPreparation[1]': 'SW',
+         'ScheduleThickness[1]': 'Sch.40',
+         'NPD[2]': '65',
+         'NpdUnitType[2]': 'mm',
+         'EndPreparation[2]': 'SW',
+         'ScheduleThickness[2]': 'Sch.40',
+         DryWeight: nodeLabel && nodeLabel.includes('45DegElbow') ? 1.6 : 0.25,
+         DryCogX: 0,
+         DryCogY: 0,
+         DryCogZ: 0,
+         PartDescription: nodeLabel && nodeLabel.includes('45DegElbow') ? '45度承插弯头' : '连接套管',
+         MaterialsMgmtIdent: nodeLabel && nodeLabel.includes('45DegElbow') ? 'MAT-ELB-002' : 'MAT-SLEEV-002',
+         GeometricIndustryStandard: nodeLabel && nodeLabel.includes('45DegElbow') ? 'Q/SWS 34-003.2-2021' : 'Q/SWS 34-010-2021',
+         BendRadius: nodeLabel && nodeLabel.includes('45DegElbow') ? 1.5 : '',
+         JsonData: ''
+       }
+     ]
+   }
+ 
+   const dedupe = (arr) => Array.from(new Set((arr || []).filter(v => v !== null && v !== undefined && String(v).trim() !== '').map(v => String(v).trim())))
+   const allCommonRows = commonRowsByCategory[category] || []
+ 
+   const ccCodes = dedupe(allCommonRows.map(r => r.IndustryCommodityCode))
+   const scheduleThicknesses = dedupe(allCommonRows.flatMap(r => [r['ScheduleThickness[1]'], r['ScheduleThickness[2]']]))
+   const rowMaterials = dedupe(allCommonRows.map(r => r.MaterialGrade))
+   const baseMat = base?.MaterialGrade || base?.Materialgrade
+   const materialGrades = dedupe([baseMat, ...rowMaterials])
+ 
+   const matchesRow = (row) => {
+     if (ccCode && row.IndustryCommodityCode !== ccCode) return false
+     if (scheduleThickness) {
+       const t1 = row['ScheduleThickness[1]']
+       const t2 = row['ScheduleThickness[2]']
+       if (t1 !== scheduleThickness && t2 !== scheduleThickness) return false
+     }
+     if (materialGrade) {
+       const rowMat = row.MaterialGrade || row.Materialgrade
+       const effectiveMat = rowMat || baseMat
+       if (effectiveMat && effectiveMat !== materialGrade) return false
+     }
+     return true
+   }
+ 
+   const filteredCommonRows = allCommonRows.filter(matchesRow)
+   const groups = {
+     common: {
+       columns: commonColumns,
+       data: filteredCommonRows
+     }
+   }
+ 
+   if (category === 'pipe') {
+     groups.appearance = {
+       columns: pipeAppearanceColumns,
+       data: (appearanceRowsByCategory.pipe || []).filter(matchesRow)
+     }
+   }
+ 
+   if (category === 'pipeComponent') {
+     groups.appearance = {
+       columns: pipeComponentAppearanceColumns,
+       data: (appearanceRowsByCategory.pipeComponent || []).filter(matchesRow)
+     }
+   }
+ 
+   return {
+     code: 200,
+     message: 'success',
+     data: {
+       category,
+       base,
+       filters: {
+         ccCodes,
+         scheduleThicknesses,
+         materialGrades
+       },
+       table: {
+         category,
+         groups
+       }
+     }
+   }
+ })
+ 
+ Mock.mock(/\/api\/library\/table-data/, 'get', (options) => {
+   const url = new URL(options.url, 'http://localhost')
+   const nodeLabel = url.searchParams.get('nodeLabel')
+   const category = url.searchParams.get('category')
+ 
+   const commonColumns = [
+    { prop: 'IndustryCommodityCode', label: 'CC码' },
+    { prop: 'NPD[1]', label: '端口1通径' },
+    { prop: 'NpdUnitType[1]', label: '端口1通径单位' },
+    { prop: 'PressureRating[1]', label: '压力1' },
+    { prop: 'EndPreparation[1]', label: '端面连接形式1' },
+    { prop: 'EndStandard[1]', label: '端面标准1' },
+    { prop: 'ScheduleThickness[1]', label: '壁厚1' },
+    { prop: 'FlowDirection[1]', label: '流向1' },
+    { prop: 'NPD[2]', label: '端口2通径' },
+    { prop: 'NpdUnitType[2]', label: '端口2通径单位' },
+    { prop: 'PressureRating[2]', label: '压力2' },
+    { prop: 'EndPreparation[2]', label: '端面连接形式2' },
+    { prop: 'EndStandard[2]', label: '端面标准2' },
+    { prop: 'ScheduleThickness[2]', label: '壁厚2' },
+    { prop: 'FlowDirection[2]', label: '流向2' },
+    { prop: 'GeometricIndustryStandard', label: '几何工业标准' }
+  ]
 
-Mock.mock(/\/api\/library\/table-data/, 'get', () => {
-  return { code: 200, data: db['library-table-data'], message: 'success' }
-})
+  const pipeComponentAppearanceColumns = [
+    { prop: 'IndustryCommodityCode', label: 'CC码' },
+    { prop: 'NPD[1]', label: '端口1通径' },
+    { prop: 'NpdUnitType[1]', label: 'NpdUnitType[1]' },
+    { prop: 'EndPreparation[1]', label: '端面连接形式1' },
+    { prop: 'ScheduleThickness[1]', label: '壁厚1' },
+    { prop: 'NPD[2]', label: '端口2通径' },
+    { prop: 'NpdUnitType[2]', label: 'NpdUnitType[2]' },
+    { prop: 'EndPreparation[2]', label: '端面连接形式2' },
+    { prop: 'ScheduleThickness[2]', label: '壁厚2' },
+    { prop: 'DryWeight', label: '重量' },
+    { prop: 'DryCogX', label: 'DryCogX' },
+    { prop: 'DryCogY', label: 'DryCogY' },
+    { prop: 'DryCogZ', label: 'DryCogZ' },
+    { prop: 'PartDescription', label: '物资描述' },
+    { prop: 'MaterialsMgmtIdent', label: '物资编码' },
+    { prop: 'GeometricIndustryStandard', label: '几何工业标准' },
+    { prop: 'BendRadius', label: '弯曲半径' },
+    { prop: 'JsonData', label: 'JsonData' }
+  ]
+
+  const pipeAppearanceColumns = [
+    { prop: 'IndustryCommodityCode', label: 'CC码' },
+    { prop: 'NPD[1]', label: '端口1通径' },
+    { prop: 'NpdUnitType[1]', label: '端口1通径单位' },
+    { prop: 'EndPreparation[1]', label: '端面连接形式1' },
+    { prop: 'ScheduleThickness[1]', label: '壁厚1' },
+    { prop: 'NPD[2]', label: '端口2通径' },
+    { prop: 'NpdUnitType[2]', label: '端口2通径单位' },
+    { prop: 'EndPreparation[2]', label: '端面连接形式2' },
+    { prop: 'ScheduleThickness[2]', label: '壁厚2' },
+    { prop: 'Density', label: '密度' },
+    { prop: 'PurchaseLength', label: '采购长度' },
+    { prop: 'MinimumPipeLength', label: '最小管长' },
+    { prop: 'MaximumPipeLength', label: '最大管长' },
+    { prop: 'WeightPerUnitLength', label: '单位长度重量' },
+    { prop: 'PartDescription', label: '物资描述' },
+    { prop: 'MaterialsMgmtIdent', label: '物资编码' },
+    { prop: 'GeometricIndustryStandard', label: '几何工业标准' },
+    { prop: 'JsonData', label: 'JsonData' }
+  ]
+ 
+   const commonRowsByCategory = {
+     pipe: [
+       {
+         IndustryCommodityCode: 'PIPE001',
+         'NPD[1]': '100',
+         'NpdUnitType[1]': 'mm',
+         'PressureRating[1]': 'PN16',
+         'EndPreparation[1]': 'BW',
+         'EndStandard[1]': 'GB/T 14976-2012',
+         'ScheduleThickness[1]': 'Sch.40',
+         'FlowDirection[1]': 'Bi',
+         'NPD[2]': '100',
+         'NpdUnitType[2]': 'mm',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': 'BW',
+         'EndStandard[2]': 'GB/T 14976-2012',
+         'ScheduleThickness[2]': 'Sch.40',
+         'FlowDirection[2]': 'Bi',
+         GeometricIndustryStandard: 'GB/T 14976-2012'
+       },
+       {
+         IndustryCommodityCode: 'PIPE002',
+         'NPD[1]': '150',
+         'NpdUnitType[1]': 'mm',
+         'PressureRating[1]': 'PN25',
+         'EndPreparation[1]': 'BW',
+         'EndStandard[1]': 'GB/T 14976-2012',
+         'ScheduleThickness[1]': 'Sch.80',
+         'FlowDirection[1]': 'Bi',
+         'NPD[2]': '150',
+         'NpdUnitType[2]': 'mm',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': 'BW',
+         'EndStandard[2]': 'GB/T 14976-2012',
+         'ScheduleThickness[2]': 'Sch.80',
+         'FlowDirection[2]': 'Bi',
+         GeometricIndustryStandard: 'GB/T 14976-2012'
+       }
+     ],
+     pipeComponent: [
+       {
+         IndustryCommodityCode: nodeLabel && nodeLabel.includes('45DegElbow') ? 'PCELB45-001' : 'PCSLEEV-001',
+         'NPD[1]': '50',
+         'NpdUnitType[1]': 'mm',
+         'PressureRating[1]': 'PN16',
+         'EndPreparation[1]': 'SW',
+         'EndStandard[1]': 'Q/SWS',
+         'ScheduleThickness[1]': 'Sch.40',
+         'FlowDirection[1]': 'Bi',
+         'NPD[2]': '50',
+         'NpdUnitType[2]': 'mm',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': 'SW',
+         'EndStandard[2]': 'Q/SWS',
+         'ScheduleThickness[2]': 'Sch.40',
+         'FlowDirection[2]': 'Bi',
+         GeometricIndustryStandard: nodeLabel && nodeLabel.includes('45DegElbow') ? 'Q/SWS 34-003.2-2021' : 'Q/SWS 34-010-2021'
+       },
+       {
+         IndustryCommodityCode: nodeLabel && nodeLabel.includes('45DegElbow') ? 'PCELB45-002' : 'PCSLEEV-002',
+         'NPD[1]': '65',
+         'NpdUnitType[1]': 'mm',
+         'PressureRating[1]': 'PN16',
+         'EndPreparation[1]': 'SW',
+         'EndStandard[1]': 'Q/SWS',
+         'ScheduleThickness[1]': 'Sch.40',
+         'FlowDirection[1]': 'Bi',
+         'NPD[2]': '65',
+         'NpdUnitType[2]': 'mm',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': 'SW',
+         'EndStandard[2]': 'Q/SWS',
+         'ScheduleThickness[2]': 'Sch.40',
+         'FlowDirection[2]': 'Bi',
+         GeometricIndustryStandard: nodeLabel && nodeLabel.includes('45DegElbow') ? 'Q/SWS 34-003.2-2021' : 'Q/SWS 34-010-2021'
+       }
+     ],
+     bolt: [
+       {
+         IndustryCommodityCode: 'BOLT001',
+         'NPD[1]': '',
+         'NpdUnitType[1]': '',
+         'PressureRating[1]': '',
+         'EndPreparation[1]': '',
+         'EndStandard[1]': '',
+         'ScheduleThickness[1]': '',
+         'FlowDirection[1]': '',
+         'NPD[2]': '',
+         'NpdUnitType[2]': '',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': '',
+         'EndStandard[2]': '',
+         'ScheduleThickness[2]': '',
+         'FlowDirection[2]': '',
+         GeometricIndustryStandard: 'GB/T 5782'
+       }
+     ],
+     gasket: [
+       {
+         IndustryCommodityCode: 'GASKET001',
+         'NPD[1]': '100',
+         'NpdUnitType[1]': 'mm',
+         'PressureRating[1]': '',
+         'EndPreparation[1]': '',
+         'EndStandard[1]': '',
+         'ScheduleThickness[1]': '',
+         'FlowDirection[1]': '',
+         'NPD[2]': '',
+         'NpdUnitType[2]': '',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': '',
+         'EndStandard[2]': '',
+         'ScheduleThickness[2]': '',
+         'FlowDirection[2]': '',
+         GeometricIndustryStandard: 'GB/T 4622.2'
+       }
+     ],
+     nut: [
+       {
+         IndustryCommodityCode: 'NUT001',
+         'NPD[1]': '',
+         'NpdUnitType[1]': '',
+         'PressureRating[1]': '',
+         'EndPreparation[1]': '',
+         'EndStandard[1]': '',
+         'ScheduleThickness[1]': '',
+         'FlowDirection[1]': '',
+         'NPD[2]': '',
+         'NpdUnitType[2]': '',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': '',
+         'EndStandard[2]': '',
+         'ScheduleThickness[2]': '',
+         'FlowDirection[2]': '',
+         GeometricIndustryStandard: 'GB/T 6170'
+       }
+     ],
+     washer: [
+       {
+         IndustryCommodityCode: 'WASHER001',
+         'NPD[1]': '',
+         'NpdUnitType[1]': '',
+         'PressureRating[1]': '',
+         'EndPreparation[1]': '',
+         'EndStandard[1]': '',
+         'ScheduleThickness[1]': '',
+         'FlowDirection[1]': '',
+         'NPD[2]': '',
+         'NpdUnitType[2]': '',
+         'PressureRating[2]': '',
+         'EndPreparation[2]': '',
+         'EndStandard[2]': '',
+         'ScheduleThickness[2]': '',
+         'FlowDirection[2]': '',
+         GeometricIndustryStandard: 'GB/T 97.1'
+       }
+     ]
+   }
+ 
+   const appearanceRowsByCategory = {
+     pipe: [
+       {
+         IndustryCommodityCode: 'PIPE001',
+         'NPD[1]': '100',
+         'NpdUnitType[1]': 'mm',
+         'EndPreparation[1]': 'BW',
+         'ScheduleThickness[1]': 'Sch.40',
+         'NPD[2]': '100',
+         'NpdUnitType[2]': 'mm',
+         'EndPreparation[2]': 'BW',
+         'ScheduleThickness[2]': 'Sch.40',
+         Density: 7.85,
+         PurchaseLength: 12,
+         MinimumPipeLength: 6,
+         MaximumPipeLength: 12,
+         WeightPerUnitLength: 18.6,
+         PartDescription: '不锈钢管',
+         MaterialsMgmtIdent: 'MAT-PIPE-001',
+         GeometricIndustryStandard: 'GB/T 14976-2012',
+         JsonData: ''
+       },
+       {
+         IndustryCommodityCode: 'PIPE002',
+         'NPD[1]': '150',
+         'NpdUnitType[1]': 'mm',
+         'EndPreparation[1]': 'BW',
+         'ScheduleThickness[1]': 'Sch.80',
+         'NPD[2]': '150',
+         'NpdUnitType[2]': 'mm',
+         'EndPreparation[2]': 'BW',
+         'ScheduleThickness[2]': 'Sch.80',
+         Density: 7.85,
+         PurchaseLength: 12,
+         MinimumPipeLength: 6,
+         MaximumPipeLength: 12,
+         WeightPerUnitLength: 28.9,
+         PartDescription: '不锈钢管',
+         MaterialsMgmtIdent: 'MAT-PIPE-002',
+         GeometricIndustryStandard: 'GB/T 14976-2012',
+         JsonData: ''
+       }
+     ],
+     pipeComponent: [
+       {
+         IndustryCommodityCode: nodeLabel && nodeLabel.includes('45DegElbow') ? 'PCELB45-001' : 'PCSLEEV-001',
+         'NPD[1]': '50',
+         'NpdUnitType[1]': 'mm',
+         'EndPreparation[1]': 'SW',
+         'ScheduleThickness[1]': 'Sch.40',
+         'NPD[2]': '50',
+         'NpdUnitType[2]': 'mm',
+         'EndPreparation[2]': 'SW',
+         'ScheduleThickness[2]': 'Sch.40',
+         DryWeight: nodeLabel && nodeLabel.includes('45DegElbow') ? 1.2 : 0.2,
+         DryCogX: 0,
+         DryCogY: 0,
+         DryCogZ: 0,
+         PartDescription: nodeLabel && nodeLabel.includes('45DegElbow') ? '45度承插弯头' : '连接套管',
+         MaterialsMgmtIdent: nodeLabel && nodeLabel.includes('45DegElbow') ? 'MAT-ELB-001' : 'MAT-SLEEV-001',
+         GeometricIndustryStandard: nodeLabel && nodeLabel.includes('45DegElbow') ? 'Q/SWS 34-003.2-2021' : 'Q/SWS 34-010-2021',
+         BendRadius: nodeLabel && nodeLabel.includes('45DegElbow') ? 1.5 : '',
+         JsonData: ''
+       },
+       {
+         IndustryCommodityCode: nodeLabel && nodeLabel.includes('45DegElbow') ? 'PCELB45-002' : 'PCSLEEV-002',
+         'NPD[1]': '65',
+         'NpdUnitType[1]': 'mm',
+         'EndPreparation[1]': 'SW',
+         'ScheduleThickness[1]': 'Sch.40',
+         'NPD[2]': '65',
+         'NpdUnitType[2]': 'mm',
+         'EndPreparation[2]': 'SW',
+         'ScheduleThickness[2]': 'Sch.40',
+         DryWeight: nodeLabel && nodeLabel.includes('45DegElbow') ? 1.6 : 0.25,
+         DryCogX: 0,
+         DryCogY: 0,
+         DryCogZ: 0,
+         PartDescription: nodeLabel && nodeLabel.includes('45DegElbow') ? '45度承插弯头' : '连接套管',
+         MaterialsMgmtIdent: nodeLabel && nodeLabel.includes('45DegElbow') ? 'MAT-ELB-002' : 'MAT-SLEEV-002',
+         GeometricIndustryStandard: nodeLabel && nodeLabel.includes('45DegElbow') ? 'Q/SWS 34-003.2-2021' : 'Q/SWS 34-010-2021',
+         BendRadius: nodeLabel && nodeLabel.includes('45DegElbow') ? 1.5 : '',
+         JsonData: ''
+       }
+     ]
+   }
+ 
+   const resolvedCategory = category || ''
+   const commonRows = commonRowsByCategory[resolvedCategory] || []
+   const groups = {
+     common: {
+       columns: commonColumns,
+       data: commonRows
+     }
+   }
+ 
+   if (resolvedCategory === 'pipe') {
+     groups.appearance = {
+       columns: pipeAppearanceColumns,
+       data: appearanceRowsByCategory.pipe || []
+     }
+   }
+ 
+   if (resolvedCategory === 'pipeComponent') {
+     groups.appearance = {
+       columns: pipeComponentAppearanceColumns,
+       data: appearanceRowsByCategory.pipeComponent || []
+     }
+   }
+ 
+   return {
+     code: 200,
+     message: 'success',
+     data: {
+       category: resolvedCategory,
+       groups
+     }
+   }
+ })
 
 Mock.mock(/\/api\/library\/codelist-table-data/, 'get', () => {
   return { code: 200, data: db['codelist-table-data'], message: 'success' }
