@@ -28,6 +28,9 @@
 3. **启动开发服务器**
    ```bash
    npm run dev
+   taskkill /F /IM node.exe
+   npm ci
+   npm run build
    ```
    > 💡 启动成功后，按住 `Ctrl` 点击终端里的链接 (如 `http://localhost:5173`) 即可打开页面。
 
