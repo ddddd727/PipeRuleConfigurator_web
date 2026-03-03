@@ -473,7 +473,7 @@ const LOCAL_COLUMNS = {
 const LOCAL_TITLES = {
   'bend-pipe': '弯管机数据',
   'bend-parameter': '弯管参数',
-  'wall-thickness-series': '壁厚系列',
+  'wall-thickness-series': '壁厚等级',
   'shortcode': 'ShortCode细类',
   'spec': 'ShortCode定义'
 }
