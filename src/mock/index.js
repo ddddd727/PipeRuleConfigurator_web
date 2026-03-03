@@ -170,7 +170,50 @@ export const db = {
   }
 }
 
+// 基础库相关接口
+Mock.mock(/\/api\/library\/tree/, 'get', () => {
+  return { code: 200, data: db['library-tree'].data, message: 'success' }
+})
 
+Mock.mock(/\/api\/library\/codelist-tree/, 'get', () => {
+  return { code: 200, data: db['codelist-tree'].data, message: 'success' }
+})
+
+Mock.mock(/\/api\/library\/component-details/, 'get', () => {
+  return { code: 200, data: db['library-component-details'], message: 'success' }
+})
+
+Mock.mock(/\/api\/library\/table-data/, 'get', () => {
+  return { code: 200, data: db['library-table-data'], message: 'success' }
+})
+
+Mock.mock(/\/api\/library\/codelist-table-data/, 'get', () => {
+  return { code: 200, data: db['codelist-table-data'], message: 'success' }
+})
+
+// 拦截请求
+Mock.mock(/\/api\/dict\/[\w-]+/, 'get', (options) => {
+  console.log('Mock拦截:', options.url)
+  // 兼容带 - 的 id
+  const urlParts = options.url.split('/')
+  const id = urlParts[urlParts.length - 1]
+
+  const result = db[id]
+
+  if (result) {
+    return {
+      code: 200,
+      message: 'success',
+      data: Mock.mock(result)
+    }
+  } else {
+    return {
+      code: 404,
+      message: `未找到 [${id}] 的配置数据`,
+      data: { title: '未定义', columns: [], data: [] }
+    }
+  }
+})
 
 // --- PMC 模块 Mock ---
 
