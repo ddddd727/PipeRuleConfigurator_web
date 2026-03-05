@@ -1,15 +1,16 @@
 <template>
-  <div class="basic-library-container">
+  <div class="basic-library-container" :class="{ 'aside-collapsed': isAsideCollapsed }">
     <el-container class="main-layout">
       <!-- 左侧目录树 -->
-      <el-aside width="280px" class="tree-aside">
+      <el-aside :width="isAsideCollapsed ? '0px' : '280px'" class="tree-aside">
         <div class="tree-title">
           <el-icon><Menu /></el-icon>
-          <span>{{ currentTitle }}</span>
+          <span v-show="!isAsideCollapsed">{{ currentTitle }}</span>
         </div>
         <div v-if="isPipeProfessional || isCodelistLibrary" class="tree-content">
           <div class="tree-header">
             <el-input
+              v-show="!isAsideCollapsed"
               v-model="filterText"
               placeholder="搜索目录..."
               prefix-icon="Search"
@@ -35,7 +36,7 @@
                 <span class="custom-tree-node">
                   <el-icon v-if="data.children" class="folder-icon"><Folder /></el-icon>
                   <el-icon v-else class="file-icon"><Document /></el-icon>
-                  <span>{{ node.label }}</span>
+                  <span v-show="!isAsideCollapsed">{{ node.label }}</span>
                 </span>
               </template>
             </el-tree>
@@ -103,9 +104,13 @@
               <el-card shadow="never" class="info-card">
                 <template #header>
                 <div class="card-header">
+                  <el-button link @click="toggleAside" class="aside-toggle-button">
+                    <el-icon><Fold v-if="!isAsideCollapsed" /><Expand v-else /></el-icon>
+                  </el-button>
                   <span class="title">部件类型基础</span>
                   <span class="subtitle">*筛选条件默认为主端口1</span>
                   <div class="header-btns">
+                    <el-button type="primary" plain :icon="Plus" @click="handleAddBase">新增</el-button>
                     <el-button type="primary" plain :icon="Upload">导入</el-button>
                     <el-button type="primary" plain :icon="Download">导出</el-button>
                   </div>
@@ -159,6 +164,7 @@
                     :row-class-name="tableRowClassName"
                     @row-click="handleRowClick"
                     @selection-change="handleCommonSelectionChange"
+                    :cell-style="cellStyle"
                   >
                     <el-table-column type="selection" width="55" />
                     <el-table-column
@@ -184,6 +190,7 @@
                     :row-class-name="tableRowClassName"
                     @row-click="handleAppearanceRowClick"
                     @selection-change="handleAppearanceSelectionChange"
+                    :cell-style="cellStyle"
                   >
                     <el-table-column type="selection" width="55" />
                     <el-table-column
@@ -222,191 +229,70 @@
           <el-empty :description="currentTitle + '模块 - 暂无内容'" />
         </div>
       </el-main>
-      <!-- 新增弹窗 -->
-      <el-dialog v-model="addDialogVisible" title="新增部件" width="80%">
-        <el-form :model="addForm" label-width="120px">
-          <!-- 共同字段 -->
+      <!-- 新增部件类型基础弹窗 -->
+      <el-dialog v-model="addBaseDialogVisible" title="新增部件类型基础" width="35%">
+        <el-form :model="addBaseForm" label-width="120px">
           <el-row :gutter="20">
-            <el-col :span="8">
+            <el-col :span="12">
+              <el-form-item label="标准号">
+                <el-input v-model="addBaseForm.manufacturingStd" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
               <el-form-item label="CC码">
-                <el-input v-model="addForm.ccCode" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="制作标准">
-                <el-input v-model="addForm.manufacturingStd" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="部件分类">
-                <el-input v-model="addForm.partCategory" disabled />
+                <el-input v-model="addBaseForm.ccCode" />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
-            <el-col :span="8">
+            <el-col :span="12" v-if="hasScheduleThicknessFilter">
+              <el-form-item label="壁厚等级">
+                <el-input v-model="addBaseForm.scheduleThickness" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
               <el-form-item label="材料">
-                <el-input v-model="addForm.material" disabled />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="弯曲角度">
-                <el-input v-model="addForm.bendingAngle" disabled />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="部分数据库">
-                <el-input v-model="addForm.partialDatabase" disabled />
+                <el-input v-model="addBaseForm.material" />
               </el-form-item>
             </el-col>
           </el-row>
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <el-form-item label="几何类别">
-                <el-input v-model="addForm.geometryCategory" disabled />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8" v-if="activeTab === 'common'">
-              <el-form-item label="端面标准1">
-                <el-input v-model="addForm.endStd1" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8" v-if="activeTab === 'common'">
-              <el-form-item label="端面标准2">
-                <el-input v-model="addForm.endStd2" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8" v-if="activeTab === 'appearance'">
-              <el-form-item label="端面连接形式1">
-                <el-input v-model="addForm.connType1" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8" v-if="activeTab === 'appearance'">
-              <el-form-item label="端面连接形式2">
-                <el-input v-model="addForm.connType2" />
+        </el-form>
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button type="primary" @click="handleSaveAddBase">保存</el-button>
+            <el-button @click="addBaseDialogVisible = false">取消</el-button>
+          </div>
+        </template>
+      </el-dialog>
+
+      <!-- 新增弹窗 -->
+      <el-dialog v-model="addDialogVisible" :title="activeTab === 'common' ? '新增公用端面数据' : '新增外形重量重心描述'" width="35%">
+        <el-form :model="addForm" label-width="140px">
+          <el-row v-for="(row, idx) in addFormRows" :key="idx" :gutter="20">
+            <el-col v-for="field in row" :key="field.prop" :span="row.length > 1 ? 12 : 24">
+              <el-form-item :label="field.label">
+                <el-select 
+                  v-if="field.prop === 'IndustryCommodityCode'"
+                  v-model="addForm[field.prop]"
+                  style="width: 100%;"
+                  placeholder="请选择CC码"
+                >
+                  <el-option 
+                    v-for="opt in ccCodeOptions" 
+                    :key="opt" 
+                    :label="opt === '/' ? '请选择' : opt" 
+                    :value="opt === '/' ? '' : opt" 
+                  />
+                </el-select>
+                <el-input v-else v-model="addForm[field.prop]" />
               </el-form-item>
             </el-col>
           </el-row>
-
-          <!-- 公用端面数据独有字段 -->
-          <template v-if="activeTab === 'common'">
-            <el-row :gutter="20">
-              <el-col :span="8">
-                <el-form-item label="端面连接形式1">
-                  <el-input v-model="addForm.connType1" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="端口1通径">
-                  <el-input v-model="addForm.port1Size" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="壁厚1">
-                  <el-input v-model="addForm.wallThickness1" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-row :gutter="20">
-              <el-col :span="8">
-                <el-form-item label="端面连接形式2">
-                  <el-input v-model="addForm.connType2" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="端口2通径">
-                  <el-input v-model="addForm.port2Size" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="壁厚2">
-                  <el-input v-model="addForm.wallThickness2" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-row :gutter="20">
-              <el-col :span="8">
-                <el-form-item label="流向1">
-                  <el-input v-model="addForm.flowDirection1" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="流向2">
-                  <el-input v-model="addForm.flowDirection2" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </template>
-
-          <!-- 外形重量重心描述独有字段 -->
-          <template v-if="activeTab === 'appearance'">
-            <el-row :gutter="20">
-              <el-col :span="8">
-                <el-form-item label="端口1通径">
-                  <el-input v-model="addForm.port1Size" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="端口2通径">
-                  <el-input v-model="addForm.port2Size" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="壁厚1">
-                  <el-input v-model="addForm.wallThickness1" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-row :gutter="20">
-              <el-col :span="8">
-                <el-form-item label="壁厚2">
-                  <el-input v-model="addForm.wallThickness2" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="重量">
-                  <el-input v-model="addForm.weight" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="DryCogX">
-                  <el-input v-model="addForm.dryCogX" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-row :gutter="20">
-              <el-col :span="8">
-                <el-form-item label="DryCogY">
-                  <el-input v-model="addForm.dryCogY" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="DryCogZ">
-                  <el-input v-model="addForm.dryCogZ" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="物资编码">
-                  <el-input v-model="addForm.materialCode" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-row :gutter="20">
-              <el-col :span="16">
-                <el-form-item label="物资描述">
-                  <el-input v-model="addForm.materialDesc" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </template>
         </el-form>
         <template #footer>
           <div class="dialog-footer">
             <el-button type="primary" @click="handleSaveAdd">保存</el-button>
             <el-button @click="addDialogVisible = false">取消</el-button>
-          </div>
-          <div class="dialog-extra-action">
-            <el-button link type="primary">批量新增点此导出模版表</el-button>
           </div>
         </template>
       </el-dialog>
@@ -420,7 +306,8 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { 
   Search, Plus, FolderAdd, Folder, Document, 
-  Upload, Download, CircleClose, Edit, Menu, CopyDocument, RefreshLeft
+  Upload, Download, CircleClose, Edit, Menu, CopyDocument, RefreshLeft,
+  Fold, Expand
 } from '@element-plus/icons-vue'
 import { getLibraryTree, getCodelistTree, getComponentFullData, getCodelistTableData, disableRows, enableRows } from '@/api/library'
 
@@ -454,32 +341,86 @@ const appearanceTableRef = ref(null)
 const codelistTableRef = ref(null)
 const commonSelection = ref([])
 const appearanceSelection = ref([])
+const isAsideCollapsed = ref(false)
+
+const toggleAside = () => {
+  isAsideCollapsed.value = !isAsideCollapsed.value
+}
 
 const addDialogVisible = ref(false)
-const addForm = ref({
-  ccCode: '',
+const addBaseDialogVisible = ref(false)
+const addBaseForm = ref({
   manufacturingStd: '',
-  partCategory: '',
-  material: '',
-  bendingAngle: '',
-  partialDatabase: '',
-  endStd1: '',
-  endStd2: '',
-  geometryCategory: '',
-  connType1: '',
-  port1Size: '',
-  wallThickness1: '',
-  connType2: '',
-  port2Size: '',
-  wallThickness2: '',
-  flowDirection1: '',
-  flowDirection2: '',
-  weight: '',
-  dryCogX: '',
-  dryCogY: '',
-  dryCogZ: '',
-  materialCode: '',
-  materialDesc: ''
+  ccCode: '',
+  scheduleThickness: '',
+  material: ''
+})
+const addForm = ref({})
+
+// 将列按 [1] [2] 分组显示逻辑
+const addFormRows = computed(() => {
+  const columns = activeTab.value === 'common' ? visibleCommonColumns.value : visibleAppearanceColumns.value
+  const rows = []
+  const processedProps = new Set()
+  const singleFields = []
+
+  // 首先，提取所有成对的字段并将其放入行中
+  columns.forEach(col => {
+    if (processedProps.has(col.prop)) return
+    const { base, index } = getPropBaseAndIndex(col.prop)
+    if (index === 1) {
+      const pairProp = `${base}[2]`
+      const pairCol = columns.find(c => c.prop === pairProp)
+      if (pairCol) {
+        rows.push([col, pairCol])
+        processedProps.add(col.prop)
+        processedProps.add(pairProp)
+      } else {
+        singleFields.push(col)
+        processedProps.add(col.prop)
+      }
+    } else if (!processedProps.has(col.prop)) {
+      singleFields.push(col)
+      processedProps.add(col.prop)
+    }
+  })
+
+  // 现在，将剩余的单个字段分组到每行两个
+  for (let i = 0; i < singleFields.length; i += 2) {
+    if (i + 1 < singleFields.length) {
+      rows.push([singleFields[i], singleFields[i + 1]])
+    } else {
+      rows.push([singleFields[i]])
+    }
+  }
+
+  // 根据活动选项卡对行进行排序
+  if (activeTab.value === 'common') {
+    rows.sort((a, b) => {
+      const aIsCC = a[0].prop === 'IndustryCommodityCode'
+      const bIsCC = b[0].prop === 'IndustryCommodityCode'
+      if (aIsCC) return -1
+      if (bIsCC) return 1
+      return 0
+    })
+  } else if (activeTab.value === 'appearance') {
+    rows.sort((a, b) => {
+      const aHasNumericSuffix = a[0].prop.includes('[')
+      const bHasNumericSuffix = b[0].prop.includes('[')
+
+      if (aHasNumericSuffix && !bHasNumericSuffix) return 1
+      if (!aHasNumericSuffix && bHasNumericSuffix) return -1
+
+      const aIsCC = a[0].prop === 'IndustryCommodityCode'
+      const bIsCC = b[0].prop === 'IndustryCommodityCode'
+      if (aIsCC) return -1
+      if (bIsCC) return 1
+
+      return 0
+    })
+  }
+
+  return rows
 })
 
 const currentTitle = computed(() => route.meta.title || '基础库')
@@ -552,13 +493,13 @@ const filterNode = (value, data) => {
 // 字段映射表
 const fieldLabels = {
   IndustryCommodityCode: 'CC码',
-  ScheduleThickness: '壁厚',
-  CommodityType: '部件分类',
+  ScheduleThickness: '壁厚等级',
+  CommodityType: 'CommodityType',
   GeometricIndustryStandard: '标准号',
   MaterialGrade: '材料',
-  GeometryType: '几何类别',
+  GeometryType: 'GeometryType',
   BentAngle: '弯曲角度',
-  PartDataBasis: '部分数据库',
+  PartDataBasis: 'PartDataBasis',
   PartClassName: 'PartClassName',
   UserClassName: 'UserClassName',
   BoltType: '螺栓类型',
@@ -623,7 +564,7 @@ const firstRowItems = computed(() => {
     items.push({
       type: 'filter',
       key: 'ScheduleThickness',
-      label: '壁厚',
+      label: '壁厚等级',
       modelKey: 'scheduleThickness',
       options: scheduleThicknessOptions.value
     })
@@ -708,7 +649,7 @@ watch(
   }
 )
 
-const excludedTableFieldBases = new Set(['NpdUnitType', 'JsonData', 'GeometricIndustryStandard', 'GeometricindustryStandard'])
+const excludedTableFieldBases = new Set(['JsonData', 'GeometricIndustryStandard', 'GeometricindustryStandard'])
 
 const getPropBaseAndIndex = (prop) => {
   const match = typeof prop === 'string' ? prop.match(/^(.*)\[(\d+)\]$/) : null
@@ -755,13 +696,43 @@ const getVisibleColumns = (columns, rows) => {
       const { base } = getPropBaseAndIndex(prop)
       return prop && !excludedTableFieldBases.has(base)
     })
-    .filter((col) => !isColumnAllEmpty(col.prop, rows))
+    // .filter((col) => !isColumnAllEmpty(col.prop, rows))
     .map((col) => ({
       ...col,
       label: col.label || col.prop,
       minWidth: col.minWidth || 140
     }))
 }
+
+const emptyCommonColumnProps = computed(() => {
+  const emptyProps = new Set()
+  if (!commonData.value || commonData.value.length === 0) return emptyProps
+  visibleCommonColumns.value.forEach(col => {
+    if (isColumnAllEmpty(col.prop, commonData.value)) {
+      emptyProps.add(col.prop)
+    }
+  })
+  return emptyProps
+})
+
+const emptyAppearanceColumnProps = computed(() => {
+  const emptyProps = new Set()
+  if (!appearanceData.value || appearanceData.value.length === 0) return emptyProps
+  visibleAppearanceColumns.value.forEach(col => {
+    if (isColumnAllEmpty(col.prop, appearanceData.value)) {
+      emptyProps.add(col.prop)
+    }
+  })
+  return emptyProps
+})
+
+const cellStyle = ({ column }) => {
+  if (emptyCommonColumnProps.value.has(column.property) || emptyAppearanceColumnProps.value.has(column.property)) {
+    return { backgroundColor: '#f5f7fa' } 
+  }
+  return null
+}
+
 
 const visibleCommonColumns = computed(() => getVisibleColumns(commonColumns.value, commonData.value))
 const visibleAppearanceColumns = computed(() => getVisibleColumns(appearanceColumns.value, appearanceData.value))
@@ -891,75 +862,51 @@ const handleToggleStatus = async () => {
   tableRef.clearSelection()
 }
 
+const handleAddBase = () => {
+  addBaseForm.value = {
+    manufacturingStd: componentDetails.value.GeometricIndustryStandard || '',
+    ccCode: filterForm.value.ccCode !== '/' ? filterForm.value.ccCode : '',
+    scheduleThickness: filterForm.value.scheduleThickness !== '/' ? filterForm.value.scheduleThickness : '',
+    material: filterForm.value.materialGrade !== '/' ? filterForm.value.materialGrade : ''
+  }
+  addBaseDialogVisible.value = true
+}
+
+const handleSaveAddBase = () => {
+  ElMessage.success('新增部件类型基础成功')
+  addBaseDialogVisible.value = false
+}
+
 const handleAdd = () => {
-  // Determine which table is active and get selection
   let selectedRows = []
+  const columns = activeTab.value === 'common' ? visibleCommonColumns.value : visibleAppearanceColumns.value
+  
   if (activeTab.value === 'common' && commonTableRef.value) {
     selectedRows = commonTableRef.value.getSelectionRows()
   } else if (activeTab.value === 'appearance' && appearanceTableRef.value) {
     selectedRows = appearanceTableRef.value.getSelectionRows()
   }
 
-  // Set default manufacturing standard from tree selection
-  const defaultStd = selectedNode.value ? selectedNode.value.label : ''
-  
+  const newForm = {}
+  // 初始化所有列的 key
+  columns.forEach(col => {
+    newForm[col.prop] = ''
+  })
+
   if (selectedRows && selectedRows.length > 0) {
-    // Clone the first selected row
+    // 预填充选中行数据
     const row = selectedRows[0]
-    addForm.value = {
-      ccCode: row.ccCode || '',
-      manufacturingStd: defaultStd,
-      partCategory: componentDetails.value.partCategory || '',
-      material: componentDetails.value.material || '',
-      bendingAngle: '', // Not in tableData usually
-      partialDatabase: '', // Not in tableData usually
-      endStd1: row.endStd1 || '',
-      endStd2: row.endStd2 || '',
-      geometryCategory: componentDetails.value.geometryCategory || '',
-      connType1: row.connType1 || '',
-      port1Size: row.port1Size || '',
-      wallThickness1: row.wallThickness1 || '',
-      connType2: row.connType2 || '',
-      port2Size: row.port2Size || '',
-      wallThickness2: row.wallThickness2 ?? '',
-      flowDirection1: row.flowDirection1 ?? '',
-      flowDirection2: row.flowDirection2 ?? '',
-      weight: row.weight ?? '',
-      dryCogX: row.dryCogX ?? '',
-      dryCogY: row.dryCogY ?? '',
-      dryCogZ: row.dryCogZ ?? '',
-      materialCode: row.materialCode ?? '',
-      materialDesc: row.materialDesc ?? ''
-    }
+    Object.keys(newForm).forEach(key => {
+      newForm[key] = row[key] ?? ''
+    })
   } else {
-    // Empty form with default standard
-    addForm.value = {
-      ccCode: '',
-      manufacturingStd: defaultStd,
-      partCategory: '',
-      material: '',
-      bendingAngle: '',
-      partialDatabase: '',
-      endStd1: '',
-      endStd2: '',
-      geometryCategory: '',
-      connType1: '',
-      port1Size: '',
-      wallThickness1: '',
-      connType2: '',
-      port2Size: '',
-      wallThickness2: '',
-      flowDirection1: '',
-      flowDirection2: '',
-      weight: '',
-      dryCogX: '',
-      dryCogY: '',
-      dryCogZ: '',
-      materialCode: '',
-      materialDesc: ''
+    // 设置默认 CC 码
+    if (filterForm.value.ccCode && filterForm.value.ccCode !== '/') {
+      newForm.IndustryCommodityCode = filterForm.value.ccCode
     }
   }
-  
+
+  addForm.value = newForm
   addDialogVisible.value = true
 }
 
@@ -1082,6 +1029,12 @@ const handleSaveAdd = () => {
 .card-header .title {
   font-weight: bold;
   font-size: 16px;
+}
+
+.aside-toggle-button {
+  margin-right: 8px;
+  font-size: 18px;
+  color: #606266;
 }
 
 .card-header .subtitle {
