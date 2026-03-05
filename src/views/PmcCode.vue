@@ -1,4 +1,5 @@
 <script setup>
+defineOptions({ name: 'PmcCode' })
 import { ref, watch, onMounted, nextTick } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -852,8 +853,7 @@ const cancelCopyRule = () => {
 </script>
 
 <template>
-  <div class="pmc-page-wrapper">
-    <div class="pmc-container">
+  <div class="pmc-container">
     <!-- Top Section -->
     <transition name="el-zoom-in-top">
       <div class="section-block" v-show="showRulePanel">
@@ -1150,13 +1150,6 @@ const cancelCopyRule = () => {
   </el-dialog>
 </template>
 <style scoped>
-/* 增加 wrapper 样式确保高度撑满 */
-.pmc-page-wrapper {
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-}
-
 .pmc-container {
   display: flex;
   flex-direction: column;
