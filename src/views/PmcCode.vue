@@ -379,6 +379,7 @@ const saveDialogData = () => {
     const newId = resultData.value.length > 0 ? Math.max(...resultData.value.map(item => item.id)) + 1 : 1
     const newRow = {
       id: newId,
+      uniqueKey: `${selectedShipType.value}_${selectedShipNumber.value}_new_${newId}`,
       ...formData.value, // Stores descriptions
       pmc: pmcCode,
       isByRule: true
@@ -507,6 +508,7 @@ const refreshData = async () => {
       const list = res.data.data || []
       resultData.value = list.map((item, index) => ({
         id: index + 1,
+        uniqueKey: `${selectedShipType.value}_${selectedShipNumber.value}_${index + 1}`,
         pmc: item.pmcCode,
         a: item.pipingClassName,
         b1: item.materialsCategoryName,
@@ -826,8 +828,10 @@ const generatePmcCode = async () => {
         // Generate PMC code (7 digits)
         const pmcCode = `${a}${b1}${b2}${b3}${c1}${c2}${d}`
 
+        const currentId = id++
         combinations.push({
-          id: id++,
+          id: currentId,
+          uniqueKey: `${selectedShipType.value}_${selectedShipNumber.value}_new_${currentId}`,
           a,
           b1,
           b2,
@@ -1152,7 +1156,7 @@ const cancelCopyRule = () => {
         <el-table 
           ref="resultTableRef"
           :data="displayData" 
-          :row-key="(row) => row.id"
+          :row-key="(row) => row.uniqueKey || row.id"
           :row-class-name="tableRowClassName"
           border 
           stripe 
