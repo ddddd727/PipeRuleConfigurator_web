@@ -444,6 +444,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'BasicLibrary' })
 import { ref, watch, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'

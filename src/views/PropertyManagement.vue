@@ -358,6 +358,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'PropertyManagement' })
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as XLSX from 'xlsx'

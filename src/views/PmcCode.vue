@@ -1,4 +1,5 @@
 <script setup>
+defineOptions({ name: 'PmcCode' })
 import { ref, watch, onMounted, nextTick } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'

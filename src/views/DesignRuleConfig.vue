@@ -396,6 +396,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'DesignRuleConfig' })
 import { ref, reactive, onMounted, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { db } from '@/mock/index.js'

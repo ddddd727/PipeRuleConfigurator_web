@@ -97,11 +97,9 @@ const menuList = computed(() => {
 
           <el-main class="main-content">
             <router-view v-slot="{ Component }">
-             <transition name="fade" mode="out-in">
-           <keep-alive :include="cachedViews">
-         <component :is="Component" :key="route.fullPath" />
+           <keep-alive>
+         <component :is="Component" :key="route.name" />
           </keep-alive>
-           </transition>
              </router-view>
           </el-main>
 
