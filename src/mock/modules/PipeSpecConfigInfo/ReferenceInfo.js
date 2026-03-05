@@ -42,19 +42,119 @@ Mock.mock(/\/api\/pipe-spec\/dimension/, 'get', () => {
   return { code: 200, msg: 'success', data: generateColumnData() }
 })
 
-// 标准文件列表
-Mock.mock(/\/api\/pipe-spec\/standard-files/, 'get', () => ({
+// 标准文件列表（支持 partType 参数）
+Mock.mock(/\/api\/pipe-spec\/standard-files/, 'get', (options) => {
+  // 解析查询参数 partType
+  let partType = null
+  if (options.url && options.url.includes('partType=')) {
+    const match = options.url.match(/partType=([^&]+)/)
+    partType = match ? decodeURIComponent(match[1]) : null
+  }
+  
+  // 根据不同的部件类型返回不同的标准文件
+  const standardFilesByType = {
+    'Pipe': [
+      { id: 1, code: 'GB/T 8163-2018' },
+      { id: 2, code: 'GB/T 5312-2009' },
+      { id: 3, code: 'ASTM A106' },
+      { id: 4, code: 'ASTM A53' },
+      { id: 5, code: 'GB/T 14976-2012' }
+    ],
+    'Bend': [
+      { id: 10, code: 'GB/T 12459-2017' },
+      { id: 11, code: 'ASME B16.9' },
+      { id: 12, code: 'GB/T 13401-2017' }
+    ],
+    'Elbow': [
+      { id: 20, code: 'GB/T 12459-2017' },
+      { id: 21, code: 'ASME B16.9' },
+      { id: 22, code: 'GB/T 13401-2017' }
+    ],
+    'Flange': [
+      { id: 30, code: 'GB/T 9119-2010' },
+      { id: 31, code: 'ASME B16.5' },
+      { id: 32, code: 'HG/T 20615-2009' }
+    ],
+    'Tee': [
+      { id: 40, code: 'GB/T 12459-2017' },
+      { id: 41, code: 'ASME B16.9' }
+    ],
+    'Red': [
+      { id: 50, code: 'GB/T 12459-2017' },
+      { id: 51, code: 'ASME B16.9' }
+    ],
+    'Sleeve': [
+      { id: 60, code: 'GB/T 12459-2017' }
+    ],
+    'Bosses': [
+      { id: 70, code: 'GB/T 12459-2017' }
+    ],
+    'Saddles': [
+      { id: 80, code: 'GB/T 12459-2017' }
+    ],
+    'Caps': [
+      { id: 90, code: 'GB/T 12459-2017' },
+      { id: 91, code: 'ASME B16.9' }
+    ],
+    'Overpass': [
+      { id: 100, code: 'GB/T 12459-2017' }
+    ],
+    'BlindFlange': [
+      { id: 110, code: 'GB/T 9119-2010' },
+      { id: 111, code: 'ASME B16.5' }
+    ],
+    'Accessories': [
+      { id: 120, code: 'General Accessories Std' }
+    ],
+    'Bolt': [
+      { id: 130, code: 'ISO 4014' },
+      { id: 131, code: 'ASME B18.2.1' }
+    ],
+    'Gasket': [
+      { id: 140, code: 'ASME B16.20' },
+      { id: 141, code: 'ASME B16.21' }
+    ],
+    'Joints': [
+      { id: 150, code: 'Manufacturer Std' }
+    ],
+    'Nut': [
+      { id: 160, code: 'ISO 4032' },
+      { id: 161, code: 'ASME B18.2.2' }
+    ],
+    'Washer': [
+      { id: 170, code: 'ISO 7089' },
+      { id: 171, code: 'ASME B18.21.1' }
+    ]
+  }
+  
+  // 如果指定了部件类型，返回对应的标准文件，否则返回通用列表
+  const files = partType && standardFilesByType[partType] 
+    ? standardFilesByType[partType]
+    : Mock.mock({
+        'list|9-15': [
+          {
+            'id|+1': 1,
+            code: /GB\/T \d{4}-\d{4}/
+          }
+        ]
+      }).list
+  
+  return {
+    code: 200,
+    msg: 'success',
+    data: files
+  }
+})
+
+// 优选规则列表
+Mock.mock(/\/api\/pipe-spec\/preferred-rules/, 'get', () => ({
   code: 200,
   msg: 'success',
-  data: Mock.mock({
-    'list|9-15': [
-      {
-        'id|+1': 1,
-        name: '@ctitle(6, 12)',
-        code: /GB\/T \d{4}-\d{4}/
-      }
-    ]
-  }).list
+  data: [
+    { label: '规则-按标准优先', value: 'rule-standard' },
+    { label: '规则-按材料优先', value: 'rule-material' },
+    { label: '规则-按通径优先', value: 'rule-npd' }
+  ]
 }))
 
 // 保存配置
@@ -99,74 +199,162 @@ Mock.mock(/\/api\/pipe-spec\/fitting-config/, 'get', (options) => {
   }
 })
 
-// 船型与船号信息（PipeSpec.vue 使用 /api/PmcSpec/ShipInfos）
-Mock.mock(/\/api\/PmcSpec\/ShipInfos/, 'get', () => ({
-  code: 200,
-  message: '获取船型船号信息成功',
-  data: [
-    { shipNumber: 'H1508', shipType: '邮轮' },
-    { shipNumber: 'H1509', shipType: '邮轮' },
-    { shipNumber: 'H1403', shipType: '民船' },
-    { shipNumber: 'H1404', shipType: '民船' },
-    { shipNumber: 'H1301', shipType: '货船' },
-    { shipNumber: 'H1603', shipType: '民船' }
-  ],
-  timestamp: '0001-01-01T00:00:00',
-  traceId: '40000004-0009-fd00-b63f-84710c7967bb'
-}))
+// // 接受审核
+// Mock.mock(/\/api\/PmcSpec\/AcceptReview/, 'post', (options) => {
+//   const body = JSON.parse(options.body)
+//   return {
+//     code: 200,
+//     msg: '审核提交成功',
+//     data: {
+//       pmcCode: body.pmcCode,
+//       status: 'approved'
+//     }
+//   }
+// })
 
-// PMC 规则树（根据船号返回）
-Mock.mock(/\/api\/PmcSpec\/PmcRules\//, 'get', (options) => {
-  const urlParts = options.url.split('/')
-  const shipNumber = urlParts[urlParts.length - 1]
+// 4.6 获取管附件规格
+// 接口: /api/PmcSpec/PipeFittingSpec?componentTypeName=...&componentTypeId=...
+Mock.mock(/\/api\/PmcSpec\/PipeFittingSpec/, 'get', (options) => {
+  // 解析查询参数
+  let componentTypeName = null
+  let componentTypeId = null
+  
+  if (options.url) {
+    const typeNameMatch = options.url.match(/componentTypeName=([^&]+)/)
+    componentTypeName = typeNameMatch ? decodeURIComponent(typeNameMatch[1]) : null
+    
+    const typeIdMatch = options.url.match(/componentTypeId=([^&]+)/)
+    componentTypeId = typeIdMatch ? parseInt(typeIdMatch[1]) : null
+  }
 
-  // 返回扁平数组，字段与 PipeSpec.vue 中 transformToTreeStructure 期望一致
-  // status 枚举值：'pending'（待配置-蓝色）、'review'（待审核-黄色）、'approved'（已审核-绿色）
-  const data = [
-    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AD', shipNumber, status: 'pending' },
-    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AE', shipNumber, status: 'review' },
-    { material: '碳钢管', pipeStadard: 'GB/T 8163', pmcCode: '1C181AJ', shipNumber, status: 'approved' },
-    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AD', shipNumber, status: 'pending' },
-    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AE', shipNumber, status: 'review' },
-    { material: '碳钢管', pipeStadard: 'GB/T 5312', pmcCode: '1C281AJ', shipNumber, status: 'approved' },
-    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AD', shipNumber, status: 'pending' },
-    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AE', shipNumber, status: 'review' },
-    { material: '不锈钢', pipeStadard: 'GB/T 14976', pmcCode: '1S181AJ', shipNumber, status: 'approved' }
+  // 模拟部件类型数据，用于 ID 到 Name 的映射
+  const componentTypesData = [
+    { id: 1, componentTypeName: 'Pipe' },
+    { id: 2, componentTypeName: 'Bend' },
+    { id: 3, componentTypeName: 'Elbow' },
+    { id: 4, componentTypeName: 'Flange' },
+    { id: 5, componentTypeName: 'Tee' },
+    { id: 6, componentTypeName: 'Red' },
+    { id: 7, componentTypeName: 'Sleeve' },
+    { id: 8, componentTypeName: 'Bosses' },
+    { id: 9, componentTypeName: 'Saddles' },
+    { id: 10, componentTypeName: 'Caps' },
+    { id: 11, componentTypeName: 'Overpass' },
+    { id: 12, componentTypeName: 'BlindFlange' },
+    { id: 13, componentTypeName: 'Accessories' },
+    { id: 14, componentTypeName: 'Bolt' },
+    { id: 15, componentTypeName: 'Gasket' },
+    { id: 16, componentTypeName: 'Joints' },
+    { id: 17, componentTypeName: 'Nut' },
+    { id: 18, componentTypeName: 'Washer' }
   ]
 
-  return {
-    code: 200,
-    msg: 'success',
-    data
-  }
-})
-
-// PMC 编码详情
-Mock.mock(/\/api\/PmcSpec\/Analyze\//, 'get', (options) => {
-  const urlParts = options.url.split('/')
-  const code = urlParts[urlParts.length - 1]
-  return {
-    code: 200,
-    msg: 'success',
-    data: {
-      code,
-      service: Mock.mock('@ctitle(6,12)'),
-      pipingMaterialClass: Mock.mock('@ctitle(4,8)'),
-      pipeStandard: Mock.mock('@ctitle(6,12)'),
-      materialGrade: Mock.mock('@ctitle(4,8)'),
-      pressureRating: Mock.mock('@ctitle(2,6)'),
-      wallThickness: Mock.mock('@float(1,50,1,2)') + ' mm'
+  // 如果提供了 componentTypeId，优先使用 ID 查找对应的 Name
+  if (componentTypeId) {
+    const componentType = componentTypesData.find(ct => ct.id === componentTypeId)
+    if (componentType) {
+      componentTypeName = componentType.componentTypeName
     }
   }
-})
 
-// 部件类型列表（用于配置对话框）
-Mock.mock(/\/api\/pipe-spec\/part-types/, 'get', () => ({
-  code: 200,
-  msg: 'success',
-  data: ['Pipe', 'Bend',
-    'Elbow', 'Red', 'Tee',
-    'Sleeve', 'Bosses', 'Saddles',
-    'Caps', 'Overpass',
-    'Flange', 'Blind Flange']
-}))
+  // 复用 standardFilesByType 数据结构 (模拟数据库中的标准)
+  const standardFilesByType = {
+    'Pipe': [
+      { id: 1, code: 'GB/T 8163-2018' },
+      { id: 2, code: 'GB/T 5312-2009' },
+      { id: 3, code: 'ASTM A106' },
+      { id: 4, code: 'ASTM A53' },
+      { id: 5, code: 'GB/T 14976-2012' }
+    ],
+    'Bend': [
+      { id: 10, code: 'GB/T 12459-2017' },
+      { id: 11, code: 'ASME B16.9' },
+      { id: 12, code: 'GB/T 13401-2017' }
+    ],
+    'Elbow': [
+      { id: 20, code: 'GB/T 12459-2017' },
+      { id: 21, code: 'ASME B16.9' },
+      { id: 22, code: 'GB/T 13401-2017' }
+    ],
+    'Flange': [
+      { id: 30, code: 'GB/T 9119-2010' },
+      { id: 31, code: 'ASME B16.5' },
+      { id: 32, code: 'HG/T 20615-2009' }
+    ],
+    'Tee': [
+      { id: 40, code: 'GB/T 12459-2017' },
+      { id: 41, code: 'ASME B16.9' }
+    ],
+    'Red': [
+      { id: 50, code: 'GB/T 12459-2017' },
+      { id: 51, code: 'ASME B16.9' }
+    ],
+    'Sleeve': [
+      { id: 60, code: 'GB/T 12459-2017' }
+    ],
+    'Bosses': [
+      { id: 70, code: 'GB/T 12459-2017' }
+    ],
+    'Saddles': [
+      { id: 80, code: 'GB/T 12459-2017' }
+    ],
+    'Caps': [
+      { id: 90, code: 'GB/T 12459-2017' },
+      { id: 91, code: 'ASME B16.9' }
+    ],
+    'Overpass': [
+      { id: 100, code: 'GB/T 12459-2017' }
+    ],
+    'BlindFlange': [
+      { id: 110, code: 'GB/T 9119-2010' },
+      { id: 111, code: 'ASME B16.5' }
+    ],
+    'Accessories': [
+      { id: 120, code: 'General Accessories Std' }
+    ],
+    'Bolt': [
+      { id: 130, code: 'ISO 4014' },
+      { id: 131, code: 'ASME B18.2.1' }
+    ],
+    'Gasket': [
+      { id: 140, code: 'ASME B16.20' },
+      { id: 141, code: 'ASME B16.21' }
+    ],
+    'Joints': [
+      { id: 150, code: 'Manufacturer Std' }
+    ],
+    'Nut': [
+      { id: 160, code: 'ISO 4032' },
+      { id: 161, code: 'ASME B18.2.2' }
+    ],
+    'Washer': [
+      { id: 170, code: 'ISO 7089' },
+      { id: 171, code: 'ASME B18.21.1' }
+    ]
+  }
+
+  // 根据部件类型获取标准列表
+  const standards = componentTypeName && standardFilesByType[componentTypeName]
+    ? standardFilesByType[componentTypeName]
+    : []
+
+  // 转换为契约定义的 PipeFittingSpec 格式
+  const data = standards.map(std => ({
+    standardName: std.code,
+    materialList: [
+      'Carbon Steel',
+      'Stainless Steel 304',
+      'Stainless Steel 316',
+      'Alloy Steel',
+      'Copper Alloy'
+    ] // 模拟材料列表
+  }))
+
+  return {
+    code: 200,
+    message: '获取管附件规格成功',
+    data: data,
+    timestamp: new Date().toISOString(),
+    traceId: Mock.mock('@guid')
+  }
+})
