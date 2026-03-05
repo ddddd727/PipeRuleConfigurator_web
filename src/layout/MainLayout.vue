@@ -6,11 +6,18 @@ import TagsView from './components/TagsView.vue'
 import PMCAIAssistant from '@/components/PMCAIAssistant.vue'
 import { constantRoutes } from '@/router/index'
 import { Expand, Fold, Platform, Cpu } from '@element-plus/icons-vue'
+import { useTagsViewStore } from '@/stores/tagsView'
 
 const route = useRoute()
-const router = useRouter()
+// router 未使用可以移除，如果后续需要跳转可保留
+// const router = useRouter() 
+
 const isCollapse = ref(false)
 const showAI = ref(false)
+
+const tagsStore = useTagsViewStore()
+// [新增] 获取缓存列表
+const cachedViews = computed(() => tagsStore.cachedViews)
 
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
@@ -23,10 +30,6 @@ const toggleAI = () => {
 const menuList = computed(() => {
   return constantRoutes.filter(item => !item.hidden && item.path !== '/' && item.path !== '/:pathMatch(.*)*')
 })
-
-const breadcrumbs = computed(() => {
-  return route.matched.filter(item => item.meta && item.meta.title)
-})
 </script>
 
 <template>
@@ -35,6 +38,22 @@ const breadcrumbs = computed(() => {
     <el-container class="layout-container">
       
       <el-aside :width="isCollapse ? '64px' : '200px'" class="aside-wrap">
+        <div class="sidebar-header">
+          <div v-if="!isCollapse" class="header-content expanded">
+            <div class="logo-area">
+              <el-icon :size="18"><Platform /></el-icon>
+              <span class="app-title">规则配置器</span>
+            </div>
+            <div class="collapse-trigger" @click="toggleCollapse">
+              <el-icon :size="16"><Fold /></el-icon>
+            </div>
+          </div>
+          
+          <div v-else class="header-content collapsed" @click="toggleCollapse">
+             <el-icon :size="20"><Expand /></el-icon>
+          </div>
+        </div>
+
         <el-menu
           :default-active="route.path"
           class="el-menu-vertical-demo"
@@ -45,13 +64,6 @@ const breadcrumbs = computed(() => {
           text-color="#303133"
           active-text-color="#ffffff"
         >
-          <el-menu-item index="/" class="logo-item">
-            <el-icon :color="'#ffffff'"><Platform /></el-icon>
-            <template #title>
-              <b style="font-size: 16px; color: #ffffff;">规则配置器</b>
-            </template>
-          </el-menu-item>
-
           <sidebar-item
             v-for="route in menuList"
             :key="route.path"
@@ -64,41 +76,33 @@ const breadcrumbs = computed(() => {
       <div class="workspace-wrapper">
         <el-container class="center-container">
           
-          <el-header class="header-wrap">
-            <div class="left-panel">
-              <div class="collapse-btn" @click="toggleCollapse">
-                <el-icon :size="20">
-                  <component :is="isCollapse ? Expand : Fold" />
-                </el-icon>
-              </div>
-              <el-breadcrumb separator="/">
-                <el-breadcrumb-item v-for="(item, index) in breadcrumbs" :key="item.path">
-                  <span v-if="index === breadcrumbs.length - 1">{{ item.meta.title }}</span>
-                  <a v-else @click.prevent="router.push(item.path)">{{ item.meta.title }}</a>
-                </el-breadcrumb-item>
-              </el-breadcrumb>
+          <div class="navbar-container">
+            <div class="tags-section">
+              <tags-view />
             </div>
-
-            <div class="right-panel">
+            
+            <div class="tools-section">
               <el-tooltip content="开启 PMC AI 助手" placement="bottom">
                 <div 
                   class="ai-trigger" 
                   :class="{ 'active': showAI }"
                   @click="toggleAI"
                 >
-                  <el-icon :size="18"><Cpu /></el-icon>
-                  <span style="margin-left: 6px; font-weight: 600;">AI 助手</span>
+                  <el-icon :size="16"><Cpu /></el-icon>
+                  <span style="margin-left: 4px; font-weight: 600; font-size: 13px;">AI 助手</span>
                 </div>
                </el-tooltip>
             </div>
-          </el-header>
-
-          <div class="tags-view-wrapper">
-            <tags-view />
           </div>
 
           <el-main class="main-content">
-            <router-view />
+            <router-view v-slot="{ Component }">
+             <transition name="fade" mode="out-in">
+           <keep-alive :include="cachedViews">
+         <component :is="Component" :key="route.fullPath" />
+          </keep-alive>
+           </transition>
+             </router-view>
           </el-main>
 
         </el-container>
@@ -128,65 +132,123 @@ const breadcrumbs = computed(() => {
   width: 100%;
   background-color: #f0f2f5;
   overflow: hidden;
-  margin: 0;
-  padding: 0;
 }
 
-/* 2. 底部栏样式：强制直角，铺满宽度 */
 .global-footer {
   width: 100%;
   height: 32px;
-  background-color: #264f7b; /* 深蓝背景 */
-  color: #ffffff; /* 白字 */
+  background-color:var(--primary-color);
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
   flex-shrink: 0;
   letter-spacing: 1px;
-  border-radius: 0 !important; /* 强制无圆角 */
-  margin: 0;
-  padding: 0;
-  box-shadow: none; /* 去掉阴影，看起来更平整 */
 }
 
-/* 3. 中间主体容器 */
 .layout-container {
-  flex: 1; /* 占据剩余空间 */
+  flex: 1;
   display: flex;
   flex-direction: row;
-  padding: 10px 10px 0 10px; /* 上左右有间距，底部紧贴 footer 或留点空隙均可，这里保留一点空隙给 footer 上方 */
+  padding: 10px 10px 0 10px;
   box-sizing: border-box;
   gap: 10px;
   overflow: hidden; 
-  margin-bottom: 0; /* 确保没有额外边距 */
+  margin-bottom: 0;
 }
 
-/* --- 以下保持原有样式 --- */
-
-/* 侧边栏 */
+/* --- 侧边栏 --- */
 .aside-wrap {
   background-color: #ffffff !important;
   transition: width 0.3s;
   flex-shrink: 0;
   z-index: 2000;
-  height: 100%;
-  border-radius: 12px; /* 侧边栏保持圆角 */     
+  
+  /* 【修改】高度减去 10px，与右侧 main-content 的 margin-bottom 对齐 */
+  height: calc(100% - 10px);
+  
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column; 
 }
 
-/* Logo */
-.logo-item { 
-  background-color: #264f7b !important; 
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  pointer-events: none; 
+/* 新增：侧边栏头部样式 */
+.sidebar-header {
+  height: 50px;
+  background-color: var(--primary-color); /* 与旧版 logo 背景一致 */
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.header-content {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+}
+
+.header-content.expanded {
+  justify-content: space-between;
+}
+
+.header-content.collapsed {
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+.header-content.collapsed:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.collapse-trigger {
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+.collapse-trigger:hover {
+  background-color: rgba(255,255,255,0.2);
+}
+
+/* 菜单样式微调 */
+.el-menu-vertical-demo {
+    /* 1. 必须设置高度和允许溢出，否则无法滚动 */
+    height: 100vh; /* 或者 100% */
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    /* 2. 隐藏滚动条的核心代码 */
+    
+    /* Firefox */
+    scrollbar-width: none; 
+    
+    /* IE 10+ */
+    -ms-overflow-style: none; 
+}
+
+/* 3. Chrome, Safari, Edge (Webkit内核) */
+.el-menu-vertical-demo::-webkit-scrollbar {
+    display: none;
 }
 
 /* 菜单交互 */
 :deep(.el-menu-item:hover), 
 :deep(.el-sub-menu__title:hover) {
-  background-color: #264f7b !important; 
+  background-color: var(--primary-color) !important; 
   color: #ffffff !important;             
 }
 :deep(.el-menu-item:hover i),
@@ -194,14 +256,14 @@ const breadcrumbs = computed(() => {
   color: #ffffff !important;
 }
 :deep(.el-menu-item.is-active) {
-  background-color: #264f7b !important; 
+  background-color: var(--primary-color) !important; 
   color: #ffffff !important;             
 }
 :deep(.el-menu-item.is-active i) {
   color: #ffffff !important;
 }
 
-/* 工作区结构 */
+/* --- 工作区 --- */
 .workspace-wrapper {
   flex: 1; 
   display: flex; 
@@ -221,27 +283,58 @@ const breadcrumbs = computed(() => {
   overflow: hidden;              
 }
 
-.header-wrap {
-  height: 50px;
-  background-color: #ffffff;    
-  border-radius: 12px;           
+.navbar-container {
+  background-color: #fff;
+  border-radius: 12px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 15px;
-  flex-shrink: 0;
-  box-shadow: 0 1px 4px rgba(0,21,41,0.04); 
+  
+  /* 【修改 1】去除 padding，让内容紧贴边缘 */
+  padding: 0; 
+  
+  /* 【修改 2】高度改为 50px，与左侧 sidebar-header 对齐 */
+  height: 50px; 
+  
+  box-shadow: 0 1px 4px rgba(0,21,41,0.04);
+  overflow: hidden;
 }
 
-.tags-view-wrapper {
-  background-color: #fff;        
-  border-radius: 12px;           
-  flex-shrink: 0;                
-  overflow: hidden;              
-  box-shadow: 0 1px 4px rgba(0,21,41,0.04);
-  min-height: 34px;              
+/* 确保标签区域高度撑满 */
+.tags-section {
+  flex: 1; 
+  overflow: hidden;
+  height: 100%; /* 【修改 3】确保高度 100% */
+}
+
+.tools-section {
+  flex-shrink: 0;
+  padding: 0 10px; /* 工具栏内部保留一点间距 */
+  border-left: 1px solid #f0f0f0; 
+  height: 100%;    /* 高度撑满，分割线才好看 */
   display: flex;
-  align-items: center;           
+  align-items: center;
+}
+
+.ai-trigger {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 16px;
+  transition: all 0.3s;
+  color: #606266;
+  border: 1px solid transparent;
+  user-select: none;
+  background: #f4f4f5; /* 默认浅灰底，显眼一点 */
+}
+
+.ai-trigger:hover { background-color: #e6f7ff; color: #409EFF; }
+.ai-trigger.active {
+  background: linear-gradient(135deg, #ecf5ff 0%, #d9ecff 100%);
+  color: #409EFF;
+  border-color: #c6e2ff;
+  box-shadow: 0 0 6px rgba(64, 158, 255, 0.25);
 }
 
 .main-content {
@@ -251,8 +344,7 @@ const breadcrumbs = computed(() => {
   flex: 1;
   overflow-y: auto;              
   box-shadow: 0 1px 4px rgba(0,21,41,0.04);
-  /* 确保内容区底部和 footer 之间有一点距离，或者直接贴合，看 padding 设置 */
-  margin-bottom: 10px; /* 在内容区和底部 footer 之间留 10px 空隙 */
+  margin-bottom: 10px; 
 }
 
 .ai-sidebar-wrap {
@@ -263,33 +355,7 @@ const breadcrumbs = computed(() => {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 0 10px rgba(0,0,0,0.05);
-  margin-bottom: 10px; /* 同步留空隙 */
-}
-
-.el-menu-vertical-demo:not(.el-menu--collapse) { width: 200px; }
-.el-menu-vertical-demo { border-right: none; height: 100%; }
-
-.left-panel, .right-panel { display: flex; align-items: center; }
-.collapse-btn { margin-right: 20px; cursor: pointer; display: flex; align-items: center; }
-
-.ai-trigger {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 20px;
-  transition: all 0.3s;
-  color: #606266;
-  border: 1px solid transparent;
-  user-select: none;
-}
-
-.ai-trigger:hover { background-color: #f0f2f5; color: #409EFF; }
-.ai-trigger.active {
-  background: linear-gradient(135deg, #ecf5ff 0%, #d9ecff 100%);
-  color: #409EFF;
-  border-color: #c6e2ff;
-  box-shadow: 0 0 6px rgba(64, 158, 255, 0.25);
+  margin-bottom: 10px; 
 }
 
 .slide-width-enter-active,

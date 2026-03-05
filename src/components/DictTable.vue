@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, computed,reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -9,6 +9,7 @@ const props = defineProps({
   dictId: { type: String, required: true }
 })
 
+const tableKey = ref(0)
 const route = useRoute()
 const { initSnapshot, isModified } = useDirtyData()
 
@@ -21,6 +22,15 @@ const selectedRows = ref([])
 const dataSnapshot = ref(null)
 const optionsMap = ref({}) 
 const loadingOptions = ref(false)
+
+const addColVisible = ref(false)
+const addColForm = reactive({
+  title: '',
+  uiType: 'Input',
+  options: '', // 逗号分隔字符串
+  isRequired: false
+})
+const addingCol = ref(false)
 
 // --- 辅助函数 ---
 const mapUiType = (backendUiType) => {
@@ -185,8 +195,8 @@ const fetchData = async () => {
   optionsMap.value = {} 
 
   try {
-    const res = await axios.get(`/api/Dict/${dictType}`)
-    const backendData = res.data.data || res.data 
+    const res = await axios.get(`/api/Dict/${dictType}?_t=${Date.now()}`)
+    const backendData = res.data.data || res.data
     
     if (backendData.rows || backendData.columns) {
       const rawRows = backendData.rows || [] 
@@ -197,11 +207,26 @@ const fetchData = async () => {
         if (firstRowKeys.includes('id') || firstRowKeys.some(k => /^[a-z]/.test(k))) {
           useCamelCase = true
         }
+        const idKey = firstRowKeys.find(k => k.toLowerCase() === 'id')
+        if (idKey) {
+            rawRows.sort((a, b) => Number(a[idKey]) - Number(b[idKey]))
+        }
+      
       }
 
+      // 1. 原有的列映射逻辑 (保持不变)
       const mappedColumns = (backendData.columns || []).map(col => {
         let finalProp = col.prop || col.DbField
         if (useCamelCase && finalProp) finalProp = toCamelCase(finalProp)
+
+        let smartWidth = col.width
+        if (!smartWidth && finalProp && finalProp.toLowerCase() === 'id') {
+           smartWidth = 80
+        }
+
+        if (col.options && Array.isArray(col.options) && col.options.length > 0) {
+           optionsMap.value[finalProp] = col.options.map(opt => ({ label: opt, value: opt }))
+        }
 
         return {
           ...col,
@@ -210,16 +235,33 @@ const fetchData = async () => {
           type: mapUiType(col.uiType || col.UiType), 
           show: col.show !== undefined ? col.show : (col.IsHidden === true ? false : true),
           isReadOnly: col.isReadOnly !== undefined ? col.isReadOnly : col.IsReadOnly,
-          required: col.required,
-          dataSource: col.dataSource || col.DataSource 
+          required: col.required !== undefined ? col.required : (col.IsRequired || false),
+          dataSource: col.dataSource || col.DataSource,
+          width: smartWidth,
+          staticOptions: col.options || col.Options 
         }
       })
 
+      // 🌟🌟🌟 新增的核心逻辑：印刷空模板 & 盖章合并 🌟🌟🌟
+      const baseRowTemplate = mappedColumns.reduce((acc, col) => {
+        acc[col.prop] = null // 让所有列（包括未来的新增列）都默认有一个 null 坑位
+        return acc
+      }, {})
+
+      const formattedRows = rawRows.map(row => ({
+        ...baseRowTemplate,  // 底层铺上全是 null 的空模板
+        ...row               // 表层盖上后端返回的真实数据
+      }))
+      // 🌟🌟🌟 新增结束 🌟🌟🌟
+
+      // 2. 赋值给表格配置（注意 list 用的是 formattedRows）
       tableConfig.value = {
         title: backendData.DisplayName || backendData.displayName || dictType, 
         columns: mappedColumns,
-        list: rawRows
+        list: formattedRows
       }
+
+      tableKey.value++
       
       dataSnapshot.value = JSON.parse(JSON.stringify(tableConfig.value))
       initSnapshot(tableConfig.value.list) 
@@ -303,11 +345,32 @@ const handleSelectionChange = (val) => { selectedRows.value = val }
 
 const handleAddRow = () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
+  
+  // 1. 核心标记：打上 _isNew 标记，告诉保存接口这是新数据
   const newRow = { _isNew: true }
   
+  // 2. 🟢 核心算法：寻找当前 ID 序列中的“最小空缺值”
+  let nextId = 1 // 默认从 1 开始试探
+  const pkCol = tableConfig.value.columns.find(col => col.isPrimaryKey)
+  
+  if (pkCol) {
+    // 提取当前表格里的所有合法正整数 ID，并放入 Set 中（查询速度 O(1)）
+    const existingIds = tableConfig.value.list
+      .map(r => Number(r[pkCol.prop])) 
+      .filter(n => !isNaN(n) && n > 0) 
+      
+    const idSet = new Set(existingIds)
+    
+    // 从 1 开始往上数，只要集合里有这个数字，就看下一个，直到找到第一个没有的！
+    while (idSet.has(nextId)) {
+      nextId++
+    }
+  }
+
+  // 3. 遍历列配置，填充这个算出来的“完美填缝 ID”和其他空坑位
   tableConfig.value.columns.forEach(col => {
     if (col.isPrimaryKey) {
-        newRow[col.prop] = 0 
+        newRow[col.prop] = nextId // 👈 填入填缝 ID
     } else if (col.type === 'switch') {
         newRow[col.prop] = false 
     } else {
@@ -315,7 +378,10 @@ const handleAddRow = () => {
     }
   })
   
+  // 4. 插入到表格中
   tableConfig.value.list.push(newRow)
+  
+  // 5. 滚动到底部
   setTimeout(() => {
     const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap')
     if(tableBody) tableBody.scrollTop = tableBody.scrollHeight
@@ -327,44 +393,69 @@ const handleBatchDelete = () => {
   ElMessageBox.confirm('确定要删除选中的行吗？', '提示', { type: 'warning' })
     .then(async () => {
       try {
+        // 1. 获取需要从后端删除的 ID (排除新增行)
         const ids = selectedRows.value
           .filter(r => !r._isNew)
-          .map(r => r.id || r.Id)
-        
-        for (const id of ids) {
-          await axios.delete(`/api/Dict/${props.dictId}/${id}`)
+          // 🟢 [修复点]：同步增加对 r.ID 的支持，兼容多种大小写格式
+          .map(r => r.id || r.Id || r.ID)
+          // 🛡️ [安全防护]：过滤掉 undefined 或 null 的 ID，防止请求报错
+          .filter(id => id !== undefined && id !== null && id !== '')
+
+        // 2. 逐个发送删除请求
+        // (如果选中的全是新增行，ids 为空，则跳过 API 请求，直接在前端移除)
+        if (ids.length > 0) {
+          for (const id of ids) {
+            await axios.delete(`/api/Dict/${props.dictId}/${id}`)
+          }
         }
         
+        // 3. 更新前端视图 (移除所有选中的行，包括新增行)
         tableConfig.value.list = tableConfig.value.list.filter(row => !selectedRows.value.includes(row))
         selectedRows.value = []
         ElMessage.success('删除成功')
       } catch (e) {
+        console.error(e)
         ElMessage.error(e.response?.data?.message || '删除失败')
       }
-    }).catch(() => {})
+    }).catch(() => {
+      // 取消删除
+    })
 }
 
 // --- 6. 保存 (含唯一性校验) ---
-// --- 6. 保存 (修复 PUT 请求 ID 为 undefined 的问题) ---
+
 const handleSave = async () => {
   const currentList = tableConfig.value.list || []
   const columns = tableConfig.value.columns || []
 
-  // 1. 必填校验
+  // ==========================
+  // 1. 必填项空值校验 (新增逻辑)
+  // ==========================
   for (let i = 0; i < currentList.length; i++) {
     const row = currentList[i]
     for (const col of columns) {
-      if (col.required && !col.isReadOnly && (row[col.prop] === null || row[col.prop] === '')) {
-         ElMessage.warning(`第 ${i + 1} 行：[${col.label}] 不能为空`)
-         return
+      // 只有 "必填" 且 "非只读" 的列才校验
+      if (col.required && !col.isReadOnly) {
+         const val = row[col.prop]
+         
+         // 严谨判断：null、undefined 或 纯空格
+         const isEmpty = val === null || val === undefined || (typeof val === 'string' && val.trim() === '')
+         
+         if (isEmpty) {
+            ElMessage.warning(`无法保存：第 ${i + 1} 行的 [${col.label}] 为必填项，不能为空。`)
+            return // ⛔ 校验不通过，直接终止，不发送请求
+         }
       }
     }
   }
 
-  // 2. CL 字段唯一性校验
+  // ==========================
+  // 2. CL 字段唯一性校验 (保留)
+  // ==========================
   const clColumn = columns.find(col => /_?cl$/i.test(col.prop))
   if (clColumn) {
     const clValues = currentList.map(row => row[clColumn.prop])
+    // 过滤掉无效值，只校验填写了的内容
     const validValues = clValues.filter(v => v !== null && v !== undefined && v !== '')
     
     const uniqueValues = new Set(validValues)
@@ -375,47 +466,100 @@ const handleSave = async () => {
     }
   }
 
+  // ==========================
+  // 3. 提交数据
+  // ==========================
   loading.value = true
   try {
     const promises = []
+    let hasChanges = false
     
     for (const row of currentList) {
+      // 提取 _isNew 标记，避免将其传给后端（如果后端不接受额外字段）
       const { _isNew, ...submitData } = row
       
       if (_isNew) {
-        // 新增 POST
+        // ---> 新增 (POST)
         promises.push(axios.post(`/api/Dict/${props.dictId}`, submitData))
+        hasChanges = true
       } else if (isModified(row)) {
-        // 修改 PUT
-        // 🟢 关键修复：兼容 id, Id, ID 三种格式
+        // ---> 修改 (PUT)
+        // 兼容 ID 的多种写法 (id, Id, ID)
         const id = row.id || row.Id || row.ID
         
-        if (!id) {
-          console.error('❌ 无法获取行ID，跳过保存:', row)
-          continue
+        if (id) {
+          promises.push(axios.put(`/api/Dict/${props.dictId}/${id}`, submitData))
+          hasChanges = true
+        } else {
+          console.error('❌ 无法获取行ID，跳过该行保存:', row)
         }
-        
-        promises.push(axios.put(`/api/Dict/${props.dictId}/${id}`, submitData))
       }
     }
 
-    if (promises.length > 0) {
-      await Promise.all(promises)
-      ElMessage.success('保存成功')
-      await fetchData()
-    } else {
+    if (!hasChanges) {
       ElMessage.info('没有检测到修改')
       isEdit.value = false
+      loading.value = false
+      return
     }
 
+    // 并行发送所有请求
+    await Promise.all(promises)
+    
+    ElMessage.success('保存成功')
+    
+    // 保存成功后刷新数据，以确保获取最新的后端状态（如自动生成的ID或默认值）
+    await fetchData()
+    
   } catch (error) {
     console.error(error)
-    ElMessage.error(error.response?.data?.message || '保存失败')
+    const errorMsg = error.response?.data?.message || '保存失败'
+    ElMessage.error(errorMsg)
   } finally {
     loading.value = false
   }
 }
 
+const openAddColumnDialog = () => {
+  // 重置表单
+  addColForm.title = ''
+  addColForm.uiType = 'Input'
+  addColForm.options = ''
+  addColForm.isRequired = false
+  addColVisible.value = true
+}
+const submitAddColumn = async () => {
+  if (!addColForm.title) return ElMessage.warning('请输入列名称')
+  if (addColForm.uiType === 'Select' && !addColForm.options) return ElMessage.warning('下拉框必须填写选项')
+
+  addingCol.value = true
+  try {
+    // 调用我们在后端新写的接口
+    await axios.post(`/api/dict-config/columns/${props.dictId}`, {
+      title: addColForm.title,
+      uiType: addColForm.uiType,
+      isRequired: addColForm.isRequired,
+      options: addColForm.options // 字符串 "A,B,C"
+    })
+
+    ElMessage.success('列添加成功')
+    addColVisible.value = false
+
+    const wasEdit = isEdit.value
+    await new Promise(resolve => setTimeout(resolve, 800))
+    // 刷新整个表格，获取新列配置
+    await fetchData()
+    if (wasEdit) {
+      await toggleEdit() // 完美复用 toggleEdit，它会自动帮你把新列的 options 拉取下来并进入编辑态
+    }
+    
+  } catch (error) {
+    console.error(error)
+    ElMessage.error(error.response?.data?.message || '添加失败')
+  } finally {
+    addingCol.value = false
+  }
+}
 const displayData = computed(() => {
   const rawData = tableConfig.value.list || [] 
   const keyword = searchKeyword.value.trim().toLowerCase()
@@ -442,7 +586,8 @@ const displayData = computed(() => {
         </el-button>
 
         <template v-if="isEdit">
-          <el-button type="primary" @click="handleAddRow">新增行</el-button>
+          <el-button type="primary" @click="handleAddRow" icon="Plus">新增行</el-button>
+          <el-button type="primary" @click="openAddColumnDialog" icon="Plus">新增列</el-button>
           <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
             批量删除 ({{ selectedRows.length }})
           </el-button>
@@ -453,6 +598,7 @@ const displayData = computed(() => {
     </div>
 
     <el-table 
+      :key="tableKey"
       :data="displayData" 
       border 
       stripe
@@ -469,9 +615,13 @@ const displayData = computed(() => {
           v-if="col.show !== false"
           :prop="col.prop"
           :label="col.label"
-          :min-width="col.width || 150" 
+          
+          :width="col.width"                 
+          :min-width="col.width ? null : 150" 
+          
           show-overflow-tooltip
           :fixed="col.isPrimaryKey ? 'left' : false"
+          sortable 
         >
           <template #header>
             <span>
@@ -485,44 +635,51 @@ const displayData = computed(() => {
                  class="dirty-cell-wrapper"
                  :class="{ 'is-modified': isModified(scope.row, col.prop) }"
             >
-              <template v-if="!col.isReadOnly">
-                <el-select 
-                  v-if="col.type === 'select'" 
-                  v-model="scope.row[col.prop]" 
-                  placeholder="请选择" 
-                  size="small"
-                  filterable
-                  @change="(val) => handleSelectChange(val, scope.row, col)"
-                >
-                  <el-option
-                    v-for="opt in getVisibleOptions(col, scope.row)"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
-                </el-select>
-
-                <el-switch
-                  v-else-if="col.type === 'switch'"
-                  v-model="scope.row[col.prop]"
-                  inline-prompt
-                  active-text="是"
-                  inactive-text="否"
-                />
-                
-                <el-input 
-                  v-else 
-                  v-model="scope.row[col.prop]" 
-                  size="small" 
-                />
-              </template>
-              
-              <span v-else style="color: #909399; cursor: not-allowed;">
-                 <el-tag v-if="col.type === 'switch'" type="info" size="small" effect="plain">
-                    {{ scope.row[col.prop] ? '是' : '否' }}
-                 </el-tag>
-                 <span v-else>{{ scope.row[col.prop] }}</span>
+              <span v-if="col.isPrimaryKey && scope.row._isNew" style="color: #67c23a; font-weight: bold; padding: 0 10px; display: flex; align-items: center;">
+                {{ scope.row[col.prop] }}
+                <el-tag size="small" type="success" effect="plain" style="margin-left: 6px; padding: 0 4px; height: 18px; line-height: 16px;">新</el-tag>
               </span>
+
+              <template v-else>
+                <template v-if="!col.isReadOnly">
+                  <el-select 
+                    v-if="col.type === 'select'" 
+                    v-model="scope.row[col.prop]" 
+                    placeholder="请选择" 
+                    size="small"
+                    filterable
+                    @change="(val) => handleSelectChange(val, scope.row, col)"
+                  >
+                    <el-option
+                      v-for="opt in getVisibleOptions(col, scope.row)"
+                      :key="opt.value"
+                      :label="opt.label"
+                      :value="opt.value"
+                    />
+                  </el-select>
+
+                  <el-switch
+                    v-else-if="col.type === 'switch'"
+                    v-model="scope.row[col.prop]"
+                    inline-prompt
+                    active-text="是"
+                    inactive-text="否"
+                  />
+                  
+                  <el-input 
+                    v-else 
+                    v-model="scope.row[col.prop]" 
+                    size="small" 
+                  />
+                </template>
+                
+                <span v-else style="color: #909399; cursor: not-allowed;">
+                   <el-tag v-if="col.type === 'switch'" type="info" size="small" effect="plain">
+                      {{ scope.row[col.prop] ? '是' : '否' }}
+                   </el-tag>
+                   <span v-else>{{ scope.row[col.prop] }}</span>
+                </span>
+              </template>
 
               <div v-if="!col.isReadOnly && isModified(scope.row, col.prop)" class="dirty-marker"></div>
             </div>
@@ -541,6 +698,32 @@ const displayData = computed(() => {
         </el-table-column>
       </template>
     </el-table>
+    <el-dialog v-model="addColVisible" title="添加自定义列" width="400px" append-to-body>
+      <el-form label-position="top">
+        <el-form-item label="列名称 (中文标题)">
+          <el-input v-model="addColForm.title" placeholder="例如：紧急程度" />
+        </el-form-item>
+        <el-form-item label="数据类型">
+          <el-select v-model="addColForm.uiType" style="width: 100%;">
+            <el-option label="文本框 (Input)" value="Input" />
+            <el-option label="下拉框 (Select)" value="Select" />
+            <el-option label="开关 (Switch)" value="Switch" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="addColForm.uiType === 'Select'" label="选项列表 (用逗号分隔)">
+          <el-input v-model="addColForm.options" placeholder="例如：高,中,低" />
+        </el-form-item>
+        <el-form-item>
+          <el-checkbox v-model="addColForm.isRequired">是否必填</el-checkbox>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="addColVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitAddColumn" :loading="addingCol">确定添加</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 

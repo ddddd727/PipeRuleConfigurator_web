@@ -22,63 +22,83 @@ export default {
           name: 'StdSeries',
           component: DictTable, 
           meta: { title: '标准系列', icon: 'List' }, 
-          props: { dictId: 'std-series' } // ✅ 匹配后端: std-series
+          props: { dictId: 'std-series' }
         },
         { 
-          path: 'piping-class', // 🔄 路径修正: pipe-grade -> piping-class
+          path: 'piping-class', 
           name: 'PipingClass',
           component: DictTable, 
-          meta: { title: 'A-管材等级', icon: 'Medal' }, 
-          props: { dictId: 'piping-class' } // ✅ 匹配后端: piping-class
+          meta: { title: '管材等级', icon: 'Medal' }, 
+          props: { dictId: 'piping-class' }
         },
         { 
-          path: 'mat-category', // 🔄 路径修正: main-material -> mat-category
+          path: 'mat-category', 
           name: 'MatCategory',
           component: DictTable, 
           meta: { title: 'B1-主材料', icon: 'Box' }, 
-          props: { dictId: 'mat-category' } // ✅ 匹配后端: mat-category
+          props: { dictId: 'mat-category' }
         },
         { 
-          path: 'piping-standard', // 🔄 路径修正: pipe-std -> piping-standard
+          path: 'piping-standard', 
           name: 'PipingStandard',
           component: DictTable, 
           meta: { title: 'B2-管材标准', icon: 'Collection' }, 
-          props: { dictId: 'piping-standard' } // ✅ 匹配后端: piping-standard
+          props: { dictId: 'piping-standard' }
         },
         { 
           path: 'mat-grade', 
           name: 'MatGrade',
           component: DictTable, 
           meta: { title: 'B3-牌号', icon: 'Ticket' }, 
-          props: { dictId: 'mat-grade' } // ✅ 匹配后端: mat-grade
+          props: { dictId: 'mat-grade' }
         },
         { 
-          path: 'flange-standard', // 🔄 路径修正: flange-std -> flange-standard
+          path: 'mat-grade-rule', 
+          name: 'MatGradeRule',
+          component: DictTable, 
+          meta: { title: 'B3-牌号规则', icon: 'SetUp' }, // 新增
+          props: { dictId: 'mat-grade-rule' }
+        },
+        { 
+          path: 'flange-standard', 
           name: 'FlangeStandard',
           component: DictTable, 
-          meta: { title: 'C1-法兰标准', icon: 'Notebook' }, 
-          props: { dictId: 'flange-standard' } // ✅ 匹配后端: flange-standard
+          meta: { title: 'C1-法兰等级标准', icon: 'Notebook' }, 
+          props: { dictId: 'flange-standard' }
         },
         { 
-          path: 'pressure-rating', // 🔄 路径修正: flange-rating -> pressure-rating
+          path: 'pressure-rating', 
           name: 'PressureRating',
           component: DictTable, 
-          meta: { title: 'C2-压力等级', icon: 'Odometer' }, 
-          props: { dictId: 'pressure-rating' } // ✅ 匹配后端: pressure-rating
+          meta: { title: 'C2-法兰压力等级', icon: 'Odometer' }, 
+          props: { dictId: 'pressure-rating' }
         },
         { 
-          path: 'schedule', // 🔄 路径修正: wall-thk -> schedule
-          name: 'Schedule',
+          path: 'schedule-series', 
+          name: 'ScheduleSeries',
           component: DictTable, 
-          meta: { title: 'D-壁厚等级', icon: 'CopyDocument' }, 
-          props: { dictId: 'schedule' } // ✅ 匹配后端: schedule
+          meta: { title: '壁厚系列', icon: 'Files' }, // 新增
+          props: { dictId: 'schedule-series' }
         },
-        
+        { 
+          path: 'schedule-thickness', 
+          name: 'ScheduleThickness',
+          component: DictTable, 
+          meta: { title: 'D-壁厚等级', icon: 'CopyDocument' }, // 替代原来的 schedule
+          props: { dictId: 'schedule-thickness' }
+        },
+        { 
+          path: 'wall-thickness-data', 
+          name: 'WallThicknessData',
+          component: DictTable, 
+          meta: { title: '外径壁厚表', icon: 'DataBoard' }, // 新增
+          props: { dictId: 'wall-thickness-data' }
+        }
       ]
     },
 
     // ============================================================
-    // 分组 2: 管子连接件 (保留原有配置，暂时未变)
+    // 分组 2: 管子连接件 (保留原有配置)
     // ============================================================
     {
       path: 'fitting',
@@ -137,7 +157,7 @@ export default {
     },
 
     // ============================================================
-    // 分组 3: 法兰连接 (保留原有配置，暂时未变)
+    // 分组 3: 法兰连接 (保留原有配置)
     // ============================================================
     {
       path: 'flange-conn',
