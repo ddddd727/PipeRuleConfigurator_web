@@ -98,7 +98,15 @@ const fetchSharedOptions = async (url, columns) => {
     console.log(`📡 发起合并请求: ${requestUrl} (服务于 ${columns.length} 个列)`)
     const res = await axios.get(requestUrl)
     const rawData = res.data
-    const list = Array.isArray(rawData) ? rawData : (rawData.data || [])
+    // 确保 list 是数组格式
+    let list = []
+    if (Array.isArray(rawData)) {
+      list = rawData
+    } else if (rawData && typeof rawData === 'object' && rawData.data) {
+      list = Array.isArray(rawData.data) ? rawData.data : []
+    } else if (rawData && typeof rawData === 'object' && rawData.rows) {
+      list = Array.isArray(rawData.rows) ? rawData.rows : []
+    }
 
     // 空数据处理
     if (!list || list.length === 0) {
@@ -109,7 +117,12 @@ const fetchSharedOptions = async (url, columns) => {
     // 简单数组处理
     if (typeof list[0] !== 'object' || list[0] === null) {
       columns.forEach(col => {
-        optionsMap.value[col.prop] = list.map(v => ({ label: String(v), value: v, __raw: v }))
+        // 确保 list 是数组再调用 map
+        if (Array.isArray(list)) {
+          optionsMap.value[col.prop] = list.map(v => ({ label: String(v), value: v, __raw: v }))
+        } else {
+          optionsMap.value[col.prop] = []
+        }
       })
       return
     }
@@ -137,15 +150,19 @@ const fetchSharedOptions = async (url, columns) => {
       }
 
       // 映射数据
-      const safeOptions = list.map(item => {
-        const val = valueKey ? item[valueKey] : item
-        const lbl = labelKey ? item[labelKey] : (val !== undefined ? String(val) : '未命名')
-        return {
-          label: lbl !== undefined && lbl !== null ? String(lbl) : '',
-          value: val,
-          __raw: item // 保留原始数据用于联动
-        }
-      }).filter(opt => opt.value !== undefined && opt.value !== null)
+      // 确保 list 是数组再调用 map
+      let safeOptions = []
+      if (Array.isArray(list)) {
+        safeOptions = list.map(item => {
+          const val = valueKey ? item[valueKey] : item
+          const lbl = labelKey ? item[labelKey] : (val !== undefined ? String(val) : '未命名')
+          return {
+            label: lbl !== undefined && lbl !== null ? String(lbl) : '',
+            value: val,
+            __raw: item // 保留原始数据用于联动
+          }
+        }).filter(opt => opt.value !== undefined && opt.value !== null)
+      }
 
       optionsMap.value[col.prop] = safeOptions
       console.log(`   ✅ 列 [${col.label}] 数据已装载`)
@@ -195,7 +212,12 @@ const fetchData = async () => {
   optionsMap.value = {} 
 
   try {
-    const res = await axios.get(`/api/Dict/${dictType}?_t=${Date.now()}`)
+    // 为所有 part- 开头的 dictId 设置特殊的请求路径
+    let apiPath = `/api/Dict/${dictType}`
+    if (dictType.startsWith('part-')) {
+      apiPath = `/api/Dictpiping/${dictType}`
+    }
+    const res = await axios.get(`${apiPath}?_t=${Date.now()}`)
     const backendData = res.data.data || res.data
     
     if (backendData.rows || backendData.columns) {
@@ -405,7 +427,8 @@ const handleBatchDelete = () => {
         // (如果选中的全是新增行，ids 为空，则跳过 API 请求，直接在前端移除)
         if (ids.length > 0) {
           for (const id of ids) {
-            await axios.delete(`/api/Dict/${props.dictId}/${id}`)
+            const apiPath = props.dictId.startsWith('part-') ? `/api/Dictpiping` : `/api/Dict`
+            await axios.delete(`${apiPath}/${props.dictId}/${id}`)
           }
         }
         
@@ -480,7 +503,8 @@ const handleSave = async () => {
       
       if (_isNew) {
         // ---> 新增 (POST)
-        promises.push(axios.post(`/api/Dict/${props.dictId}`, submitData))
+        const apiPath = props.dictId.startsWith('part-') ? `/api/Dictpiping` : `/api/Dict`
+        promises.push(axios.post(`${apiPath}/${props.dictId}`, submitData))
         hasChanges = true
       } else if (isModified(row)) {
         // ---> 修改 (PUT)
@@ -488,7 +512,8 @@ const handleSave = async () => {
         const id = row.id || row.Id || row.ID
         
         if (id) {
-          promises.push(axios.put(`/api/Dict/${props.dictId}/${id}`, submitData))
+          const apiPath = props.dictId.startsWith('part-') ? `/api/Dictpiping` : `/api/Dict`
+          promises.push(axios.put(`${apiPath}/${props.dictId}/${id}`, submitData))
           hasChanges = true
         } else {
           console.error('❌ 无法获取行ID，跳过该行保存:', row)
