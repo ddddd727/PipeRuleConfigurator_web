@@ -1,7 +1,7 @@
 import Mock from 'mockjs'
 // 导入管道规格配置相关的Mock数据
-// 已禁用 PipeSpec 相关的 mock，使用真实 API
-// import './modules/PipeSpecConfigInfo/ReferenceInfo.js'
+// 启用 PipeSpecConfigForm 组件相关的 mock
+import './modules/PipeSpecConfigInfo/ReferenceInfo.js'
 
 Mock.setup({
   timeout: '200-600'
@@ -167,83 +167,53 @@ export const db = {
       'name': '@ctitle(5, 12)',
       'status|1': ['现行', '废止', '即将实施']
     }]
-  },
-
-  // 1. 弯管数据 (bend-pipe)
-  'bend-pipe': {
-    title: '部件库名称：PlainPipingGenericData',
-    columns: [
-      // { prop: 'id', label: '序号', width: 80 },
-      { prop: 'diameter', label: '外径DN', editable: true },
-      { prop: 'unit', label: '外径单位', editable: true },
-      { prop: 'l1', label: '前夹长L1', editable: true },
-      { prop: 'l2', label: '后夹长L2', editable: true }
-    ],
-    'data|5': [{
-      'id|+1': 1,
-      'diameter|1': ['DN15', 'DN20', 'DN25', 'DN32', 'DN40', 'DN50'],
-      'unit': 'mm',
-      'l1|100-500': 1,
-      'l2|100-500': 1
-    }]
-  },
-
-  // 2. 壁厚系列 (wall-thickness-series)
-  'wall-thickness-series': {
-    title: '部件库名称：PlainPipingGenericData',
-    columns: [
-      // { prop: 'id', label: '序号', width: 80 },
-      { prop: 'diameter', label: '通径DN', editable: true },
-      { prop: 'unit', label: '通径单位', editable: true },
-      { prop: 'standard', label: '管材标准EndStandard', editable: true },
-      { prop: 'series', label: '壁厚系列', editable: true },
-      { prop: 'outer', label: '外径', editable: true },
-      { prop: 'value', label: '壁厚值', editable: true }
-    ],
-    'data|5': [{
-      'id|+1': 1,
-      'diameter|1': ['DN15', 'DN20', 'DN25', 'DN32', 'DN40', 'DN50'],
-      'unit': 'mm',
-      'standard|1': ['ASTM A106', 'GB/T 8163', 'ASTM A53'],
-      'series|1': ['Sch10', 'Sch20', 'Sch40', 'Sch80', 'Sch160'],
-      'outer|20-200': 1,
-      'value|1.0-10.0': 1
-    }]
-  },
-
-  // 3. ShortCode (shortcode)
-  'shortcode': {
-    title: '部件库名称：ShortCodeHierarchyRule',
-    columns: [
-      // { prop: 'id', label: '序号', width: 80 },
-      { prop: 'type', label: 'ShortCodeHierarchyType', editable: true },
-      { prop: 'shortcode', label: 'ShortCode', editable: true }
-    ],
-    'data|5': [{
-      'id|+1': 1,
-      'type|1': ['PIPE', 'VALVE', 'FLANGE', 'FITTING', 'INSTRUMENT', 'EQUIPMENT'],
-      'shortcode|1': ['管道', '阀门', '法兰', '管件', '仪表', '设备']
-    }]
-  },
-
-  // 4. Spec (spec)
-  'spec': {
-    title: '部件库名称：PipingCommodityFilter',
-    columns: [
-      // { prop: 'id', label: '序号', width: 80 },
-      { prop: 'shortcode', label: 'ShortCode', editable: true },
-      { prop: 'type', label: 'GeometricIndustryStandard', editable: true },
-      { prop: 'type', label: 'CommodityCode', editable: true }
-    ],
-    'data|5': [{
-      'id|+1': 1,
-      'shortcode|1': ['管道', '阀门', '法兰', '管件', '仪表', '设备']
-    }]
-  },
+  }
 }
 
-// 拦截请求
+// 基础库相关接口
+Mock.mock(/\/api\/library\/tree/, 'get', () => {
+  return { code: 200, data: db['library-tree'].data, message: 'success' }
+})
 
+Mock.mock(/\/api\/library\/codelist-tree/, 'get', () => {
+  return { code: 200, data: db['codelist-tree'].data, message: 'success' }
+})
+
+Mock.mock(/\/api\/library\/component-details/, 'get', () => {
+  return { code: 200, data: db['library-component-details'], message: 'success' }
+})
+
+Mock.mock(/\/api\/library\/table-data/, 'get', () => {
+  return { code: 200, data: db['library-table-data'], message: 'success' }
+})
+
+Mock.mock(/\/api\/library\/codelist-table-data/, 'get', () => {
+  return { code: 200, data: db['codelist-table-data'], message: 'success' }
+})
+
+// 拦截请求
+Mock.mock(/\/api\/dict\/[\w-]+/, 'get', (options) => {
+  console.log('Mock拦截:', options.url)
+  // 兼容带 - 的 id
+  const urlParts = options.url.split('/')
+  const id = urlParts[urlParts.length - 1]
+
+  const result = db[id]
+
+  if (result) {
+    return {
+      code: 200,
+      message: 'success',
+      data: Mock.mock(result)
+    }
+  } else {
+    return {
+      code: 404,
+      message: `未找到 [${id}] 的配置数据`,
+      data: { title: '未定义', columns: [], data: [] }
+    }
+  }
+})
 
 // --- PMC 模块 Mock ---
 
@@ -276,45 +246,12 @@ Mock.mock(/\/api\/pmc\/ship-numbers/, 'get', (options) => {
   }
 })
 
-// 2. 主材料规则内容 (B1, B2, B3, D)
-Mock.mock(/\/api\/pmc\/rules\/main-material/, 'get', (options) => {
-  return Mock.mock({
-    code: 200,
-    'data|5-10': [{
-      'id|+1': 1,
-      'code|1': ['A', 'B', 'C', 'D'],
-      'std|1': ['1', '2', '3', '4'],
-      'grade|1': ['1', '2', '3', '4'],
-      'thickness|1': ['1', '2', '3', '4']
-    }]
-  })
-})
+// 2. 主材料规则内容 (B1, B2, B3, D) - 已迁移至后端
+// Mock.mock(/\/api\/pmc\/rules\/main-material/, 'get', (options) => { ... })
 
-// 3. 法兰规则内容 (C1, C2)
-Mock.mock(/\/api\/pmc\/rules\/flange/, 'get', (options) => {
-  return Mock.mock({
-    code: 200,
-    'data|3-6': [{
-      'id|+1': 1,
-      'std|1': ['A', 'B', 'C', 'D'],
-      'press|1': ['1', '2', '3', '4']
-    }]
-  })
-})
+// 3. 法兰规则内容 (C1, C2) - 已迁移至后端
+// Mock.mock(/\/api\/pmc\/rules\/flange/, 'get', (options) => { ... })
 
-// 4. 管材一二级限定规则 (A, B2, B3, C2)
-Mock.mock(/\/api\/pmc\/rules\/pipe-limit/, 'get', (options) => {
-  return Mock.mock({
-    code: 200,
-    'data|4-8': [{
-      'id|+1': 1,
-      'grade|1': ['A', 'B', 'C', 'D'],
-      'std|1': ['1', '2', '3', '4'],
-      'gradeCode|1': ['1', '2', '3', '4'],
-      'press|1': ['1', '2', '3', '4']
-    }]
-  })
-})
 
 // 5. 获取规则下拉列表 (主材料、法兰、管材限定)
 Mock.mock(/\/api\/pmc\/rules\/list/, 'get', (options) => {

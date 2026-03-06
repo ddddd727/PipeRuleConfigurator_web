@@ -6,11 +6,18 @@ import TagsView from './components/TagsView.vue'
 import PMCAIAssistant from '@/components/PMCAIAssistant.vue'
 import { constantRoutes } from '@/router/index'
 import { Expand, Fold, Platform, Cpu } from '@element-plus/icons-vue'
+import { useTagsViewStore } from '@/stores/tagsView'
 
 const route = useRoute()
-const router = useRouter()
+// router 未使用可以移除，如果后续需要跳转可保留
+// const router = useRouter() 
+
 const isCollapse = ref(false)
 const showAI = ref(false)
+
+const tagsStore = useTagsViewStore()
+// [新增] 获取缓存列表
+const cachedViews = computed(() => tagsStore.cachedViews)
 
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
@@ -23,167 +30,306 @@ const toggleAI = () => {
 const menuList = computed(() => {
   return constantRoutes.filter(item => !item.hidden && item.path !== '/' && item.path !== '/:pathMatch(.*)*')
 })
-
-const breadcrumbs = computed(() => {
-  return route.matched.filter(item => item.meta && item.meta.title)
-})
 </script>
 
 <template>
-  <el-container class="layout-container">
+  <div class="app-wrapper">
     
-    <el-aside :width="isCollapse ? '64px' : '200px'" class="aside-wrap">
-      <el-menu
-        :default-active="route.path"
-        class="el-menu-vertical-demo"
-        :collapse="isCollapse"
-        router
-        unique-opened
-        background-color="#304156"
-        text-color="#bfcbd9"
-        active-text-color="#409EFF"
-      >
-        <el-menu-item index="/" class="logo-item">
-          <el-icon><Platform /></el-icon>
-          <template #title>
-            <b style="font-size: 16px;">规则配置器</b>
-          </template>
-        </el-menu-item>
-
-        <sidebar-item
-          v-for="route in menuList"
-          :key="route.path"
-          :item="route"
-          :basePath="''"
-        />
-      </el-menu>
-    </el-aside>
-
-    <div class="workspace-wrapper">
+    <el-container class="layout-container">
       
-      <el-container class="center-container">
-        <el-header class="header-wrap">
-          <div class="left-panel">
-            <div class="collapse-btn" @click="toggleCollapse">
-              <el-icon :size="20">
-                <component :is="isCollapse ? Expand : Fold" />
-              </el-icon>
+      <el-aside :width="isCollapse ? '64px' : '200px'" class="aside-wrap">
+        <div class="sidebar-header">
+          <div v-if="!isCollapse" class="header-content expanded">
+            <div class="logo-area">
+              <el-icon :size="18"><Platform /></el-icon>
+              <span class="app-title">规则配置器</span>
             </div>
-            <el-breadcrumb separator="/">
-              <el-breadcrumb-item v-for="(item, index) in breadcrumbs" :key="item.path">
-                <span v-if="index === breadcrumbs.length - 1">{{ item.meta.title }}</span>
-                <a v-else @click.prevent="router.push(item.path)">{{ item.meta.title }}</a>
-              </el-breadcrumb-item>
-            </el-breadcrumb>
+            <div class="collapse-trigger" @click="toggleCollapse">
+              <el-icon :size="16"><Fold /></el-icon>
+            </div>
           </div>
-
-          <div class="right-panel">
-            <el-tooltip content="开启 PMC AI 助手" placement="bottom">
-              <div 
-                class="ai-trigger" 
-                :class="{ 'active': showAI }"
-                @click="toggleAI"
-              >
-                <el-icon :size="18"><Cpu /></el-icon>
-                <span style="margin-left: 6px; font-weight: 600;">AI 助手</span>
-              </div>
-             </el-tooltip>
+          
+          <div v-else class="header-content collapsed" @click="toggleCollapse">
+             <el-icon :size="20"><Expand /></el-icon>
           </div>
-        </el-header>
-
-        <tags-view />
-
-        <el-main class="main-content">
-          <router-view />
-        </el-main>
-      </el-container>
-
-      <transition name="slide-width">
-        <div v-if="showAI" class="ai-sidebar-wrap">
-          <PMCAIAssistant />
         </div>
-      </transition>
 
+        <el-menu
+          :default-active="route.path"
+          class="el-menu-vertical-demo"
+          :collapse="isCollapse"
+          router
+          unique-opened
+          background-color="#ffffff"
+          text-color="#303133"
+          active-text-color="#ffffff"
+        >
+          <sidebar-item
+            v-for="route in menuList"
+            :key="route.path"
+            :item="route"
+            :basePath="''"
+          />
+        </el-menu>
+      </el-aside>
+
+      <div class="workspace-wrapper">
+        <el-container class="center-container">
+          
+          <div class="navbar-container">
+            <div class="tags-section">
+              <tags-view />
+            </div>
+            
+            <div class="tools-section">
+              <el-tooltip content="开启 PMC AI 助手" placement="bottom">
+                <div 
+                  class="ai-trigger" 
+                  :class="{ 'active': showAI }"
+                  @click="toggleAI"
+                >
+                  <el-icon :size="16"><Cpu /></el-icon>
+                  <span style="margin-left: 4px; font-weight: 600; font-size: 13px;">AI 助手</span>
+                </div>
+               </el-tooltip>
+            </div>
+          </div>
+
+          <el-main class="main-content">
+            <router-view v-slot="{ Component }">
+             <transition name="fade" mode="out-in">
+           <keep-alive :include="cachedViews">
+         <component :is="Component" :key="route.fullPath" />
+          </keep-alive>
+           </transition>
+             </router-view>
+          </el-main>
+
+        </el-container>
+
+        <transition name="slide-width">
+          <div v-if="showAI" class="ai-sidebar-wrap">
+            <PMCAIAssistant />
+          </div>
+        </transition>
+
+      </div>
+    </el-container>
+
+    <div class="global-footer">
+      <span>***管系规格配置器  版权所有  ***有限公司</span>
     </div>
-  </el-container>
+
+  </div>
 </template>
 
 <style scoped>
-.layout-container {
+/* 1. APP 根容器 */
+.app-wrapper {
+  display: flex;
+  flex-direction: column;
   height: 100vh;
   width: 100%;
-  display: flex;
-}
-
-.aside-wrap {
-  background-color: #304156;
-  transition: width 0.3s;
-  flex-shrink: 0;
-  z-index: 2000;
-}
-
-/* 核心布局修改：Workspace 是一个 Flex Row */
-.workspace-wrapper {
-  flex: 1; /* 占满除了 Menu 之外的所有宽度 */
-  display: flex; /* 左右排列 */
-  flex-direction: row; 
-  height: 100vh;
+  background-color: #f0f2f5;
   overflow: hidden;
 }
 
-/* 中间容器：Header + Content 是 Flex Column */
+.global-footer {
+  width: 100%;
+  height: 32px;
+  background-color:var(--primary-color);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+  letter-spacing: 1px;
+}
+
+.layout-container {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  padding: 10px 10px 0 10px;
+  box-sizing: border-box;
+  gap: 10px;
+  overflow: hidden; 
+  margin-bottom: 0;
+}
+
+/* --- 侧边栏 --- */
+.aside-wrap {
+  background-color: #ffffff !important;
+  transition: width 0.3s;
+  flex-shrink: 0;
+  z-index: 2000;
+  
+  /* 【修改】高度减去 10px，与右侧 main-content 的 margin-bottom 对齐 */
+  height: calc(100% - 10px);
+  
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column; 
+}
+
+/* 新增：侧边栏头部样式 */
+.sidebar-header {
+  height: 50px;
+  background-color: var(--primary-color); /* 与旧版 logo 背景一致 */
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.header-content {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+}
+
+.header-content.expanded {
+  justify-content: space-between;
+}
+
+.header-content.collapsed {
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+.header-content.collapsed:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.collapse-trigger {
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+.collapse-trigger:hover {
+  background-color: rgba(255,255,255,0.2);
+}
+
+/* 菜单样式微调 */
+.el-menu-vertical-demo {
+    /* 1. 必须设置高度和允许溢出，否则无法滚动 */
+    height: 100vh; /* 或者 100% */
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    /* 2. 隐藏滚动条的核心代码 */
+    
+    /* Firefox */
+    scrollbar-width: none; 
+    
+    /* IE 10+ */
+    -ms-overflow-style: none; 
+}
+
+/* 3. Chrome, Safari, Edge (Webkit内核) */
+.el-menu-vertical-demo::-webkit-scrollbar {
+    display: none;
+}
+
+/* 菜单交互 */
+:deep(.el-menu-item:hover), 
+:deep(.el-sub-menu__title:hover) {
+  background-color: var(--primary-color) !important; 
+  color: #ffffff !important;             
+}
+:deep(.el-menu-item:hover i),
+:deep(.el-sub-menu__title:hover i) {
+  color: #ffffff !important;
+}
+:deep(.el-menu-item.is-active) {
+  background-color: var(--primary-color) !important; 
+  color: #ffffff !important;             
+}
+:deep(.el-menu-item.is-active i) {
+  color: #ffffff !important;
+}
+
+/* --- 工作区 --- */
+.workspace-wrapper {
+  flex: 1; 
+  display: flex; 
+  flex-direction: row; 
+  height: 100%;
+  overflow: hidden;
+  gap: 10px;                 
+}
+
 .center-container {
-  flex: 1; /* 自动占据剩余空间 */
+  flex: 1;
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-width: 0; /* 防止 Flex 子项溢出 */
-  transition: all 0.3s ease; /* 增加挤压动画 */
+  min-width: 0;
+  gap: 10px;                     
+  overflow: hidden;              
 }
 
-/* AI 侧边栏：高度由父级(100vh)决定，不再受 Header 限制 */
-.ai-sidebar-wrap {
-  width: 360px;
-  height: 100%; 
+.navbar-container {
   background-color: #fff;
+  border-radius: 12px;
   flex-shrink: 0;
-  border-left: 1px solid #dcdfe6;
-  z-index: 1000;
-  box-shadow: -2px 0 5px rgba(0,0,0,0.05); /* 加点阴影更有层次感 */
-}
-
-/* 保持原有样式 */
-.el-menu-vertical-demo:not(.el-menu--collapse) { width: 200px; }
-.el-menu-vertical-demo { border-right: none; height: 100%; }
-.logo-item { background-color: #2b2f3a !important; color: #fff !important; pointer-events: none; }
-
-.header-wrap {
-  height: 50px;
-  border-bottom: 1px solid #e6e6e6;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 15px;
-  flex-shrink: 0;
-  background-color: #fff; /* 确保背景色，防止透视 */
+  
+  /* 【修改 1】去除 padding，让内容紧贴边缘 */
+  padding: 0; 
+  
+  /* 【修改 2】高度改为 50px，与左侧 sidebar-header 对齐 */
+  height: 50px; 
+  
+  box-shadow: 0 1px 4px rgba(0,21,41,0.04);
+  overflow: hidden;
 }
 
-.left-panel, .right-panel { display: flex; align-items: center; }
-.collapse-btn { margin-right: 20px; cursor: pointer; display: flex; align-items: center; }
+/* 确保标签区域高度撑满 */
+.tags-section {
+  flex: 1; 
+  overflow: hidden;
+  height: 100%; /* 【修改 3】确保高度 100% */
+}
+
+.tools-section {
+  flex-shrink: 0;
+  padding: 0 10px; /* 工具栏内部保留一点间距 */
+  border-left: 1px solid #f0f0f0; 
+  height: 100%;    /* 高度撑满，分割线才好看 */
+  display: flex;
+  align-items: center;
+}
 
 .ai-trigger {
   display: flex;
   align-items: center;
   cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 20px;
+  padding: 4px 10px;
+  border-radius: 16px;
   transition: all 0.3s;
   color: #606266;
   border: 1px solid transparent;
   user-select: none;
+  background: #f4f4f5; /* 默认浅灰底，显眼一点 */
 }
 
-.ai-trigger:hover { background-color: #f0f2f5; color: #409EFF; }
+.ai-trigger:hover { background-color: #e6f7ff; color: #409EFF; }
 .ai-trigger.active {
   background: linear-gradient(135deg, #ecf5ff 0%, #d9ecff 100%);
   color: #409EFF;
@@ -192,23 +338,31 @@ const breadcrumbs = computed(() => {
 }
 
 .main-content {
-  background-color: #f0f2f5;
+  background-color: #fff;        
+  border-radius: 12px;           
   padding: 20px;
-  height: 100%;
-  overflow-y: auto;
   flex: 1;
+  overflow-y: auto;              
+  box-shadow: 0 1px 4px rgba(0,21,41,0.04);
+  margin-bottom: 10px; 
 }
 
-/* 动画 */
+.ai-sidebar-wrap {
+  width: 360px;
+  height: 100%; 
+  background-color: #fff;
+  flex-shrink: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+  margin-bottom: 10px; 
+}
+
 .slide-width-enter-active,
 .slide-width-leave-active {
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
   overflow: hidden;
 }
-
 .slide-width-enter-from,
-.slide-width-leave-to {
-  width: 0;
-  opacity: 0;
-}
+.slide-width-leave-to { width: 0; opacity: 0; }
 </style>

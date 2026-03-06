@@ -1,3 +1,4 @@
+// vite.config.js
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -11,13 +12,13 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
-  // 👇 核心配置：添加代理转发
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:5022',
+  
+        target: 'https://localhost:7051', 
         changeOrigin: true,
-        secure: false, // 如果是https接口，需要配置这个参数
+        secure: false 
       }
     }
   }
