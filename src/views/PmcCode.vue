@@ -1,6 +1,5 @@
 <script setup>
-defineOptions({ name: 'PmcCode' })
-import { ref, watch, onMounted, nextTick } from 'vue'
+import { ref, watch, onMounted, nextTick, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Check, Search, CopyDocument, CaretTop, CaretBottom } from '@element-plus/icons-vue'
@@ -380,18 +379,22 @@ const saveDialogData = () => {
     const newId = resultData.value.length > 0 ? Math.max(...resultData.value.map(item => item.id)) + 1 : 1
     const newRow = {
       id: newId,
+      uniqueKey: `${selectedShipType.value}_${selectedShipNumber.value}_new_${newId}`,
       ...formData.value, // Stores descriptions
       pmc: pmcCode,
       isByRule: true
     }
     resultData.value.push(newRow)
 
-    // Scroll to new row
+    // Scroll to new row and select it
     nextTick(() => {
       // Find row by specific ID class
       const rowEl = resultTableRef.value?.$el.querySelector(`.el-table__body .row-id-${newId}`)
       if (rowEl) {
         rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        resultTableRef.value.toggleRowSelection(newRow, true)
+      } else {
+        // Fallback: just toggle selection if DOM element not found immediately
         resultTableRef.value.toggleRowSelection(newRow, true)
       }
     })
@@ -433,9 +436,9 @@ const performSave = async (shipType, shipNo) => {
     if (res?.data?.code === 200) {
       ElMessage.success(res.data.message || '保存成功')
       // 如果保存的是当前选中的船型船号，则刷新数据
-      if (shipType === selectedShipType.value && shipNo === selectedShipNumber.value) {
-        refreshData()
-      }
+      // if (shipType === selectedShipType.value && shipNo === selectedShipNumber.value) {
+      //   refreshData()
+      // }
     } else {
       ElMessage.error(res?.data?.message || '保存失败')
     }
@@ -447,29 +450,18 @@ const performSave = async (shipType, shipNo) => {
 
 // 保存PMC编码到后端（入口）
 const saveToApi = async () => {
-  // 如果已经选择了船型船号，直接保存（需二次确认）
+  // 如果已经选择了船型船号，直接保存
   if (selectedShipType.value && selectedShipNumber.value) {
     if (selectedRows.value.length === 0) {
-      try {
-        await ElMessageBox.confirm(
-          `当前未勾选需要保存的数据，是否清空当前船型船号(${selectedShipType.value}/${selectedShipNumber.value})下的所有数据？`,
-          '警告',
-          {
-            confirmButtonText: '是',
-            cancelButtonText: '否',
-            type: 'warning'
-          }
-        )
-        // 用户点击“是”后继续
-        await performSave(selectedShipType.value, selectedShipNumber.value)
-      } catch (e) {
-        // 用户点击“否”或取消
-        return
-      }
-    } else {
-      await performSave(selectedShipType.value, selectedShipNumber.value)
-    }
-  } else {
+    ElMessage.warning('请勾选需要保存的新增数据')
+    return
+  }
+  await performSave(selectedShipType.value, selectedShipNumber.value)
+  // 清除勾选
+  if (resultTableRef.value) {
+    resultTableRef.value.clearSelection()
+  }
+} else {
     // 否则弹出窗口选择
     targetSaveShipType.value = ''
     targetSaveShipNumber.value = ''
@@ -485,27 +477,16 @@ const confirmSaveFromDialog = async () => {
   }
   
   if (selectedRows.value.length === 0) {
-    try {
-      await ElMessageBox.confirm(
-        `当前未勾选需要保存的数据，是否清空目标船型船号(${targetSaveShipType.value}/${targetSaveShipNumber.value})下的所有数据？`,
-        '警告',
-        {
-          confirmButtonText: '是',
-          cancelButtonText: '否',
-          type: 'warning'
-        }
-      )
-      // 用户点击“是”后继续
-      await performSave(targetSaveShipType.value, targetSaveShipNumber.value)
-      saveDialogVisible.value = false
-    } catch (e) {
-      // 用户点击“否”或取消
-      return
-    }
-  } else {
-    await performSave(targetSaveShipType.value, targetSaveShipNumber.value)
-    saveDialogVisible.value = false
+    ElMessage.warning('请勾选需要保存的新增数据')
+    return
   }
+  
+  await performSave(targetSaveShipType.value, targetSaveShipNumber.value)
+  // 清除勾选
+  if (resultTableRef.value) {
+    resultTableRef.value.clearSelection()
+  }
+  saveDialogVisible.value = false
 }
 
 // Refresh Data
@@ -527,6 +508,7 @@ const refreshData = async () => {
       const list = res.data.data || []
       resultData.value = list.map((item, index) => ({
         id: index + 1,
+        uniqueKey: `${selectedShipType.value}_${selectedShipNumber.value}_${index + 1}`,
         pmc: item.pmcCode,
         a: item.pipingClassName,
         b1: item.materialsCategoryName,
@@ -537,6 +519,10 @@ const refreshData = async () => {
         d: item.scheduleThicknessName,
         isByRule: item.isByRule
       }))
+      // 清除勾选
+      if (resultTableRef.value) {
+        resultTableRef.value.clearSelection()
+      }
       ElMessage.success(`查询成功，共 ${list.length} 条数据`)
     } else {
       ElMessage.error(res.data?.message || '刷新失败')
@@ -551,89 +537,212 @@ const cancelDialog = () => {
 }
 
 // Delete API Placeholder
-const deleteFromApi = (ids) => {
-  console.log('Deleting IDs from API:', ids)
-  // In real app: await api.deletePmc(ids)
-}
+  const deleteFromApi = async (pmcCodes) => {
+    console.log('Deleting PMCs from API:', pmcCodes)
+    if (!selectedShipType.value || !selectedShipNumber.value) {
+      ElMessage.error('请选择船型船号')
+      return
+    }
 
-// Delete Button Click
-const handleDelete = () => {
+    try {
+      const res = await axios.post('/api/pmc/pmccode/delete', {
+        shipType: selectedShipType.value,
+        shipNo: selectedShipNumber.value,
+        pmcCodes: pmcCodes
+      })
+
+      if (res.data?.code === 200) {
+        ElMessage.success(res.data.message || '删除成功')
+        // 刷新数据以同步状态
+        // refreshData()
+        
+        // 前端移除已删除的行
+        resultData.value = resultData.value.filter(item => !pmcCodes.includes(item.pmc))
+        selectedRows.value = []
+      } else {
+        ElMessage.error(res.data?.message || '删除失败')
+      }
+    } catch (error) {
+      console.error('Delete failed:', error)
+      ElMessage.error('删除失败')
+    }
+  }
+
+  // Delete Button Click
+  const handleDelete = () => {
   if (selectedRows.value.length === 0) {
-    ElMessage.error('请先选择要删除的数据')
+    ElMessage.warning('请先选择要删除的数据')
     return
   }
   // Show confirmation dialog
-  if (confirm(`确定要删除选中的 ${selectedRows.value.length} 行吗？`)) {
-    const selectedIds = selectedRows.value.map(row => row.id)
-    resultData.value = resultData.value.filter(item => !selectedIds.includes(item.id))
-    selectedRows.value = []
-    
-    // Call API placeholder
-    deleteFromApi(selectedIds)
-    ElMessage.success('删除成功')
-  }
+  ElMessageBox.confirm(
+    `确定要删除选中的 ${selectedRows.value.length} 行数据吗？此操作将直接删除数据库中的记录。`,
+    '删除警告',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(() => {
+    const selectedPmcCodes = selectedRows.value.map(row => row.pmc)
+    // Call API
+    deleteFromApi(selectedPmcCodes)
+  }).catch(() => {
+    // Cancelled
+  })
 }
+
+// 筛选方法
+const filterHandler = (value, row, column) => {
+  const property = column['property']
+  return row[property] === value
+}
+
+// 跟踪当前过滤后的数据
+const filteredData = ref([])
+
+// 初始化/重置时，filteredData 默认为所有数据
+watch(resultData, (newVal) => {
+  filteredData.value = newVal
+}, { immediate: true })
+
+// 监听表格筛选变化
+const handleFilterChange = (filters) => {
+  // filters 是一个对象，key 是 columnKey (如果未设置则为 prop?), value 是选中的值数组
+  // Element Plus 的 filter-change 事件返回的是 { prop: [values] }
+
+  // 最佳实践：使用 store 或 ref 存储各列的筛选值，然后 computed 计算 filteredData
+  // 但为了适配 Element Plus 内置筛选，我们需要一点 hack 或者改用自定义表头筛选。
+  // 鉴于不想重写表头，我们尝试监听 filter-change 并结合 tableRef 获取筛选后的数据。
+  
+  // 实际上，el-table 并没有直接暴露 "filteredData"。
+  // 我们可以维护一个 activeFilters 对象
+  Object.entries(filters).forEach(([key, values]) => {
+    // 这里的 key 是 column-key， values 是选中的筛选值数组
+    // 如果 values 长度为 0，说明清除了该列筛选
+    if (values && values.length > 0) {
+      activeFilters.value[key] = values
+    } else {
+      delete activeFilters.value[key]
+    }
+  })
+  
+  // 每次筛选变化，我们需要强制触发 activeFilters 的更新，以便 computed 重新计算
+  activeFilters.value = { ...activeFilters.value }
+  
+  updateFilteredData()
+}
+
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
+import { ElConfigProvider } from 'element-plus'
+
+// 将整个内容包裹在 ConfigProvider 中？或者在 main.js 中配置。
+// 既然只能改这个文件，我们在 template 最外层包裹 ElConfigProvider。
+
+
+const activeFilters = ref({})
+
+const updateFilteredData = () => {
+  if (Object.keys(activeFilters.value).length === 0) {
+    filteredData.value = resultData.value
+    return
+  }
+  
+  filteredData.value = resultData.value.filter(row => {
+    return Object.entries(activeFilters.value).every(([prop, values]) => {
+      // 只要行数据的该属性值在筛选选中值列表中即可
+      return values.includes(row[prop])
+    })
+  })
+}
+
+// 获取某一列的所有唯一值作为筛选选项（Computed）
+// 修改逻辑：基于 filteredData 生成选项，但要排除“当前列”的筛选影响？
+// Excel 逻辑：
+// 1. 如果当前列没有筛选，显示所有（基于其他列筛选后的结果）。
+// 2. 如果当前列有筛选，显示的选项应该是“基于其他列筛选后的结果”中的该列所有可能值，
+//    这样用户可以勾选更多或者取消勾选。
+//    但如果直接用 filteredData，那么当前列的选项就只剩下已选的了，用户没法加选其他的。
+//    所以：
+//    对于列 A 的筛选菜单，数据来源应该是：resultData 经过“除了 A 以外的所有列筛选条件”过滤后的数据。
+const filterOptions = computed(() => {
+  const getOptions = (targetProp) => {
+    if (!resultData.value || resultData.value.length === 0) return []
+    
+    // 构造临时过滤器：排除当前列的筛选条件
+    const otherFilters = { ...activeFilters.value }
+    delete otherFilters[targetProp]
+    
+    let sourceData = resultData.value
+    
+    // 如果有其他列的筛选，先过滤
+    if (Object.keys(otherFilters).length > 0) {
+      sourceData = sourceData.filter(row => {
+        return Object.entries(otherFilters).every(([prop, values]) => {
+          return values.includes(row[prop])
+        })
+      })
+    }
+    
+    const values = sourceData.map(item => item[targetProp]).filter(val => val)
+    return [...new Set(values)].sort().map(val => ({ text: val, value: val }))
+  }
+
+  return {
+    a: getOptions('a'),
+    b1: getOptions('b1'),
+    b2: getOptions('b2'),
+    b3: getOptions('b3'),
+    c1: getOptions('c1'),
+    c2: getOptions('c2'),
+    d: getOptions('d')
+  }
+})
 
 const resultTableRef = ref(null)
 const mainMaterialTableRef = ref(null)
 const flangeTableRef = ref(null)
 const pipeLimitTableRef = ref(null)
 const searchPmcCodeInput = ref('')
-const highlightedRowId = ref(null)
-let highlightTimeout = null
+const confirmedSearchKeyword = ref('') // Store the keyword when search is triggered
+
+// 基于 filteredData 和 搜索关键字 生成最终显示的数据
+const displayData = computed(() => {
+  if (!confirmedSearchKeyword.value) {
+    return filteredData.value
+  }
+  const keyword = confirmedSearchKeyword.value.toLowerCase()
+  return filteredData.value.filter(item => {
+    // 搜索范围：PMC编码以及各列的值
+    const searchableFields = [
+      item.pmc,
+      item.a,
+      item.b1,
+      item.b2,
+      item.b3,
+      item.c1,
+      item.c2,
+      item.d
+    ]
+    return searchableFields.some(val => val && String(val).toLowerCase().includes(keyword))
+  })
+})
 
 const tableRowClassName = ({ row }) => {
   const classes = [`row-id-${row.id}`]
-  if (row.id === highlightedRowId.value) {
-    classes.push('highlight-row')
-  }
   if (row.isByRule) {
     classes.push('new-added-row')
   }
   return classes.join(' ')
 }
 
-// Search PMC Code in Table
+// Search Logic (Triggered by button or enter key)
 const searchPmcCode = () => {
-  if (!searchPmcCodeInput.value) {
-    ElMessage.warning('请输入PMC编码')
-    return
-  }
-
-  const targetRow = resultData.value.find(item => item.pmc && item.pmc.toLowerCase() === searchPmcCodeInput.value.toLowerCase())
-  if (targetRow) {
-    // Set highlight
-    if (highlightTimeout) clearTimeout(highlightTimeout)
-    highlightedRowId.value = targetRow.id
-    highlightTimeout = setTimeout(() => {
-      highlightedRowId.value = null
-      highlightTimeout = null
-    }, 3000)
-
-    // 1. Select the row
-    resultTableRef.value.setCurrentRow(targetRow)
-    
-    // 2. Scroll to the row
-    const index = resultData.value.indexOf(targetRow)
-    if (index !== -1 && resultTableRef.value) {
-      const tableBodyWrapper = resultTableRef.value.$el.querySelector('.el-table__body-wrapper .el-scrollbar__wrap')
-      if (tableBodyWrapper) {
-        // Find the row element
-        const rowEl = tableBodyWrapper.querySelector(`tr:nth-child(${index + 1})`)
-        if (rowEl) {
-           rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-           resultTableRef.value.toggleRowSelection(targetRow, true)
-           ElMessage.success(`找到 PMC 编码: ${targetRow.pmc}`)
-           return
-        }
-      }
-      
-      // Fallback if DOM manipulation fails
-      resultTableRef.value.toggleRowSelection(targetRow, true)
-      ElMessage.success(`找到 PMC 编码: ${targetRow.pmc}`)
-    }
+  confirmedSearchKeyword.value = searchPmcCodeInput.value.trim()
+  if (confirmedSearchKeyword.value) {
+    ElMessage.success('已应用搜索过滤')
   } else {
-    ElMessage.info('未找到该 PMC 编码')
+    ElMessage.info('已清除搜索过滤')
   }
 }
 
@@ -719,8 +828,10 @@ const generatePmcCode = async () => {
         // Generate PMC code (7 digits)
         const pmcCode = `${a}${b1}${b2}${b3}${c1}${c2}${d}`
 
+        const currentId = id++
         combinations.push({
-          id: id++,
+          id: currentId,
+          uniqueKey: `${selectedShipType.value}_${selectedShipNumber.value}_new_${currentId}`,
           a,
           b1,
           b2,
@@ -785,6 +896,17 @@ const generatePmcCode = async () => {
     })
 
     resultData.value = [...resultData.value, ...newRows]
+
+    // 默认勾选新增的行
+    nextTick(() => {
+      newRows.forEach(row => {
+        const targetRow = resultData.value.find(r => r.id === row.id)
+        if (targetRow) {
+          resultTableRef.value.toggleRowSelection(targetRow, true)
+        }
+      })
+    })
+
     ElMessage.success(`成功生成 ${newRows.length} 条PMC编码`)
   } catch (error) {
     console.error('生成PMC编码失败', error)
@@ -820,6 +942,16 @@ const confirmCopyRule = async () => {
   }
 
   try {
+    await ElMessageBox.confirm(
+      `此操作将清空目标船型船号 (${targetShipType.value}/${targetShipNumber.value}) 下的所有现有数据，并用源数据覆盖。是否继续？`,
+      '覆盖确认',
+      {
+        confirmButtonText: '确定覆盖',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
     const payload = {
       sourceShipType: sourceShipType.value,
       sourceShipNo: sourceShipNumber.value,
@@ -840,8 +972,10 @@ const confirmCopyRule = async () => {
       ElMessage.error(res.data.message || '复制失败')
     }
   } catch (error) {
-    console.error('Copy rule failed:', error)
-    ElMessage.error('复制规则失败: ' + (error.response?.data?.message || error.message))
+    if (error !== 'cancel') {
+      console.error('Copy rule failed:', error)
+      ElMessage.error('复制规则失败: ' + (error.response?.data?.message || error.message))
+    }
   }
 }
 
@@ -853,7 +987,8 @@ const cancelCopyRule = () => {
 </script>
 
 <template>
-  <div class="pmc-container">
+  <el-config-provider :locale="zhCn">
+    <div class="pmc-container">
     <!-- Top Section -->
     <transition name="el-zoom-in-top">
       <div class="section-block" v-show="showRulePanel">
@@ -1000,8 +1135,8 @@ const cancelCopyRule = () => {
         <div class="actions">
           <el-input 
             v-model="searchPmcCodeInput" 
-            placeholder="输入PMC编码" 
-            style="width: 180px; margin-right: 12px;" 
+            placeholder="请输入查找内容" 
+            style="width: 200px; margin-right: 12px;" 
             @keyup.enter="searchPmcCode"
             clearable
           >
@@ -1020,7 +1155,8 @@ const cancelCopyRule = () => {
       <div class="main-table-wrap">
         <el-table 
           ref="resultTableRef"
-          :data="resultData" 
+          :data="displayData" 
+          :row-key="(row) => row.uniqueKey || row.id"
           :row-class-name="tableRowClassName"
           border 
           stripe 
@@ -1028,20 +1164,70 @@ const cancelCopyRule = () => {
           height="100%" 
           @selection-change="handleSelectionChange"
           @row-click="(row) => handleRowClick(row, resultTableRef)"
+          @filter-change="handleFilterChange"
         >
-          <el-table-column type="selection" width="50" align="center" />
+          <el-table-column type="selection" width="50" align="center" reserve-selection />
           <el-table-column label="序号" width="60" align="center">
             <template #default="scope">
               {{ scope.$index + 1 }}
             </template>
           </el-table-column>
-          <el-table-column prop="a" label="管材等级 A" align="center" />
-          <el-table-column prop="b1" label="主材料 B1" align="center" />
-          <el-table-column prop="b2" label="管材标准 B2" align="center" />
-          <el-table-column prop="b3" label="牌号 B3" align="center" />
-          <el-table-column prop="c1" label="法兰标准 C1" align="center" />
-          <el-table-column prop="c2" label="法兰压力等级 C2" align="center" />
-          <el-table-column prop="d" label="壁厚等级 D" align="center" />
+          <el-table-column 
+            prop="a" 
+            label="管材等级 A" 
+            align="center" 
+            column-key="a"
+            :filters="filterOptions.a"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="b1" 
+            label="主材料 B1" 
+            align="center" 
+            column-key="b1"
+            :filters="filterOptions.b1"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="b2" 
+            label="管材标准 B2" 
+            align="center" 
+            column-key="b2"
+            :filters="filterOptions.b2"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="b3" 
+            label="牌号 B3" 
+            align="center" 
+            column-key="b3"
+            :filters="filterOptions.b3"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="c1" 
+            label="法兰标准 C1" 
+            align="center" 
+            column-key="c1"
+            :filters="filterOptions.c1"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="c2" 
+            label="法兰压力等级 C2" 
+            align="center" 
+            column-key="c2"
+            :filters="filterOptions.c2"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="d" 
+            label="壁厚等级 D" 
+            align="center" 
+            column-key="d"
+            :filters="filterOptions.d"
+            :filter-method="filterHandler"
+          />
           <el-table-column prop="pmc" label="PMC" align="center" />
         </el-table>
       </div>
@@ -1148,6 +1334,7 @@ const cancelCopyRule = () => {
       </span>
     </template>
   </el-dialog>
+  </el-config-provider>
 </template>
 <style scoped>
 .pmc-container {
@@ -1263,20 +1450,5 @@ const cancelCopyRule = () => {
 
 :deep(.el-table .new-added-row td.el-table__cell) {
   background-color: var(--el-color-success-light-9) !important;
-}
-
-:deep(.el-table .highlight-row) {
-  --el-table-tr-bg-color: var(--el-color-warning-light-7);
-}
-
-:deep(.el-table .highlight-row td.el-table__cell) {
-  background-color: var(--el-color-warning-light-7) !important;
-  animation: flash-highlight 3s;
-}
-
-@keyframes flash-highlight {
-  0% { background-color: var(--el-color-warning-light-3); }
-  50% { background-color: var(--el-color-warning-light-5); }
-  100% { background-color: transparent; }
 }
 </style>
