@@ -177,16 +177,27 @@ const fetchSharedOptions = async (url, columns) => {
 // --- 3. 联动处理 ---
 const handleSelectChange = (val, row, col) => {
   const ds = col.dataSource || col.DataSource
-  const mapping = ds?.valueMapping || ds?.ValueMapping
   
-  if (!mapping || Object.keys(mapping).length === 0) return
-
   const options = optionsMap.value[col.prop] || []
   const selectedOption = options.find(opt => opt.value === val)
   
   if (!selectedOption || !selectedOption.__raw) return
 
   const rawData = selectedOption.__raw
+
+  // 自动更新对应的 Long 字段为 code 值
+  const codeProp = col.prop
+  const longProp = codeProp.replace(/Code$/, 'Long')
+  const targetProp = findKey(row, longProp)
+  
+  if (targetProp) {
+    // Long 字段也设置为 code 值
+    row[targetProp] = val
+  }
+
+  // 处理 valueMapping 联动
+  const mapping = ds?.valueMapping || ds?.ValueMapping
+  if (!mapping || Object.keys(mapping).length === 0) return
 
   Object.entries(mapping).forEach(([sourceField, targetDbField]) => {
     const rawKey = findKey(rawData, sourceField)
@@ -343,12 +354,47 @@ const toggleEdit = async () => {
         
         await Promise.all(promises)
 
+        // ✅ 修正 Select 列的数据：确保 prop 字段和 long 字段的值都是正确的 code 值
+        selectColumns.forEach(col => {
+          const options = optionsMap.value[col.prop] || []
+          const ds = col.dataSource || col.DataSource
+          const labelField = ds.labelField || ds.LabelField
+          
+          tableConfig.value.list.forEach(row => {
+            const currentValue = row[col.prop]
+            if (currentValue === undefined || currentValue === null || currentValue === '') return
+            
+            // 先尝试在 value 中查找
+            let matchedOption = options.find(opt => opt.value === currentValue)
+            
+            if (!matchedOption) {
+              // 如果当前值不在 value 中，尝试在 label 中查找
+              matchedOption = options.find(opt => opt.label === currentValue)
+              if (matchedOption) {
+                // 修正为正确的 value (code)
+                row[col.prop] = matchedOption.value
+              }
+            }
+            
+            // 无论是否修正，都要同步 long 字段为 code 值
+            if (matchedOption) {
+              const codeProp = col.prop
+              const longProp = codeProp.replace(/Code$/, 'Long')
+              const targetProp = findKey(row, longProp)
+              if (targetProp) {
+                row[targetProp] = matchedOption.value
+              }
+            }
+          })
+        })
+
       } finally {
         loadingOptions.value = false
       }
     }
 
     dataSnapshot.value = JSON.parse(JSON.stringify(tableConfig.value))
+    initSnapshot(tableConfig.value.list || [])
     isEdit.value = true
   }
 }
@@ -395,6 +441,24 @@ const handleAddRow = () => {
         newRow[col.prop] = nextId // 👈 填入填缝 ID
     } else if (col.type === 'switch') {
         newRow[col.prop] = false 
+    } else if (props.dictId === 'part-elbow') {
+        // Elbow 菜单默认值
+        if (col.prop === 'type') {
+            newRow[col.prop] = 'Elbow'
+        } else if (col.prop === 'description') {
+            newRow[col.prop] = '弯头'
+        } else {
+            newRow[col.prop] = null 
+        }
+    } else if (props.dictId === 'part-red') {
+        // Red 菜单默认值
+        if (col.prop === 'type') {
+            newRow[col.prop] = 'Red'
+        } else if (col.prop === 'description') {
+            newRow[col.prop] = '异径'
+        } else {
+            newRow[col.prop] = null 
+        }
     } else {
         newRow[col.prop] = null 
     }
@@ -423,12 +487,17 @@ const handleBatchDelete = () => {
           // 🛡️ [安全防护]：过滤掉 undefined 或 null 的 ID，防止请求报错
           .filter(id => id !== undefined && id !== null && id !== '')
 
-        // 2. 逐个发送删除请求
+        // 2. 发送删除请求
         // (如果选中的全是新增行，ids 为空，则跳过 API 请求，直接在前端移除)
         if (ids.length > 0) {
-          for (const id of ids) {
-            const apiPath = props.dictId.startsWith('part-') ? `/api/Dictpiping` : `/api/Dict`
-            await axios.delete(`${apiPath}/${props.dictId}/${id}`)
+          if (props.dictId.startsWith('part-')) {
+            // 管子连接和法兰：使用 POST 请求，传入 ID 列表
+            await axios.post(`/api/Dictpiping/${props.dictId}/batch-delete`, ids)
+          } else {
+            // 其他菜单：保持原有的逐个 DELETE 请求
+            for (const id of ids) {
+              await axios.delete(`/api/Dict/${props.dictId}/${id}`)
+            }
           }
         }
         
@@ -497,9 +566,24 @@ const handleSave = async () => {
     const promises = []
     let hasChanges = false
     
+    // 获取所有 Select 列
+    const selectColumns = tableConfig.value.columns.filter(col => col.type === 'select' && !col.isReadOnly)
+    
     for (const row of currentList) {
       // 提取 _isNew 标记，避免将其传给后端（如果后端不接受额外字段）
       const { _isNew, ...submitData } = row
+      
+      // ✅ 保存前修正 Select 列的数据：确保 Long 字段的值与 prop 字段的值一致（都是 code 值）
+      selectColumns.forEach(col => {
+        const codeProp = col.prop
+        const longProp = codeProp.replace(/Code$/, 'Long')
+        const codeValue = submitData[codeProp]
+        
+        // Long 字段设置为与 prop 字段相同的值（code 值）
+        if (codeValue !== undefined && codeValue !== null && codeValue !== '') {
+          submitData[longProp] = codeValue
+        }
+      })
       
       if (_isNew) {
         // ---> 新增 (POST)
