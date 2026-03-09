@@ -16,6 +16,8 @@ const isCollapse = ref(false)
 const showAI = ref(false)
 
 const tagsStore = useTagsViewStore()
+// [新增] 获取缓存列表
+const cachedViews = computed(() => tagsStore.cachedViews)
 
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value

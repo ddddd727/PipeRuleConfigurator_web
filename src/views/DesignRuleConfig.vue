@@ -661,6 +661,14 @@ const treeData = ref([
     children: [
       { id: 'bend-pipe', label: '弯管机数据', icon: Document }
     ]
+  },
+  {
+    id: 'production',
+    label: '生产规则类',
+    icon: Folder,
+    children: [
+      { id: 'bend-pipe', label: '弯管机数据', icon: Document }
+    ]
   }
 ])
 
