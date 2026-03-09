@@ -396,7 +396,6 @@
 </template>
 
 <script setup>
-defineOptions({ name: 'DesignRuleConfig' })
 import { ref, reactive, onMounted, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { db } from '@/mock/index.js'
@@ -652,14 +651,6 @@ const treeData = ref([
       { id: 'shortcode-major', label: 'ShortCode大类', icon: Document },
       { id: 'shortcode', label: 'ShortCode细类', icon: Document },
       { id: 'spec', label: 'ShortCode定义', icon: Document }
-    ]
-  },
-  {
-    id: 'production',
-    label: '生产规则类',
-    icon: Folder,
-    children: [
-      { id: 'bend-pipe', label: '弯管机数据', icon: Document }
     ]
   },
   {
