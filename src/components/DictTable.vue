@@ -1,16 +1,78 @@
 <script setup>
-import { ref, watch, onMounted, computed,reactive } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, watch, onMounted, computed, reactive } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDirtyData } from '@/hooks/useDirtyData'
+
+// 缓存管理函数
+const getCache = (key) => {
+  try {
+    const item = localStorage.getItem(key)
+    if (!item) return null
+    const parsed = JSON.parse(item)
+    if (parsed.expiry && Date.now() > parsed.expiry) {
+      localStorage.removeItem(key)
+      return null
+    }
+    return parsed.data
+  } catch (error) {
+    console.error('获取缓存失败:', error)
+    return null
+  }
+}
+
+const setCache = (key, data, expiryMs = 7 * 24 * 60 * 60 * 1000) => {
+  try {
+    const item = {
+      data,
+      expiry: Date.now() + expiryMs
+    }
+    localStorage.setItem(key, JSON.stringify(item))
+  } catch (error) {
+    console.error('设置缓存失败:', error)
+  }
+}
+
+// 组件类型数据缓存键
+const COMPONENT_TYPE_CACHE_KEY = 'component_type_data'
+
+// 获取组件类型数据
+const getComponentTypeData = async () => {
+  // 尝试从缓存获取
+  const cachedData = getCache(COMPONENT_TYPE_CACHE_KEY)
+  if (cachedData) {
+    return cachedData
+  }
+  
+  // 缓存不存在或过期，调用接口
+  try {
+    const res = await axios.get('/api/DictPiping/componentType')
+    const data = res.data
+    // 保存到缓存
+    setCache(COMPONENT_TYPE_CACHE_KEY, data)
+    return data
+  } catch (error) {
+    console.error('获取组件类型数据失败:', error)
+    ElMessage.error('获取组件类型数据失败')
+    return []
+  }
+}
+
+// 根据 part-{type} 获取对应的组件类型信息
+const getComponentTypeByDictId = (dictId, componentTypeList) => {
+  if (!dictId || !dictId.startsWith('part-')) return null
+  
+  const type = dictId.replace('part-', '')
+  return componentTypeList.find(item => item.ComponentTypeName.toLowerCase() === type.toLowerCase())
+}
 
 const props = defineProps({
   dictId: { type: String, required: true }
 })
 
+// 表格重新渲染的key
 const tableKey = ref(0)
-const route = useRoute()
+// 脏数据检测hook
 const { initSnapshot, isModified } = useDirtyData()
 
 // --- 核心状态 ---
@@ -22,6 +84,12 @@ const selectedRows = ref([])
 const dataSnapshot = ref(null)
 const optionsMap = ref({}) 
 const loadingOptions = ref(false)
+const componentTypeList = ref([]) // 存储组件类型数据
+
+// 分页相关状态
+const currentPage = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 
 const addColVisible = ref(false)
 const addColForm = reactive({
@@ -214,7 +282,7 @@ const handleSelectChange = (val, row, col) => {
   })
 }
 
-// --- 4. 获取表格数据 ---
+// 从后端获取表格数据，包括列配置和数据列表
 const fetchData = async () => {
   const dictType = props.dictId 
   if (!dictType) return
@@ -223,6 +291,12 @@ const fetchData = async () => {
   optionsMap.value = {} 
 
   try {
+    // 加载组件类型数据
+    if (dictType.startsWith('part-')) {
+      const data = await getComponentTypeData()
+      componentTypeList.value = data
+    }
+
     // 为所有 part- 开头的 dictId 设置特殊的请求路径
     let apiPath = `/api/Dict/${dictType}`
     if (dictType.startsWith('part-')) {
@@ -294,6 +368,10 @@ const fetchData = async () => {
         list: formattedRows
       }
 
+      // 重置分页状态
+      currentPage.value = 1
+      total.value = formattedRows.length
+
       tableKey.value++
       
       dataSnapshot.value = JSON.parse(JSON.stringify(tableConfig.value))
@@ -315,7 +393,7 @@ const fetchData = async () => {
 watch(() => props.dictId, fetchData)
 onMounted(fetchData)
 
-// --- 5. 编辑模式 (含分组请求逻辑) ---
+// 切换编辑模式，进入编辑时加载下拉框选项数据
 const toggleEdit = async () => {
   if (isEdit.value) {
     handleCancel()
@@ -399,10 +477,17 @@ const toggleEdit = async () => {
   }
 }
 
-const handleCancel = () => {
+// 取消编辑操作，恢复数据并重新获取后端最新数据
+const handleCancel = async () => {
   if (dataSnapshot.value) {
-    tableConfig.value = JSON.parse(JSON.stringify(dataSnapshot.value))
-    initSnapshot(tableConfig.value.list || [])
+    // 保存当前页码，以便恢复后保持原位
+    const currentPageNum = currentPage.value
+    
+    // 重新调用后端查询列表接口获取最新数据
+    await fetchData()
+    
+    // 恢复到之前的页码
+    currentPage.value = currentPageNum
   }
   isEdit.value = false
   selectedRows.value = [] 
@@ -411,7 +496,8 @@ const handleCancel = () => {
 
 const handleSelectionChange = (val) => { selectedRows.value = val }
 
-const handleAddRow = () => {
+// 添加新行，自动分配ID并填充默认值
+const handleAddRow = async () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
   
   // 1. 核心标记：打上 _isNew 标记，告诉保存接口这是新数据
@@ -435,27 +521,43 @@ const handleAddRow = () => {
     }
   }
 
-  // 3. 遍历列配置，填充这个算出来的“完美填缝 ID”和其他空坑位
+  // 3. 确保组件类型数据已加载
+  if (props.dictId.startsWith('part-')) {
+    // 检查缓存数据是否存在且包含当前类型
+    let componentType = getComponentTypeByDictId(props.dictId, componentTypeList.value)
+    
+    // 如果找不到，重新获取数据
+    if (!componentType) {
+      const data = await getComponentTypeData()
+      componentTypeList.value = data
+      componentType = getComponentTypeByDictId(props.dictId, data)
+    }
+  }
+
+  // 4. 遍历列配置，填充这个算出来的"完美填缝 ID"和其他空坑位
+  let componentType = null
+  if (props.dictId.startsWith('part-')) {
+    componentType = getComponentTypeByDictId(props.dictId, componentTypeList.value)
+    if (componentType) {
+      newRow.componentTypeId = componentType.id
+    }
+  }
+  
   tableConfig.value.columns.forEach(col => {
     if (col.isPrimaryKey) {
         newRow[col.prop] = nextId // 👈 填入填缝 ID
     } else if (col.type === 'switch') {
         newRow[col.prop] = false 
-    } else if (props.dictId === 'part-elbow') {
-        // Elbow 菜单默认值
-        if (col.prop === 'type') {
-            newRow[col.prop] = 'Elbow'
-        } else if (col.prop === 'description') {
-            newRow[col.prop] = '弯头'
-        } else {
-            newRow[col.prop] = null 
-        }
-    } else if (props.dictId === 'part-red') {
-        // Red 菜单默认值
-        if (col.prop === 'type') {
-            newRow[col.prop] = 'Red'
-        } else if (col.prop === 'description') {
-            newRow[col.prop] = '异径'
+    } else if (props.dictId.startsWith('part-')) {
+        // 填充默认值
+        if (componentType) {
+            if (col.prop === 'type' || col.prop === 'componentTypeName') {
+                newRow[col.prop] = componentType.ComponentTypeName
+            } else if (col.prop === 'description' || col.prop === 'componentTypeDescription') {
+                newRow[col.prop] = componentType.ComponentTypeDescription
+            } else {
+                newRow[col.prop] = null 
+            }
         } else {
             newRow[col.prop] = null 
         }
@@ -464,16 +566,17 @@ const handleAddRow = () => {
     }
   })
   
-  // 4. 插入到表格中
+  // 5. 插入到表格中
   tableConfig.value.list.push(newRow)
   
-  // 5. 滚动到底部
+  // 6. 滚动到底部
   setTimeout(() => {
     const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap')
     if(tableBody) tableBody.scrollTop = tableBody.scrollHeight
   }, 100)
 }
 
+// 批量删除选中的行，支持后端删除和前端移除新增行
 const handleBatchDelete = () => {
   if (selectedRows.value.length === 0) return
   ElMessageBox.confirm('确定要删除选中的行吗？', '提示', { type: 'warning' })
@@ -514,8 +617,7 @@ const handleBatchDelete = () => {
     })
 }
 
-// --- 6. 保存 (含唯一性校验) ---
-
+// 保存表格数据，包含必填校验、唯一性校验和脏数据检测
 const handleSave = async () => {
   const currentList = tableConfig.value.list || []
   const columns = tableConfig.value.columns || []
@@ -629,6 +731,16 @@ const handleSave = async () => {
   }
 }
 
+// 分页事件处理函数
+const handleSizeChange = (size) => {
+  pageSize.value = size
+  currentPage.value = 1 // 重置到第一页
+}
+
+const handleCurrentChange = (current) => {
+  currentPage.value = current
+}
+
 const openAddColumnDialog = () => {
   // 重置表单
   addColForm.title = ''
@@ -669,13 +781,26 @@ const submitAddColumn = async () => {
     addingCol.value = false
   }
 }
+// 计算属性：处理表格数据的搜索过滤和分页显示
 const displayData = computed(() => {
   const rawData = tableConfig.value.list || [] 
   const keyword = searchKeyword.value.trim().toLowerCase()
-  if (!keyword) return rawData
-  return rawData.filter(row => 
-    Object.values(row).some(val => String(val).toLowerCase().includes(keyword))
-  )
+  let filteredData = rawData
+  
+  // 搜索过滤
+  if (keyword) {
+    filteredData = rawData.filter(row => 
+      Object.values(row).some(val => String(val).toLowerCase().includes(keyword))
+    )
+  }
+  
+  // 更新总条数
+  total.value = filteredData.length
+  
+  // 分页处理
+  const startIndex = (currentPage.value - 1) * pageSize.value
+  const endIndex = startIndex + pageSize.value
+  return filteredData.slice(startIndex, endIndex)
 })
 </script>
 
@@ -807,6 +932,20 @@ const displayData = computed(() => {
         </el-table-column>
       </template>
     </el-table>
+    
+    <!-- 分页组件 -->
+    <div class="pagination-container" style="margin-top: 16px; display: flex; justify-content: flex-end; align-items: center;">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </div>
+    
     <el-dialog v-model="addColVisible" title="添加自定义列" width="400px" append-to-body>
       <el-form label-position="top">
         <el-form-item label="列名称 (中文标题)">
