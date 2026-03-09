@@ -1,7 +1,7 @@
 import Mock from 'mockjs'
 // 导入管道规格配置相关的Mock数据
-// 启用 PipeSpecConfigForm 组件相关的 mock
-import './modules/PipeSpecConfigInfo/ReferenceInfo.js'
+// 已禁用 PipeSpec 相关的 mock，使用真实 API
+// import './modules/PipeSpecConfigInfo/ReferenceInfo.js'
 
 Mock.setup({
   timeout: '200-600'
@@ -167,29 +167,53 @@ export const db = {
       'name': '@ctitle(5, 12)',
       'status|1': ['现行', '废止', '即将实施']
     }]
-  }
+  },
+
+  // 1. 弯管数据 (bend-pipe)
+  'bend-pipe': {
+    title: '部件库名称：PlainPipingGenericData',
+    'data|5': [{
+      'id|+1': 1,
+      'diameter|1': ['DN15', 'DN20', 'DN25', 'DN32', 'DN40', 'DN50'],
+      'unit': 'mm',
+      'l1|100-500': 1,
+      'l2|100-500': 1
+    }]
+  },
+
+  // 2. 壁厚系列 (wall-thickness-series)
+  'wall-thickness-series': {
+    title: '部件库名称：PlainPipingGenericData',
+    'data|5': [{
+      'id|+1': 1,
+      'diameter|1': ['DN15', 'DN20', 'DN25', 'DN32', 'DN40', 'DN50'],
+      'unit': 'mm',
+      'standard|1': ['ASTM A106', 'GB/T 8163', 'ASTM A53'],
+      'series|1': ['Sch10', 'Sch20', 'Sch40', 'Sch80', 'Sch160'],
+      'outer|20-200': 1,
+      'value|1.0-10.0': 1
+    }]
+  },
+
+  // 3. ShortCode (shortcode)
+  'shortcode': {
+    title: '部件库名称：ShortCodeHierarchyRule',
+    'data|5': [{
+      'id|+1': 1,
+      'type|1': ['PIPE', 'VALVE', 'FLANGE', 'FITTING', 'INSTRUMENT', 'EQUIPMENT'],
+      'shortcode|1': ['管道', '阀门', '法兰', '管件', '仪表', '设备']
+    }]
+  },
+
+  // 4. Spec (spec)
+  'spec': {
+    title: '部件库名称：PipingCommodityFilter',
+    'data|5': [{
+      'id|+1': 1,
+      'shortcode|1': ['管道', '阀门', '法兰', '管件', '仪表', '设备']
+    }]
+  },
 }
-
-// 基础库相关接口
-Mock.mock(/\/api\/library\/tree/, 'get', () => {
-  return { code: 200, data: db['library-tree'].data, message: 'success' }
-})
-
-Mock.mock(/\/api\/library\/codelist-tree/, 'get', () => {
-  return { code: 200, data: db['codelist-tree'].data, message: 'success' }
-})
-
-Mock.mock(/\/api\/library\/component-details/, 'get', () => {
-  return { code: 200, data: db['library-component-details'], message: 'success' }
-})
-
-Mock.mock(/\/api\/library\/table-data/, 'get', () => {
-  return { code: 200, data: db['library-table-data'], message: 'success' }
-})
-
-Mock.mock(/\/api\/library\/codelist-table-data/, 'get', () => {
-  return { code: 200, data: db['codelist-table-data'], message: 'success' }
-})
 
 // 拦截请求
 Mock.mock(/\/api\/dict\/[\w-]+/, 'get', (options) => {
