@@ -9,7 +9,7 @@ export default {
       path: 'rule-config',
       name: 'DesignRuleConfig',
       component: () => import('@/views/DesignRuleConfig.vue'),
-      meta: { title: '设计规则类', icon: 'Guide' }
+      meta: { title: '设计规则类', icon: 'Guide', keepAlive: true }
     }
   ]
 }

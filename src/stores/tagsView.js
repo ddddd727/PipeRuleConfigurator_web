@@ -26,24 +26,27 @@ export const useTagsViewStore = defineStore('tagsView', {
     },
 
     delView(view) {
-      // ... 原有删除 visitedViews 逻辑 ...
       const i = this.visitedViews.findIndex(v => v.path === view.path)
       if (i > -1) this.visitedViews.splice(i, 1)
 
-      // [新增] 同步删除缓存
-      const index = this.cachedViews.indexOf(view.name)
-      if (index > -1) this.cachedViews.splice(index, 1)
+      const name = view.name
+      if (name && !this.visitedViews.some(v => v.name === name)) {
+        const index = this.cachedViews.indexOf(name)
+        if (index > -1) this.cachedViews.splice(index, 1)
+      }
     },
 
     // [新增] 下面是新增加的方法
     delOthersViews(view) {
       this.visitedViews = this.visitedViews.filter(v => v.pinned || v.path === view.path)
-      this.cachedViews = this.visitedViews.map(v => v.name)
+      const set = new Set(this.visitedViews.map(v => v.name).filter(Boolean))
+      this.cachedViews = Array.from(set)
     },
     delAllViews() {
       const pinned = this.visitedViews.filter(v => v.pinned)
       this.visitedViews = pinned
-      this.cachedViews = pinned.map(v => v.name)
+      const set = new Set(pinned.map(v => v.name).filter(Boolean))
+      this.cachedViews = Array.from(set)
     },
     togglePinView(view) {
       const v = this.visitedViews.find(i => i.path === view.path)
