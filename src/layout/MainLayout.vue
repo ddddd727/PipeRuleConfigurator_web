@@ -16,8 +16,6 @@ const isCollapse = ref(false)
 const showAI = ref(false)
 
 const tagsStore = useTagsViewStore()
-// [新增] 获取缓存列表
-const cachedViews = computed(() => tagsStore.cachedViews)
 
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
@@ -96,13 +94,12 @@ const menuList = computed(() => {
           </div>
 
           <el-main class="main-content">
-            <router-view v-slot="{ Component }">
-             <transition name="fade" mode="out-in">
-           <keep-alive :include="cachedViews">
-         <component :is="Component" :key="route.fullPath" />
+            <router-view v-slot="{ Component, route }">
+           <keep-alive>
+         <component v-if="route && route.meta && route.meta.keepAlive" :is="Component" :key="route.fullPath" />
           </keep-alive>
-           </transition>
-             </router-view>
+         <component v-if="!(route && route.meta && route.meta.keepAlive)" :is="Component" :key="route.fullPath" />
+            </router-view>
           </el-main>
 
         </el-container>

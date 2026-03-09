@@ -140,9 +140,27 @@ const dialogVisible = computed({
     ]
   }
 
-  // 标准规格列表 (包含标准名和材料列表)
+  // 标准规格列表 (包含标准名)
   const pipeFittingSpecs = ref([])
   const specsLoading = ref(false)
+
+  // 材料列表 (从后端获取的统一列表)
+  const materialsList = ref([])
+
+  // 获取材料列表
+  const fetchMaterials = async () => {
+    try {
+      const res = await axios.get('/api/PmcSpec/MaterialsGrades')
+      if (res.data.code === 200) {
+        materialsList.value = res.data.data || []
+      } else {
+        ElMessage.error(res.data.message || '获取材料列表失败')
+      }
+    } catch (error) {
+      console.error('获取材料列表错误:', error)
+      ElMessage.error('网络错误，获取材料列表失败')
+    }
+  }
 
   // 获取管附件规格列表
   const fetchPipeFittingSpecs = async () => {
@@ -159,7 +177,12 @@ const dialogVisible = computed({
         }
       })
       if (res.data.code === 200) {
-        pipeFittingSpecs.value = res.data.data || []
+        // 后端返回的是字符串数组，需转换为对象结构以保持兼容
+        const standards = res.data.data || []
+        pipeFittingSpecs.value = standards.map(std => ({
+          standardName: std,
+          // materialList 不再从此处获取，而是使用统一的 materialsList
+        }))
       } else {
         ElMessage.error(res.data.message || '获取管附件规格失败')
       }
@@ -192,9 +215,8 @@ const handleStandardChange = (value) => {
     if (existingConfig) {
       newConfigurations.push(existingConfig)
     } else {
-      // 查找对应标准的默认材料（取第一个）
-      const spec = pipeFittingSpecs.value.find(s => s.standardName === stdName)
-      const defaultMaterial = spec && spec.materialList.length > 0 ? spec.materialList[0] : ''
+      // 查找对应标准的默认材料（取全局材料列表第一个）
+      const defaultMaterial = materialsList.value.length > 0 ? materialsList.value[0] : ''
       
       newConfigurations.push({
         standardName: stdName,
@@ -206,10 +228,9 @@ const handleStandardChange = (value) => {
   form.value.standardConfigurations = newConfigurations
 }
 
-// 获取指定标准的材料列表
+// 获取指定标准的材料列表（统一使用全局材料列表）
 const getMaterialsForStandard = (standardName) => {
-  const spec = pipeFittingSpecs.value.find(s => s.standardName === standardName)
-  return spec ? spec.materialList : []
+  return materialsList.value
 }
 
 // 提交状态
@@ -355,6 +376,8 @@ watch(dialogVisible, async (val) => {
   if (val) {
     // 获取部件类型列表
     await fetchPartTypes()
+    // 获取材料列表
+    await fetchMaterials()
     
     // 如果有初始配置，进行回填
     if (props.initialConfig) {

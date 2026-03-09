@@ -10,31 +10,31 @@ export default {
       path: 'codelist',
       name: 'CodelistLibrary',
       component: () => import('@/views/BasicLibrary.vue'),
-      meta: { title: 'Codelist管理', icon: 'Menu' }
+      meta: { title: 'Codelist管理', icon: 'Menu', keepAlive: true }
     },
     {
       path: 'pipe',
       name: 'PipeLibrary',
       component: () => import('@/views/BasicLibrary.vue'), 
-      meta: { title: '管系专业', icon: 'Menu' }
+      meta: { title: '管系专业', icon: 'Menu', keepAlive: true }
     },
     {
       path: 'duct',
       name: 'DuctLibrary',
       component: () => import('@/views/BasicLibrary.vue'), 
-      meta: { title: '风管专业', icon: 'Menu' }
+      meta: { title: '风管专业', icon: 'Menu', keepAlive: true }
     },
     {
       path: 'electrical',
       name: 'ElectricalLibrary',
       component: () => import('@/views/BasicLibrary.vue'), 
-      meta: { title: '电气专业', icon: 'Menu' }
+      meta: { title: '电气专业', icon: 'Menu', keepAlive: true }
     },
     {
       path: 'outfitting',
       name: 'OutfittingLibrary',
       component: () => import('@/views/BasicLibrary.vue'), 
-      meta: { title: '铁舾&内装专业', icon: 'Menu' }
+      meta: { title: '铁舾&内装专业', icon: 'Menu', keepAlive: true }
     }
   ]
 }

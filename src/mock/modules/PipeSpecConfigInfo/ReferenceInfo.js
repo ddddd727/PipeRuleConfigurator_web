@@ -2,7 +2,8 @@ import Mock from 'mockjs'
 
 // 精简并统一对 PipeSpec.vue 使用到的接口 mock
 
-// 物料数据
+// 物料数据 - 已移除 Mock，使用真实接口
+/*
 Mock.mock(/\/api\/pipe-spec\/material/, 'get', () => ({
   code: 200,
   msg: 'success',
@@ -16,6 +17,7 @@ Mock.mock(/\/api\/pipe-spec\/material/, 'get', () => ({
     { id: 7, name: '钛合金 (Titanium Alloy)' }
   ]
 }))
+*/
 
 // 尺寸数据（通径/外径/壁厚表格）
 Mock.mock(/\/api\/pipe-spec\/dimension/, 'get', () => {
@@ -42,7 +44,8 @@ Mock.mock(/\/api\/pipe-spec\/dimension/, 'get', () => {
   return { code: 200, msg: 'success', data: generateColumnData() }
 })
 
-// 标准文件列表（支持 partType 参数）
+// 标准文件列表（支持 partType 参数） - 已移除 Mock，使用真实接口
+/*
 Mock.mock(/\/api\/pipe-spec\/standard-files/, 'get', (options) => {
   // 解析查询参数 partType
   let partType = null
@@ -126,25 +129,19 @@ Mock.mock(/\/api\/pipe-spec\/standard-files/, 'get', (options) => {
       { id: 171, code: 'ASME B18.21.1' }
     ]
   }
-  
-  // 如果指定了部件类型，返回对应的标准文件，否则返回通用列表
-  const files = partType && standardFilesByType[partType] 
-    ? standardFilesByType[partType]
-    : Mock.mock({
-        'list|9-15': [
-          {
-            'id|+1': 1,
-            code: /GB\/T \d{4}-\d{4}/
-          }
-        ]
-      }).list
-  
+
+  // 根据部件类型获取标准列表
+  const standards = partType && standardFilesByType[partType] 
+    ? standardFilesByType[partType] 
+    : []
+
   return {
     code: 200,
     msg: 'success',
-    data: files
+    data: standards
   }
 })
+*/
 
 // 优选规则列表
 Mock.mock(/\/api\/pipe-spec\/preferred-rules/, 'get', () => ({
@@ -212,8 +209,9 @@ Mock.mock(/\/api\/pipe-spec\/fitting-config/, 'get', (options) => {
 //   }
 // })
 
-// 4.6 获取管附件规格
+// 4.6 获取管附件规格 - 已移除 Mock，使用真实接口
 // 接口: /api/PmcSpec/PipeFittingSpec?componentTypeName=...&componentTypeId=...
+/*
 Mock.mock(/\/api\/PmcSpec\/PipeFittingSpec/, 'get', (options) => {
   // 解析查询参数
   let componentTypeName = null
@@ -358,3 +356,4 @@ Mock.mock(/\/api\/PmcSpec\/PipeFittingSpec/, 'get', (options) => {
     traceId: Mock.mock('@guid')
   }
 })
+*/

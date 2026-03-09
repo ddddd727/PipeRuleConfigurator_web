@@ -13,7 +13,7 @@ export default {
       path: 'list',
       name: 'PropertyManagement',
       component: () => import('@/views/PropertyManagement.vue'),
-      meta: { title: '属性管理' }
+      meta: { title: '属性管理', keepAlive: true }
     }
   ]
 }
