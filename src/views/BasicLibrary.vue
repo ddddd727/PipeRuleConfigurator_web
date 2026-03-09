@@ -444,14 +444,16 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'BasicLibrary' })
 import { ref, watch, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { 
   Search, Plus, FolderAdd, Folder, Document, 
-  Upload, Download, CircleClose, Edit, Menu, CopyDocument 
+  Upload, Download, CircleClose, Edit, Menu, CopyDocument, RefreshLeft,
+  Fold, Expand
 } from '@element-plus/icons-vue'
-import { getLibraryTree, getCodelistTree, getComponentDetails, getTableData, getCodelistTableData, disableRows } from '@/api/library'
+import { getLibraryTree, getCodelistTree, getComponentFullData, getCodelistTableData, disableRows, enableRows } from '@/api/library'
 
 const route = useRoute()
 const filterText = ref('')
@@ -462,38 +464,107 @@ const activeTab = ref('common')
 const treeData = ref([])
 const componentDetails = ref({})
 // const tableData = ref([]) // Removed shared tableData
+const selectedCategory = ref('')
+const commonColumns = ref([])
+const appearanceColumns = ref([])
 const commonData = ref([])
 const appearanceData = ref([])
+const filterOptions = ref({
+  ccCodes: [],
+  scheduleThicknesses: [],
+  materialGrades: []
+})
+const filterForm = ref({
+  ccCode: '/',
+  scheduleThickness: '/',
+  materialGrade: '/'
+})
 const codelistTableData = ref([])
 const commonTableRef = ref(null)
 const appearanceTableRef = ref(null)
 const codelistTableRef = ref(null)
+const commonSelection = ref([])
+const appearanceSelection = ref([])
+const isAsideCollapsed = ref(false)
+
+const toggleAside = () => {
+  isAsideCollapsed.value = !isAsideCollapsed.value
+}
 
 const addDialogVisible = ref(false)
-const addForm = ref({
-  ccCode: '',
+const addBaseDialogVisible = ref(false)
+const addBaseForm = ref({
   manufacturingStd: '',
-  partCategory: '',
-  material: '',
-  bendingAngle: '',
-  partialDatabase: '',
-  endStd1: '',
-  endStd2: '',
-  geometryCategory: '',
-  connType1: '',
-  port1Size: '',
-  wallThickness1: '',
-  connType2: '',
-  port2Size: '',
-  wallThickness2: '',
-  flowDirection1: '',
-  flowDirection2: '',
-  weight: '',
-  dryCogX: '',
-  dryCogY: '',
-  dryCogZ: '',
-  materialCode: '',
-  materialDesc: ''
+  ccCode: '',
+  scheduleThickness: '',
+  material: ''
+})
+const addForm = ref({})
+
+// 将列按 [1] [2] 分组显示逻辑
+const addFormRows = computed(() => {
+  const columns = activeTab.value === 'common' ? visibleCommonColumns.value : visibleAppearanceColumns.value
+  const rows = []
+  const processedProps = new Set()
+  const singleFields = []
+
+  // 首先，提取所有成对的字段并将其放入行中
+  columns.forEach(col => {
+    if (processedProps.has(col.prop)) return
+    const { base, index } = getPropBaseAndIndex(col.prop)
+    if (index === 1) {
+      const pairProp = `${base}[2]`
+      const pairCol = columns.find(c => c.prop === pairProp)
+      if (pairCol) {
+        rows.push([col, pairCol])
+        processedProps.add(col.prop)
+        processedProps.add(pairProp)
+      } else {
+        singleFields.push(col)
+        processedProps.add(col.prop)
+      }
+    } else if (!processedProps.has(col.prop)) {
+      singleFields.push(col)
+      processedProps.add(col.prop)
+    }
+  })
+
+  // 现在，将剩余的单个字段分组到每行两个
+  for (let i = 0; i < singleFields.length; i += 2) {
+    if (i + 1 < singleFields.length) {
+      rows.push([singleFields[i], singleFields[i + 1]])
+    } else {
+      rows.push([singleFields[i]])
+    }
+  }
+
+  // 根据活动选项卡对行进行排序
+  if (activeTab.value === 'common') {
+    rows.sort((a, b) => {
+      const aIsCC = a[0].prop === 'IndustryCommodityCode'
+      const bIsCC = b[0].prop === 'IndustryCommodityCode'
+      if (aIsCC) return -1
+      if (bIsCC) return 1
+      return 0
+    })
+  } else if (activeTab.value === 'appearance') {
+    rows.sort((a, b) => {
+      const aHasNumericSuffix = a[0].prop.includes('[')
+      const bHasNumericSuffix = b[0].prop.includes('[')
+
+      if (aHasNumericSuffix && !bHasNumericSuffix) return 1
+      if (!aHasNumericSuffix && bHasNumericSuffix) return -1
+
+      const aIsCC = a[0].prop === 'IndustryCommodityCode'
+      const bIsCC = b[0].prop === 'IndustryCommodityCode'
+      if (aIsCC) return -1
+      if (bIsCC) return 1
+
+      return 0
+    })
+  }
+
+  return rows
 })
 
 const currentTitle = computed(() => route.meta.title || '基础库')
@@ -505,19 +576,40 @@ const defaultProps = {
   label: 'label',
 }
 
+// 递归处理树节点，添加唯一ID和继承的category
+const processTreeData = (nodes, parentPath = '', parentCategory = '') => {
+  return nodes.map(node => {
+    // 构建唯一路径ID，格式：Parent-Child-Grandchild
+    const currentPath = parentPath ? `${parentPath}-${node.label}` : node.label
+    // 继承 category
+    const currentCategory = node.category || parentCategory
+    
+    const newNode = {
+      ...node,
+      id: currentPath, // 使用全路径作为唯一ID
+      fullPath: currentPath,
+      category: currentCategory
+    }
+    if (node.children) {
+      newNode.children = processTreeData(node.children, currentPath, currentCategory)
+    }
+    return newNode
+  })
+}
+
 // 初始化加载目录树
 const loadTreeData = async () => {
   if (isPipeProfessional.value) {
     try {
       const data = await getLibraryTree()
-      treeData.value = data
+      treeData.value = processTreeData(data)
     } catch (error) {
       console.error('加载目录树失败:', error)
     }
   } else if (isCodelistLibrary.value) {
     try {
       const data = await getCodelistTree()
-      treeData.value = data
+      treeData.value = processTreeData(data)
     } catch (error) {
       console.error('加载Codelist目录树失败:', error)
     }
@@ -542,19 +634,287 @@ const filterNode = (value, data) => {
   return data.label.includes(value)
 }
 
-const handleNodeClick = async (data) => {
+// 字段映射表
+const fieldLabels = {
+  IndustryCommodityCode: 'CC码',
+  ScheduleThickness: '壁厚等级',
+  CommodityType: 'CommodityType',
+  GeometricIndustryStandard: '标准号',
+  MaterialGrade: '材料',
+  GeometryType: 'GeometryType',
+  BentAngle: '弯曲角度',
+  PartDataBasis: 'PartDataBasis',
+  PartClassName: 'PartClassName',
+  UserClassName: 'UserClassName',
+  BoltType: '螺栓类型',
+  NominalDiameterFrom: '公称直径起始',
+  NominalDiameterTo: '公称直径结束',
+  NominalDiameter: '公称直径',
+  NpdUnitType: '通径单位类型',
+  GasketType: '垫片类型',
+  ThicknessFor3DModel: '3D模型壁厚',
+  ProcurementThickness: '采购壁厚',
+  GasketOutsideDiameter: '垫片外径',
+  GasketInsideDiameter: '垫片内径',
+  FlangeFacing: '法兰密封面',
+  NutType: '螺母类型',
+  NutHeight: '螺母高度',
+  WasherType: '垫圈类型',
+  WasherThickness: '垫圈厚度'
+}
+
+// 需要隐藏的字段
+const hiddenFields = ['GeometricIndustryStandard', 'GeometricindustryStandard']
+const baseFilterFields = new Set(['IndustryCommodityCode', 'ScheduleThickness', 'MaterialGrade'])
+
+const componentDetailsFields = computed(() => {
+  if (!componentDetails.value) return []
+  return Object.keys(componentDetails.value)
+    .filter(key => !hiddenFields.includes(key) && !baseFilterFields.has(key) && fieldLabels[key])
+    .map(key => ({
+      key,
+      label: fieldLabels[key] || key,
+      value: componentDetails.value[key]
+    }))
+})
+
+const normalizeOptionList = (list) => {
+  const normalized = (list || [])
+    .map(v => (v === null || v === undefined) ? '' : String(v).trim())
+    .filter(v => v.length > 0 && v !== '/')
+  return ['/', ...Array.from(new Set(normalized))]
+}
+
+const ccCodeOptions = computed(() => normalizeOptionList(filterOptions.value.ccCodes))
+const scheduleThicknessOptions = computed(() => normalizeOptionList(filterOptions.value.scheduleThicknesses))
+const materialGradeOptions = computed(() => normalizeOptionList(filterOptions.value.materialGrades))
+
+const hasCcCodeFilter = computed(() => ccCodeOptions.value.length > 1)
+const hasScheduleThicknessFilter = computed(() => scheduleThicknessOptions.value.length > 1)
+const hasMaterialGradeFilter = computed(() => materialGradeOptions.value.length > 1)
+
+const firstRowItems = computed(() => {
+  const items = []
+  if (hasCcCodeFilter.value) {
+    items.push({
+      type: 'filter',
+      key: 'IndustryCommodityCode',
+      label: 'CC码',
+      modelKey: 'ccCode',
+      options: ccCodeOptions.value
+    })
+  }
+  if (hasScheduleThicknessFilter.value) {
+    items.push({
+      type: 'filter',
+      key: 'ScheduleThickness',
+      label: '壁厚等级',
+      modelKey: 'scheduleThickness',
+      options: scheduleThicknessOptions.value
+    })
+  }
+  if (hasMaterialGradeFilter.value) {
+    items.push({
+      type: 'filter',
+      key: 'MaterialGrade',
+      label: '材料',
+      modelKey: 'materialGrade',
+      options: materialGradeOptions.value
+    })
+  }
+  const remainSlots = Math.max(0, 4 - items.length)
+  const extraFields = componentDetailsFields.value.slice(0, remainSlots).map(f => ({
+    type: 'field',
+    key: f.key,
+    label: f.label
+  }))
+  return [...items, ...extraFields]
+})
+
+const remainingDetailsFields = computed(() => {
+  const usedFieldKeys = new Set(firstRowItems.value.filter(i => i.type === 'field').map(i => i.key))
+  return componentDetailsFields.value.filter(f => !usedFieldKeys.has(f.key))
+})
+
+const showAppearanceGroup = computed(() => {
+  return selectedCategory.value === 'pipe' || selectedCategory.value === 'pipeComponent'
+})
+
+watch(showAppearanceGroup, (val) => {
+  if (!val && activeTab.value === 'appearance') {
+    activeTab.value = 'common'
+  }
+})
+
+const getFilterParams = () => {
+  const params = {}
+  if (filterForm.value.ccCode && filterForm.value.ccCode !== '/') params.ccCode = filterForm.value.ccCode
+  if (filterForm.value.scheduleThickness && filterForm.value.scheduleThickness !== '/') params.scheduleThickness = filterForm.value.scheduleThickness
+  if (filterForm.value.materialGrade && filterForm.value.materialGrade !== '/') params.materialGrade = filterForm.value.materialGrade
+  return params
+}
+
+const lastRequestContext = ref({ nodeLabel: '', category: '' })
+
+const loadFullData = async ({ nodeLabel, category, resetFilters = false }) => {
+  if (!nodeLabel) return
+  if (resetFilters) {
+    filterForm.value.ccCode = '/'
+    filterForm.value.scheduleThickness = '/'
+    filterForm.value.materialGrade = '/'
+  }
+  const res = await getComponentFullData(nodeLabel, category, getFilterParams())
+  selectedCategory.value = res?.category || category || ''
+  componentDetails.value = res?.base || {}
+  filterOptions.value = res?.filters || { ccCodes: [], scheduleThicknesses: [], materialGrades: [] }
+
+  const tableConfig = res?.table || {}
+  const groups = tableConfig?.groups || {}
+  commonColumns.value = groups?.common?.columns || []
+  commonData.value = JSON.parse(JSON.stringify(groups?.common?.data || []))
+  appearanceColumns.value = groups?.appearance?.columns || []
+  appearanceData.value = JSON.parse(JSON.stringify(groups?.appearance?.data || []))
+  if (!showAppearanceGroup.value) {
+    appearanceColumns.value = []
+    appearanceData.value = []
+  }
+}
+
+watch(
+  () => [filterForm.value.ccCode, filterForm.value.scheduleThickness, filterForm.value.materialGrade],
+  async () => {
+    if (!lastRequestContext.value.nodeLabel || !lastRequestContext.value.category) return
+    try {
+      await loadFullData({ nodeLabel: lastRequestContext.value.nodeLabel, category: lastRequestContext.value.category })
+    } catch (error) {
+      console.error('筛选加载失败:', error)
+      ElMessage.error('筛选加载失败')
+    }
+  }
+)
+
+const excludedTableFieldBases = new Set(['JsonData', 'GeometricIndustryStandard', 'GeometricindustryStandard'])
+
+const getPropBaseAndIndex = (prop) => {
+  const match = typeof prop === 'string' ? prop.match(/^(.*)\[(\d+)\]$/) : null
+  if (!match) return { base: prop, index: 0 }
+  return { base: match[1], index: Number(match[2]) }
+}
+
+const normalizeColumns = (columns) => {
+  const groups = new Map()
+  const baseOrder = []
+
+  ;(columns || []).forEach((col) => {
+    const prop = col?.prop
+    const { base, index } = getPropBaseAndIndex(prop)
+    if (!groups.has(base)) {
+      groups.set(base, [])
+      baseOrder.push(base)
+    }
+    groups.get(base).push({ ...col, __index: index })
+  })
+
+  return baseOrder.flatMap((base) => {
+    const cols = groups.get(base) || []
+    return cols.sort((a, b) => (a.__index || 0) - (b.__index || 0)).map(({ __index, ...rest }) => rest)
+  })
+}
+
+const isEmptyValue = (val) => {
+  if (val === null || val === undefined) return true
+  if (typeof val === 'string') return val.trim() === ''
+  return false
+}
+
+const isColumnAllEmpty = (prop, rows) => {
+  if (!prop) return true
+  if (!rows || rows.length === 0) return false
+  return rows.every((row) => isEmptyValue(row?.[prop]))
+}
+
+const getVisibleColumns = (columns, rows) => {
+  return normalizeColumns(columns)
+    .filter((col) => {
+      const prop = col?.prop
+      const { base } = getPropBaseAndIndex(prop)
+      return prop && !excludedTableFieldBases.has(base)
+    })
+    // .filter((col) => !isColumnAllEmpty(col.prop, rows))
+    .map((col) => ({
+      ...col,
+      label: col.label || col.prop,
+      minWidth: col.minWidth || 140
+    }))
+}
+
+const emptyCommonColumnProps = computed(() => {
+  const emptyProps = new Set()
+  if (!commonData.value || commonData.value.length === 0) return emptyProps
+  visibleCommonColumns.value.forEach(col => {
+    if (isColumnAllEmpty(col.prop, commonData.value)) {
+      emptyProps.add(col.prop)
+    }
+  })
+  return emptyProps
+})
+
+const emptyAppearanceColumnProps = computed(() => {
+  const emptyProps = new Set()
+  if (!appearanceData.value || appearanceData.value.length === 0) return emptyProps
+  visibleAppearanceColumns.value.forEach(col => {
+    if (isColumnAllEmpty(col.prop, appearanceData.value)) {
+      emptyProps.add(col.prop)
+    }
+  })
+  return emptyProps
+})
+
+const cellStyle = ({ column }) => {
+  if (emptyCommonColumnProps.value.has(column.property) || emptyAppearanceColumnProps.value.has(column.property)) {
+    return { backgroundColor: '#f5f7fa' } 
+  }
+  return null
+}
+
+
+const visibleCommonColumns = computed(() => getVisibleColumns(commonColumns.value, commonData.value))
+const visibleAppearanceColumns = computed(() => getVisibleColumns(appearanceColumns.value, appearanceData.value))
+
+const currentSelection = computed(() => {
+  return activeTab.value === 'common' ? commonSelection.value : appearanceSelection.value
+})
+
+const isAllDisabled = computed(() => {
+  if (!currentSelection.value || currentSelection.value.length === 0) return false
+  return currentSelection.value.every(row => row.disabled)
+})
+
+const statusButtonText = computed(() => isAllDisabled.value ? '恢复' : '禁用')
+const statusButtonIcon = computed(() => isAllDisabled.value ? RefreshLeft : CircleClose)
+const statusButtonType = computed(() => isAllDisabled.value ? 'success' : 'danger')
+
+const handleNodeClick = async (data, node) => {
   if (!data.children) {
     selectedNode.value = data
     if (isPipeProfessional.value) {
       try {
-        const details = await getComponentDetails(data.label)
-        const table = await getTableData(data.label)
-        componentDetails.value = details
-        // Initialize both tables with deep copy to ensure independence
-        commonData.value = JSON.parse(JSON.stringify(table))
-        appearanceData.value = JSON.parse(JSON.stringify(table))
+        // 使用预处理好的唯一路径ID
+        const fullPath = data.fullPath || data.id
+        const category = data.category
+        lastRequestContext.value = { nodeLabel: fullPath, category }
+        await loadFullData({ nodeLabel: fullPath, category, resetFilters: true })
       } catch (error) {
         console.error('加载节点详情失败:', error)
+        selectedCategory.value = ''
+        filterOptions.value = { ccCodes: [], scheduleThicknesses: [], materialGrades: [] }
+        filterForm.value = { ccCode: '/', scheduleThickness: '/', materialGrade: '/' }
+        commonColumns.value = []
+        appearanceColumns.value = []
+        componentDetails.value = {}
+        commonData.value = []
+        appearanceData.value = []
+        ElMessage.error('加载节点详情失败')
       }
     } else if (isCodelistLibrary.value) {
       try {
@@ -567,6 +927,9 @@ const handleNodeClick = async (data) => {
     } else {
       // 其他专业暂无数据加载逻辑
       componentDetails.value = {}
+      selectedCategory.value = ''
+      commonColumns.value = []
+      appearanceColumns.value = []
       commonData.value = []
       appearanceData.value = []
     }
@@ -585,8 +948,12 @@ const handleCodelistRowClick = (row) => {
   codelistTableRef.value?.toggleRowSelection(row)
 }
 
-const checkSelectable = (row) => {
-  return !row.disabled
+const handleCommonSelectionChange = (selection) => {
+  commonSelection.value = selection
+}
+
+const handleAppearanceSelectionChange = (selection) => {
+  appearanceSelection.value = selection
 }
 
 const tableRowClassName = ({ row }) => {
@@ -596,105 +963,94 @@ const tableRowClassName = ({ row }) => {
   return ''
 }
 
-const handleDisable = async () => {
+const handleToggleStatus = async () => {
   let tableRef = null
+  let selection = []
+  
   if (activeTab.value === 'common') {
     tableRef = commonTableRef.value
+    selection = commonSelection.value
   } else {
     tableRef = appearanceTableRef.value
+    selection = appearanceSelection.value
   }
   
-  const selectedRows = tableRef?.getSelectionRows()
-  
-  if (!selectedRows || selectedRows.length === 0) {
-    ElMessage.warning('请先选择要禁用的行')
+  if (!selection || selection.length === 0) {
+    ElMessage.warning('请先选择要操作的行')
     return
   }
   
-  // 标记行为禁用并取消选择
-  selectedRows.forEach(row => {
-    row.disabled = true
-    tableRef.toggleRowSelection(row, false)
-  })
-  
-  try {
-    await disableRows(selectedRows)
-    ElMessage.success('禁用成功')
-  } catch (error) {
-    console.error('禁用失败:', error)
-    ElMessage.error('禁用失败')
+  if (isAllDisabled.value) {
+    // 恢复操作
+    try {
+      await enableRows(selection)
+      selection.forEach(row => row.disabled = false)
+      ElMessage.success('恢复成功')
+    } catch (error) {
+      console.error('恢复失败:', error)
+      ElMessage.error('恢复失败')
+    }
+  } else {
+    // 禁用操作
+    try {
+      await disableRows(selection)
+      selection.forEach(row => row.disabled = true)
+      ElMessage.success('禁用成功')
+    } catch (error) {
+      console.error('禁用失败:', error)
+      ElMessage.error('禁用失败')
+    }
   }
+  
+  // 清除选择状态
+  tableRef.clearSelection()
+}
+
+const handleAddBase = () => {
+  addBaseForm.value = {
+    manufacturingStd: componentDetails.value.GeometricIndustryStandard || '',
+    ccCode: filterForm.value.ccCode !== '/' ? filterForm.value.ccCode : '',
+    scheduleThickness: filterForm.value.scheduleThickness !== '/' ? filterForm.value.scheduleThickness : '',
+    material: filterForm.value.materialGrade !== '/' ? filterForm.value.materialGrade : ''
+  }
+  addBaseDialogVisible.value = true
+}
+
+const handleSaveAddBase = () => {
+  ElMessage.success('新增部件类型基础成功')
+  addBaseDialogVisible.value = false
 }
 
 const handleAdd = () => {
-  // Determine which table is active and get selection
   let selectedRows = []
+  const columns = activeTab.value === 'common' ? visibleCommonColumns.value : visibleAppearanceColumns.value
+  
   if (activeTab.value === 'common' && commonTableRef.value) {
     selectedRows = commonTableRef.value.getSelectionRows()
   } else if (activeTab.value === 'appearance' && appearanceTableRef.value) {
     selectedRows = appearanceTableRef.value.getSelectionRows()
   }
 
-  // Set default manufacturing standard from tree selection
-  const defaultStd = selectedNode.value ? selectedNode.value.label : ''
-  
+  const newForm = {}
+  // 初始化所有列的 key
+  columns.forEach(col => {
+    newForm[col.prop] = ''
+  })
+
   if (selectedRows && selectedRows.length > 0) {
-    // Clone the first selected row
+    // 预填充选中行数据
     const row = selectedRows[0]
-    addForm.value = {
-      ccCode: row.ccCode || '',
-      manufacturingStd: defaultStd,
-      partCategory: componentDetails.value.partCategory || '',
-      material: componentDetails.value.material || '',
-      bendingAngle: '', // Not in tableData usually
-      partialDatabase: '', // Not in tableData usually
-      endStd1: row.endStd1 || '',
-      endStd2: row.endStd2 || '',
-      geometryCategory: componentDetails.value.geometryCategory || '',
-      connType1: row.connType1 || '',
-      port1Size: row.port1Size || '',
-      wallThickness1: row.wallThickness1 || '',
-      connType2: row.connType2 || '',
-      port2Size: row.port2Size || '',
-      wallThickness2: row.wallThickness2 ?? '',
-      flowDirection1: row.flowDirection1 ?? '',
-      flowDirection2: row.flowDirection2 ?? '',
-      weight: row.weight ?? '',
-      dryCogX: row.dryCogX ?? '',
-      dryCogY: row.dryCogY ?? '',
-      dryCogZ: row.dryCogZ ?? '',
-      materialCode: row.materialCode ?? '',
-      materialDesc: row.materialDesc ?? ''
-    }
+    Object.keys(newForm).forEach(key => {
+      newForm[key] = row[key] ?? ''
+    })
   } else {
-    // Empty form with default standard
-    addForm.value = {
-      ccCode: '',
-      manufacturingStd: defaultStd,
-      partCategory: '',
-      material: '',
-      bendingAngle: '',
-      partialDatabase: '',
-      endStd1: '',
-      endStd2: '',
-      geometryCategory: '',
-      connType1: '',
-      port1Size: '',
-      wallThickness1: '',
-      connType2: '',
-      port2Size: '',
-      wallThickness2: '',
-      flowDirection1: '',
-      flowDirection2: '',
-      weight: '',
-      dryCogX: '',
-      dryCogY: '',
-      dryCogZ: '',
-      materialCode: '',
-      materialDesc: ''
+    // 设置默认 CC 码
+    if (filterForm.value.ccCode && filterForm.value.ccCode !== '/') {
+      newForm.IndustryCommodityCode = filterForm.value.ccCode
     }
   }
-  
+
+  addForm.value = newForm
   addDialogVisible.value = true
 }
 
@@ -817,6 +1173,12 @@ const handleSaveAdd = () => {
 .card-header .title {
   font-weight: bold;
   font-size: 16px;
+}
+
+.aside-toggle-button {
+  margin-right: 8px;
+  font-size: 18px;
+  color: #606266;
 }
 
 .card-header .subtitle {

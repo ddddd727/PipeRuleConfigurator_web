@@ -385,6 +385,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'SpecConfig' })
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'

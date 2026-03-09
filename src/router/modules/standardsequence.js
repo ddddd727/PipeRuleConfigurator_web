@@ -10,7 +10,7 @@ export default {
       path: 'index',
       name: 'StandardSequence',
       component: () => import('@/views/StandardSequence.vue'),
-      meta: { title: '标准简选' }
+      meta: { title: '标准简选', keepAlive: true }
     }
   ]
 }
