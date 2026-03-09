@@ -1,13 +1,445 @@
 <template>
-  <div class="app-container" style="padding: 20px;">
-    <el-card shadow="never">
-      <template #header>
-        <span style="font-weight: bold;">基础库管理 (Library)</span>
-      </template>
-      <div style="height: 500px; display: flex; justify-content: center; align-items: center;">
-        <el-empty description="基础库模块 - 待开发" />
-      </div>
-    </el-card>
+  <div class="basic-library-container">
+    <el-container class="main-layout">
+      <!-- 左侧目录树 -->
+      <el-aside width="280px" class="tree-aside">
+        <div class="tree-title">
+          <el-icon><Menu /></el-icon>
+          <span>{{ currentTitle }}</span>
+        </div>
+        <div v-if="isPipeProfessional || isCodelistLibrary" class="tree-content">
+          <div class="tree-header">
+            <el-input
+              v-model="filterText"
+              placeholder="搜索目录..."
+              prefix-icon="Search"
+              clearable
+            />
+            <div class="tree-actions">
+              <el-button link :icon="Plus" />
+              <el-button link :icon="FolderAdd" />
+              <el-button link :icon="CopyDocument" />
+            </div>
+          </div>
+          <div class="tree-wrapper">
+            <el-tree
+              ref="treeRef"
+              :data="treeData"
+              :props="defaultProps"
+              :filter-node-method="filterNode"
+              node-key="label"
+              highlight-current
+              @node-click="handleNodeClick"
+            >
+              <template #default="{ node, data }">
+                <span class="custom-tree-node">
+                  <el-icon v-if="data.children" class="folder-icon"><Folder /></el-icon>
+                  <el-icon v-else class="file-icon"><Document /></el-icon>
+                  <span>{{ node.label }}</span>
+                </span>
+              </template>
+            </el-tree>
+          </div>
+        </div>
+      </el-aside>
+
+      <!-- 右侧内容区 -->
+      <el-main class="content-main">
+        <template v-if="isPipeProfessional || isCodelistLibrary">
+          <div v-if="selectedNode" class="detail-container">
+            <!-- Codelist 专用界面 -->
+            <template v-if="isCodelistLibrary">
+              <el-card v-if="selectedNode.label === 'FlowDirection'" shadow="never" class="codelist-card">
+                <template #header>
+                  <div class="card-header codelist-header">
+                    <div class="header-left">
+                      <span class="title">{{ selectedNode.label }}</span>
+                      <span class="subtitle">*本codelist表共1层关系</span>
+                    </div>
+                    <div class="header-center">
+                      <el-input
+                        v-model="codelistFilterText"
+                        placeholder=""
+                        class="search-input"
+                      >
+                        <template #append>
+                          <el-button :icon="Search" />
+                        </template>
+                      </el-input>
+                    </div>
+                    <div class="header-right">
+                      <el-button type="primary" :icon="Plus">新增</el-button>
+                      <el-button type="danger" :icon="CircleClose">禁用</el-button>
+                      <el-button type="info" plain :icon="Download">导出</el-button>
+                    </div>
+                  </div>
+                </template>
+                
+                <div class="table-wrapper">
+                  <el-table 
+                    ref="codelistTableRef"
+                    :data="codelistTableData" 
+                    border 
+                    stripe 
+                    height="100%"
+                    :row-class-name="tableRowClassName"
+                    @row-click="handleCodelistRowClick"
+                  >
+                    <el-table-column type="selection" width="55" :selectable="checkSelectable" />
+                    <el-table-column prop="shortDesc" label="ShortDescription" min-width="150" />
+                    <el-table-column prop="longDesc" label="LongDescription" min-width="300" />
+                    <el-table-column prop="codeNum" label="Codelist Number" width="150" />
+                  </el-table>
+                </div>
+              </el-card>
+              <div v-else class="empty-state">
+                <el-empty description="暂未配置该Codelist类型的界面" />
+              </div>
+            </template>
+
+            <!-- 管系专业 界面 -->
+            <template v-else-if="isPipeProfessional">
+              <!-- 部件类型基础 -->
+              <el-card shadow="never" class="info-card">
+                <template #header>
+                <div class="card-header">
+                  <span class="title">部件类型基础</span>
+                  <span class="subtitle">*筛选条件默认为主端口1</span>
+                  <div class="header-btns">
+                    <el-button type="primary" plain :icon="Upload">导入</el-button>
+                    <el-button type="primary" plain :icon="Download">导出</el-button>
+                  </div>
+                </div>
+              </template>
+              
+              <div class="info-form-container">
+                <el-form :model="componentDetails" label-width="130px" class="info-form">
+                  <el-row :gutter="20">
+                    <el-col :span="6">
+                      <el-form-item label="CC码：">
+                        <el-select v-model="componentDetails.ccCode" style="width: 100%;">
+                          <el-option label="PCSSA23" value="PCSSA23" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item label="壁厚：">
+                        <el-select v-model="componentDetails.wallThickness" style="width: 100%;">
+                          <el-option label="Sch.40" value="Sch.40" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item label="材料：">
+                        <el-select v-model="componentDetails.material" style="width: 100%;">
+                          <el-option label="20#" value="20#" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item label="PartClassName：">
+                        <el-input v-model="componentDetails.partClassName" readonly />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                  <el-row :gutter="20">
+                    <el-col :span="6">
+                      <el-form-item label="几何类别：">
+                        <el-input v-model="componentDetails.geometryCategory" readonly />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item label="部件分类：">
+                        <el-input v-model="componentDetails.partCategory" readonly />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item label="Symbol方法：">
+                        <el-input v-model="componentDetails.symbolMethod" readonly />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item label="UserClassName：">
+                        <el-input v-model="componentDetails.userClassName" readonly />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                </el-form>
+              </div>
+            </el-card>
+            </template>
+
+            <!-- 数据页签 -->
+            <template v-if="isPipeProfessional">
+            <div class="tabs-container">
+              <el-tabs v-model="activeTab" class="data-tabs" type="border-card">
+                <el-tab-pane label="公用端面数据" name="common">
+                  <div class="table-wrapper">
+                    <el-table 
+                    ref="commonTableRef"
+                    :data="commonData" 
+                    border 
+                    stripe 
+                    height="100%"
+                    :row-class-name="tableRowClassName"
+                    @row-click="handleRowClick"
+                  >
+                    <el-table-column type="selection" width="55" :selectable="checkSelectable" />
+                    <el-table-column prop="ccCode" label="CC码" width="120" />
+                    <el-table-column prop="endStd1" label="端面标准1" min-width="180" />
+                    <el-table-column prop="endStd2" label="端面标准2" min-width="180" />
+                    <el-table-column prop="connType1" label="端面连接形式1" width="140" />
+                    <el-table-column prop="connType2" label="端面连接形式2" width="140" />
+                    <el-table-column prop="port1Size" label="端口1通径" width="120" />
+                    <el-table-column prop="port2Size" label="端口2通径" width="120" />
+                    <el-table-column prop="wallThickness1" label="壁厚1" width="100" />
+                    <el-table-column prop="wallThickness2" label="壁厚2" width="100" />
+                    <el-table-column prop="flowDirection1" label="流向1" width="100" />
+                    <el-table-column prop="flowDirection2" label="流向2" width="100" />
+                  </el-table>
+                </div>
+              </el-tab-pane>
+              <el-tab-pane label="外形重量重心描述" name="appearance">
+                <div class="table-wrapper">
+                  <el-table 
+                    ref="appearanceTableRef"
+                    :data="appearanceData" 
+                    border 
+                    stripe 
+                    height="100%"
+                    :row-class-name="tableRowClassName"
+                    @row-click="handleAppearanceRowClick"
+                  >
+                    <el-table-column type="selection" width="55" :selectable="checkSelectable" />
+                    <el-table-column prop="ccCode" label="CC码" width="120" />
+                    <el-table-column prop="connType1" label="端面连接形式1" width="140" />
+                    <el-table-column prop="connType2" label="端面连接形式2" width="140" />
+                    <el-table-column prop="port1Size" label="端口1通径" width="120" />
+                    <el-table-column prop="port2Size" label="端口2通径" width="120" />
+                    <el-table-column prop="wallThickness1" label="壁厚1" width="100" />
+                    <el-table-column prop="wallThickness2" label="壁厚2" width="100" />
+                    <el-table-column prop="weight" label="重量" width="100" />
+                    <el-table-column prop="dryCogX" label="DryCogX" width="100" />
+                    <el-table-column prop="dryCogY" label="DryCogY" width="100" />
+                    <el-table-column prop="dryCogZ" label="DryCogZ" width="100" />
+                    <el-table-column prop="materialCode" label="物资编码" width="180" />
+                    <el-table-column prop="materialDesc" label="物资描述" min-width="400" show-overflow-tooltip />
+                  </el-table>
+                </div>
+              </el-tab-pane>
+            </el-tabs>
+              <!-- 公用端面数据 tab 页的按钮 -->
+              <div class="tab-header-actions" v-if="activeTab === 'common'">
+                <el-button type="primary" :icon="Plus" @click="handleAdd">新增</el-button>
+                <el-button type="danger" :icon="CircleClose" @click="handleDisable">禁用</el-button>
+                <el-button type="warning" :icon="Edit">修改</el-button>
+              </div>
+              <!-- 外形重量重心描述 tab 页的按钮 -->
+              <div class="tab-header-actions" v-if="activeTab === 'appearance'">
+                <el-button type="primary" :icon="Plus" @click="handleAdd">新增</el-button>
+                <el-button type="danger" :icon="CircleClose" @click="handleDisable">禁用</el-button>
+                <el-button type="warning" :icon="Edit">修改</el-button>
+              </div>
+            </div>
+            </template>
+          </div>
+          <div v-else class="empty-state">
+            <el-empty description="请选择目录查看详情" />
+          </div>
+        </template>
+        <div v-else class="empty-state">
+          <el-empty :description="currentTitle + '模块 - 暂无内容'" />
+        </div>
+      </el-main>
+      <!-- 新增弹窗 -->
+      <el-dialog v-model="addDialogVisible" title="新增部件" width="80%">
+        <el-form :model="addForm" label-width="120px">
+          <!-- 共同字段 -->
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item label="CC码">
+                <el-input v-model="addForm.ccCode" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="制作标准">
+                <el-input v-model="addForm.manufacturingStd" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="部件分类">
+                <el-input v-model="addForm.partCategory" disabled />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item label="材料">
+                <el-input v-model="addForm.material" disabled />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="弯曲角度">
+                <el-input v-model="addForm.bendingAngle" disabled />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="部分数据库">
+                <el-input v-model="addForm.partialDatabase" disabled />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item label="几何类别">
+                <el-input v-model="addForm.geometryCategory" disabled />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8" v-if="activeTab === 'common'">
+              <el-form-item label="端面标准1">
+                <el-input v-model="addForm.endStd1" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8" v-if="activeTab === 'common'">
+              <el-form-item label="端面标准2">
+                <el-input v-model="addForm.endStd2" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8" v-if="activeTab === 'appearance'">
+              <el-form-item label="端面连接形式1">
+                <el-input v-model="addForm.connType1" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8" v-if="activeTab === 'appearance'">
+              <el-form-item label="端面连接形式2">
+                <el-input v-model="addForm.connType2" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <!-- 公用端面数据独有字段 -->
+          <template v-if="activeTab === 'common'">
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="端面连接形式1">
+                  <el-input v-model="addForm.connType1" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="端口1通径">
+                  <el-input v-model="addForm.port1Size" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="壁厚1">
+                  <el-input v-model="addForm.wallThickness1" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="端面连接形式2">
+                  <el-input v-model="addForm.connType2" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="端口2通径">
+                  <el-input v-model="addForm.port2Size" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="壁厚2">
+                  <el-input v-model="addForm.wallThickness2" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="流向1">
+                  <el-input v-model="addForm.flowDirection1" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="流向2">
+                  <el-input v-model="addForm.flowDirection2" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </template>
+
+          <!-- 外形重量重心描述独有字段 -->
+          <template v-if="activeTab === 'appearance'">
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="端口1通径">
+                  <el-input v-model="addForm.port1Size" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="端口2通径">
+                  <el-input v-model="addForm.port2Size" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="壁厚1">
+                  <el-input v-model="addForm.wallThickness1" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="壁厚2">
+                  <el-input v-model="addForm.wallThickness2" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="重量">
+                  <el-input v-model="addForm.weight" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="DryCogX">
+                  <el-input v-model="addForm.dryCogX" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="DryCogY">
+                  <el-input v-model="addForm.dryCogY" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="DryCogZ">
+                  <el-input v-model="addForm.dryCogZ" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="物资编码">
+                  <el-input v-model="addForm.materialCode" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="16">
+                <el-form-item label="物资描述">
+                  <el-input v-model="addForm.materialDesc" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </template>
+        </el-form>
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button type="primary" @click="handleSaveAdd">保存</el-button>
+            <el-button @click="addDialogVisible = false">取消</el-button>
+          </div>
+          <div class="dialog-extra-action">
+            <el-button link type="primary">批量新增点此导出模版表</el-button>
+          </div>
+        </template>
+      </el-dialog>
+    </el-container>
   </div>
 </template>
 
