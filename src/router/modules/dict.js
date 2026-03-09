@@ -35,14 +35,14 @@ export default {
           path: 'mat-category', 
           name: 'MatCategory',
           component: DictTable, 
-          meta: { title: 'B1-主材料', icon: 'Box' }, 
+          meta: { title: '主材料', icon: 'Box' }, 
           props: { dictId: 'mat-category' }
         },
         { 
           path: 'piping-standard', 
           name: 'PipingStandard',
           component: DictTable, 
-          meta: { title: 'B2-管材标准', icon: 'Collection' }, 
+          meta: { title: '管材标准', icon: 'Collection' }, 
           props: { dictId: 'piping-standard' }
         },
         { 
@@ -63,14 +63,14 @@ export default {
           path: 'flange-standard', 
           name: 'FlangeStandard',
           component: DictTable, 
-          meta: { title: 'C1-法兰等级标准', icon: 'Notebook' }, 
+          meta: { title: '法兰等级标准', icon: 'Notebook' }, 
           props: { dictId: 'flange-standard' }
         },
         { 
           path: 'pressure-rating', 
           name: 'PressureRating',
           component: DictTable, 
-          meta: { title: 'C2-法兰压力等级', icon: 'Odometer' }, 
+          meta: { title: '法兰压力等级', icon: 'Odometer' }, 
           props: { dictId: 'pressure-rating' }
         },
         { 
@@ -84,7 +84,7 @@ export default {
           path: 'schedule-thickness', 
           name: 'ScheduleThickness',
           component: DictTable, 
-          meta: { title: 'D-壁厚等级', icon: 'CopyDocument' }, // 替代原来的 schedule
+          meta: { title: '壁厚等级', icon: 'CopyDocument' }, // 替代原来的 schedule
           props: { dictId: 'schedule-thickness' }
         },
         { 
