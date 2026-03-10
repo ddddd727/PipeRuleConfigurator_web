@@ -1,20 +1,82 @@
 <script setup>
-import { ref, watch, onMounted, computed,reactive } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, watch, onMounted, computed, reactive } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDirtyData } from '@/hooks/useDirtyData'
+
+// 缓存管理函数
+const getCache = (key) => {
+  try {
+    const item = localStorage.getItem(key)
+    if (!item) return null
+    const parsed = JSON.parse(item)
+    if (parsed.expiry && Date.now() > parsed.expiry) {
+      localStorage.removeItem(key)
+      return null
+    }
+    return parsed.data
+  } catch (error) {
+    console.error('获取缓存失败:', error)
+    return null
+  }
+}
+
+const setCache = (key, data, expiryMs = 7 * 24 * 60 * 60 * 1000) => {
+  try {
+    const item = {
+      data,
+      expiry: Date.now() + expiryMs
+    }
+    localStorage.setItem(key, JSON.stringify(item))
+  } catch (error) {
+    console.error('设置缓存失败:', error)
+  }
+}
+
+// 组件类型数据缓存键
+const COMPONENT_TYPE_CACHE_KEY = 'component_type_data'
+
+// 获取组件类型数据
+const getComponentTypeData = async () => {
+  // 尝试从缓存获取
+  const cachedData = getCache(COMPONENT_TYPE_CACHE_KEY)
+  if (cachedData) {
+    return cachedData
+  }
+  
+  // 缓存不存在或过期，调用接口
+  try {
+    const res = await axios.get('/api/DictPiping/componentType')
+    const data = res.data
+    // 保存到缓存
+    setCache(COMPONENT_TYPE_CACHE_KEY, data)
+    return data
+  } catch (error) {
+    console.error('获取组件类型数据失败:', error)
+    ElMessage.error('获取组件类型数据失败')
+    return []
+  }
+}
+
+// 根据 part-{type} 获取对应的组件类型信息
+const getComponentTypeByDictId = (dictId, componentTypeList) => {
+  if (!dictId || !dictId.startsWith('part-')) return null
+  
+  const type = dictId.replace('part-', '')
+  return componentTypeList.find(item => item.ComponentTypeName.toLowerCase() === type.toLowerCase())
+}
 
 const props = defineProps({
   dictId: { type: String, required: true }
 })
 
+// 表格重新渲染的key
 const tableKey = ref(0)
-const route = useRoute()
+// 脏数据检测hook
 const { initSnapshot, isModified } = useDirtyData()
 
 // --- 核心状态 ---
-const tableConfig = ref({ title: '', columns: [], list: [] }) 
+const tableConfig = ref({ title: '', columns: [], list: [] })
 const loading = ref(false)
 const isEdit = ref(false)
 const searchKeyword = ref('')
@@ -22,12 +84,19 @@ const selectedRows = ref([])
 const dataSnapshot = ref(null)
 const optionsMap = ref({}) 
 const loadingOptions = ref(false)
+const componentTypeList = ref([]) // 存储组件类型数据
+const mappedColumns = ref([]) // 存储原始列配置，用于判断哪些列是JsonData中的列
+
+// 分页相关状态
+const currentPage = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 
 const addColVisible = ref(false)
 const addColForm = reactive({
   title: '',
   uiType: 'Input',
-  options: '', // 逗号分隔字符串
+  options: [], // 选项数组
   isRequired: false
 })
 const addingCol = ref(false)
@@ -98,7 +167,15 @@ const fetchSharedOptions = async (url, columns) => {
     console.log(`📡 发起合并请求: ${requestUrl} (服务于 ${columns.length} 个列)`)
     const res = await axios.get(requestUrl)
     const rawData = res.data
-    const list = Array.isArray(rawData) ? rawData : (rawData.data || [])
+    // 确保 list 是数组格式
+    let list = []
+    if (Array.isArray(rawData)) {
+      list = rawData
+    } else if (rawData && typeof rawData === 'object' && rawData.data) {
+      list = Array.isArray(rawData.data) ? rawData.data : []
+    } else if (rawData && typeof rawData === 'object' && rawData.rows) {
+      list = Array.isArray(rawData.rows) ? rawData.rows : []
+    }
 
     // 空数据处理
     if (!list || list.length === 0) {
@@ -109,7 +186,12 @@ const fetchSharedOptions = async (url, columns) => {
     // 简单数组处理
     if (typeof list[0] !== 'object' || list[0] === null) {
       columns.forEach(col => {
-        optionsMap.value[col.prop] = list.map(v => ({ label: String(v), value: v, __raw: v }))
+        // 确保 list 是数组再调用 map
+        if (Array.isArray(list)) {
+          optionsMap.value[col.prop] = list.map(v => ({ label: String(v), value: v, __raw: v }))
+        } else {
+          optionsMap.value[col.prop] = []
+        }
       })
       return
     }
@@ -137,15 +219,19 @@ const fetchSharedOptions = async (url, columns) => {
       }
 
       // 映射数据
-      const safeOptions = list.map(item => {
-        const val = valueKey ? item[valueKey] : item
-        const lbl = labelKey ? item[labelKey] : (val !== undefined ? String(val) : '未命名')
-        return {
-          label: lbl !== undefined && lbl !== null ? String(lbl) : '',
-          value: val,
-          __raw: item // 保留原始数据用于联动
-        }
-      }).filter(opt => opt.value !== undefined && opt.value !== null)
+      // 确保 list 是数组再调用 map
+      let safeOptions = []
+      if (Array.isArray(list)) {
+        safeOptions = list.map(item => {
+          const val = valueKey ? item[valueKey] : item
+          const lbl = labelKey ? item[labelKey] : (val !== undefined ? String(val) : '未命名')
+          return {
+            label: lbl !== undefined && lbl !== null ? String(lbl) : '',
+            value: val,
+            __raw: item // 保留原始数据用于联动
+          }
+        }).filter(opt => opt.value !== undefined && opt.value !== null)
+      }
 
       optionsMap.value[col.prop] = safeOptions
       console.log(`   ✅ 列 [${col.label}] 数据已装载`)
@@ -160,16 +246,27 @@ const fetchSharedOptions = async (url, columns) => {
 // --- 3. 联动处理 ---
 const handleSelectChange = (val, row, col) => {
   const ds = col.dataSource || col.DataSource
-  const mapping = ds?.valueMapping || ds?.ValueMapping
   
-  if (!mapping || Object.keys(mapping).length === 0) return
-
   const options = optionsMap.value[col.prop] || []
   const selectedOption = options.find(opt => opt.value === val)
   
   if (!selectedOption || !selectedOption.__raw) return
 
   const rawData = selectedOption.__raw
+
+  // 自动更新对应的 Long 字段为 code 值
+  const codeProp = col.prop
+  const longProp = codeProp.replace(/Code$/, 'Long')
+  const targetProp = findKey(row, longProp)
+  
+  if (targetProp) {
+    // Long 字段也设置为 code 值
+    row[targetProp] = val
+  }
+
+  // 处理 valueMapping 联动
+  const mapping = ds?.valueMapping || ds?.ValueMapping
+  if (!mapping || Object.keys(mapping).length === 0) return
 
   Object.entries(mapping).forEach(([sourceField, targetDbField]) => {
     const rawKey = findKey(rawData, sourceField)
@@ -186,7 +283,7 @@ const handleSelectChange = (val, row, col) => {
   })
 }
 
-// --- 4. 获取表格数据 ---
+// 从后端获取表格数据，包括列配置和数据列表
 const fetchData = async () => {
   const dictType = props.dictId 
   if (!dictType) return
@@ -195,7 +292,18 @@ const fetchData = async () => {
   optionsMap.value = {} 
 
   try {
-    const res = await axios.get(`/api/Dict/${dictType}?_t=${Date.now()}`)
+    // 加载组件类型数据
+    if (dictType.startsWith('part-')) {
+      const data = await getComponentTypeData()
+      componentTypeList.value = data
+    }
+
+    // 为所有 part- 开头的 dictId 设置特殊的请求路径
+    let apiPath = `/api/Dict/${dictType}`
+    if (dictType.startsWith('part-')) {
+      apiPath = `/api/Dictpiping/${dictType}`
+    }
+    const res = await axios.get(`${apiPath}?_t=${Date.now()}`)
     const backendData = res.data.data || res.data
     
     if (backendData.rows || backendData.columns) {
@@ -215,7 +323,7 @@ const fetchData = async () => {
       }
 
       // 1. 原有的列映射逻辑 (保持不变)
-      const mappedColumns = (backendData.columns || []).map(col => {
+      mappedColumns.value = (backendData.columns || []).map(col => {
         let finalProp = col.prop || col.DbField
         if (useCamelCase && finalProp) finalProp = toCamelCase(finalProp)
 
@@ -242,24 +350,89 @@ const fetchData = async () => {
         }
       })
 
+      // 2. 解析JsonData字段，添加动态列
+      const jsonDataColumns = []
+      const jsonDataProps = new Set()
+      
+      rawRows.forEach(row => {
+        if (row.JsonData) {
+          try {
+            const jsonData = JSON.parse(row.JsonData)
+            if (Array.isArray(jsonData)) {
+              jsonData.forEach(item => {
+                const prop = item.prop || item.DbField
+                if (prop && !jsonDataProps.has(prop)) {
+                  jsonDataProps.add(prop)
+                  jsonDataColumns.push({
+                    prop: prop,
+                    label: item.label || item.Title || '未命名',
+                    type: mapUiType(item.uiType || item.UiType),
+                    show: item.show !== undefined ? item.show : true,
+                    isReadOnly: item.isReadOnly !== undefined ? item.isReadOnly : (item.IsReadOnly || false),
+                    required: item.required !== undefined ? item.required : (item.IsRequired || false), // 使用JsonData中的required值
+                    staticOptions: item.options || (item.opions ? item.opions.split(';') : [])
+                  })
+                  // 为select类型添加选项
+                  if ((item.uiType === 'Select' || item.uiType === 'select' || item.UiType === 'select') && (item.options || item.opions)) {
+                    const options = Array.isArray(item.options) ? item.options : item.opions.split(';')
+                    optionsMap.value[prop] = options.map(opt => ({ label: opt, value: opt }))
+                  }
+                }
+              })
+            }
+          } catch (error) {
+            console.error('解析JsonData失败:', error)
+          }
+        }
+      })
+
+      // 合并原有列和JsonData解析出的列
+      const allColumns = [...mappedColumns.value, ...jsonDataColumns]
+
       // 🌟🌟🌟 新增的核心逻辑：印刷空模板 & 盖章合并 🌟🌟🌟
-      const baseRowTemplate = mappedColumns.reduce((acc, col) => {
+      const baseRowTemplate = allColumns.reduce((acc, col) => {
         acc[col.prop] = null // 让所有列（包括未来的新增列）都默认有一个 null 坑位
         return acc
       }, {})
 
-      const formattedRows = rawRows.map(row => ({
-        ...baseRowTemplate,  // 底层铺上全是 null 的空模板
-        ...row               // 表层盖上后端返回的真实数据
-      }))
+      const formattedRows = rawRows.map(row => {
+        const newRow = {
+          ...baseRowTemplate,  // 底层铺上全是 null 的空模板
+          ...row               // 表层盖上后端返回的真实数据
+        }
+        
+        // 解析JsonData并填充到对应列
+        if (row.JsonData) {
+          try {
+            const jsonData = JSON.parse(row.JsonData)
+            if (Array.isArray(jsonData)) {
+              jsonData.forEach(item => {
+                const prop = item.prop || item.DbField
+                if (prop) {
+                  // 直接使用value字段作为初始值
+                  newRow[prop] = item.value || item.DbField
+                }
+              })
+            }
+          } catch (error) {
+            console.error('解析JsonData失败:', error)
+          }
+        }
+        
+        return newRow
+      })
       // 🌟🌟🌟 新增结束 🌟🌟🌟
 
       // 2. 赋值给表格配置（注意 list 用的是 formattedRows）
       tableConfig.value = {
         title: backendData.DisplayName || backendData.displayName || dictType, 
-        columns: mappedColumns,
+        columns: allColumns,
         list: formattedRows
       }
+
+      // 重置分页状态
+      currentPage.value = 1
+      total.value = formattedRows.length
 
       tableKey.value++
       
@@ -282,13 +455,13 @@ const fetchData = async () => {
 watch(() => props.dictId, fetchData)
 onMounted(fetchData)
 
-// --- 5. 编辑模式 (含分组请求逻辑) ---
+// 切换编辑模式，进入编辑时加载下拉框选项数据
 const toggleEdit = async () => {
   if (isEdit.value) {
     handleCancel()
   } else {
-    // 筛选出所有需要加载数据的下拉框列
-    const selectColumns = tableConfig.value.columns.filter(col => col.type === 'select' && !col.isReadOnly)
+    // 筛选出所有需要加载数据的下拉框列（只处理有dataSource的列）
+    const selectColumns = tableConfig.value.columns.filter(col => col.type === 'select' && !col.isReadOnly && (col.dataSource || col.DataSource))
     
     if (selectColumns.length > 0) {
       loadingOptions.value = true 
@@ -321,20 +494,63 @@ const toggleEdit = async () => {
         
         await Promise.all(promises)
 
+        // ✅ 修正 Select 列的数据：确保 prop 字段和 long 字段的值都是正确的 code 值
+        selectColumns.forEach(col => {
+          const options = optionsMap.value[col.prop] || []
+          const ds = col.dataSource || col.DataSource
+          // 只有当ds存在时才获取labelField
+          const labelField = ds ? (ds.labelField || ds.LabelField) : undefined
+          
+          tableConfig.value.list.forEach(row => {
+            const currentValue = row[col.prop]
+            if (currentValue === undefined || currentValue === null || currentValue === '') return
+            
+            // 先尝试在 value 中查找
+            let matchedOption = options.find(opt => opt.value === currentValue)
+            
+            if (!matchedOption) {
+              // 如果当前值不在 value 中，尝试在 label 中查找
+              matchedOption = options.find(opt => opt.label === currentValue)
+              if (matchedOption) {
+                // 修正为正确的 value (code)
+                row[col.prop] = matchedOption.value
+              }
+            }
+            
+            // 无论是否修正，都要同步 long 字段为 code 值
+            if (matchedOption) {
+              const codeProp = col.prop
+              const longProp = codeProp.replace(/Code$/, 'Long')
+              const targetProp = findKey(row, longProp)
+              if (targetProp) {
+                row[targetProp] = matchedOption.value
+              }
+            }
+          })
+        })
+
       } finally {
         loadingOptions.value = false
       }
     }
 
     dataSnapshot.value = JSON.parse(JSON.stringify(tableConfig.value))
+    initSnapshot(tableConfig.value.list || [])
     isEdit.value = true
   }
 }
 
-const handleCancel = () => {
+// 取消编辑操作，恢复数据并重新获取后端最新数据
+const handleCancel = async () => {
   if (dataSnapshot.value) {
-    tableConfig.value = JSON.parse(JSON.stringify(dataSnapshot.value))
-    initSnapshot(tableConfig.value.list || [])
+    // 保存当前页码，以便恢复后保持原位
+    const currentPageNum = currentPage.value
+    
+    // 重新调用后端查询列表接口获取最新数据
+    await fetchData()
+    
+    // 恢复到之前的页码
+    currentPage.value = currentPageNum
   }
   isEdit.value = false
   selectedRows.value = [] 
@@ -343,7 +559,8 @@ const handleCancel = () => {
 
 const handleSelectionChange = (val) => { selectedRows.value = val }
 
-const handleAddRow = () => {
+// 添加新行，自动分配ID并填充默认值
+const handleAddRow = async () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
   
   // 1. 核心标记：打上 _isNew 标记，告诉保存接口这是新数据
@@ -367,27 +584,62 @@ const handleAddRow = () => {
     }
   }
 
-  // 3. 遍历列配置，填充这个算出来的“完美填缝 ID”和其他空坑位
+  // 3. 确保组件类型数据已加载
+  if (props.dictId.startsWith('part-')) {
+    // 检查缓存数据是否存在且包含当前类型
+    let componentType = getComponentTypeByDictId(props.dictId, componentTypeList.value)
+    
+    // 如果找不到，重新获取数据
+    if (!componentType) {
+      const data = await getComponentTypeData()
+      componentTypeList.value = data
+      componentType = getComponentTypeByDictId(props.dictId, data)
+    }
+  }
+
+  // 4. 遍历列配置，填充这个算出来的"完美填缝 ID"和其他空坑位
+  let componentType = null
+  if (props.dictId.startsWith('part-')) {
+    componentType = getComponentTypeByDictId(props.dictId, componentTypeList.value)
+    if (componentType) {
+      newRow.componentTypeId = componentType.id
+    }
+  }
+  
   tableConfig.value.columns.forEach(col => {
     if (col.isPrimaryKey) {
         newRow[col.prop] = nextId // 👈 填入填缝 ID
     } else if (col.type === 'switch') {
         newRow[col.prop] = false 
+    } else if (props.dictId.startsWith('part-')) {
+        // 填充默认值
+        if (componentType) {
+            if (col.prop === 'type' || col.prop === 'componentTypeName') {
+                newRow[col.prop] = componentType.ComponentTypeName
+            } else if (col.prop === 'description' || col.prop === 'componentTypeDescription') {
+                newRow[col.prop] = componentType.ComponentTypeDescription
+            } else {
+                newRow[col.prop] = null 
+            }
+        } else {
+            newRow[col.prop] = null 
+        }
     } else {
         newRow[col.prop] = null 
     }
   })
   
-  // 4. 插入到表格中
+  // 5. 插入到表格中
   tableConfig.value.list.push(newRow)
   
-  // 5. 滚动到底部
+  // 6. 滚动到底部
   setTimeout(() => {
     const tableBody = document.querySelector('.el-table__body-wrapper .el-scrollbar__wrap')
     if(tableBody) tableBody.scrollTop = tableBody.scrollHeight
   }, 100)
 }
 
+// 批量删除选中的行，支持后端删除和前端移除新增行
 const handleBatchDelete = () => {
   if (selectedRows.value.length === 0) return
   ElMessageBox.confirm('确定要删除选中的行吗？', '提示', { type: 'warning' })
@@ -401,11 +653,17 @@ const handleBatchDelete = () => {
           // 🛡️ [安全防护]：过滤掉 undefined 或 null 的 ID，防止请求报错
           .filter(id => id !== undefined && id !== null && id !== '')
 
-        // 2. 逐个发送删除请求
+        // 2. 发送删除请求
         // (如果选中的全是新增行，ids 为空，则跳过 API 请求，直接在前端移除)
         if (ids.length > 0) {
-          for (const id of ids) {
-            await axios.delete(`/api/Dict/${props.dictId}/${id}`)
+          if (props.dictId.startsWith('part-')) {
+            // 管子连接和法兰：使用 POST 请求，传入 ID 列表
+            await axios.post(`/api/Dictpiping/${props.dictId}/batch-delete`, ids)
+          } else {
+            // 其他菜单：保持原有的逐个 DELETE 请求
+            for (const id of ids) {
+              await axios.delete(`/api/Dict/${props.dictId}/${id}`)
+            }
           }
         }
         
@@ -422,8 +680,7 @@ const handleBatchDelete = () => {
     })
 }
 
-// --- 6. 保存 (含唯一性校验) ---
-
+// 保存表格数据，包含必填校验、唯一性校验和脏数据检测
 const handleSave = async () => {
   const currentList = tableConfig.value.list || []
   const columns = tableConfig.value.columns || []
@@ -474,21 +731,74 @@ const handleSave = async () => {
     const promises = []
     let hasChanges = false
     
+    // 检查是否有新增的列
+    const hasNewColumns = tableConfig.value.columns.length > mappedColumns.value.length
+    
+    // 获取所有 Select 列
+    const selectColumns = tableConfig.value.columns.filter(col => col.type === 'select' && !col.isReadOnly)
+    
     for (const row of currentList) {
       // 提取 _isNew 标记，避免将其传给后端（如果后端不接受额外字段）
       const { _isNew, ...submitData } = row
       
+      // ✅ 保存前修正 Select 列的数据：确保 Long 字段的值与 prop 字段的值一致（都是 code 值）
+      selectColumns.forEach(col => {
+        const codeProp = col.prop
+        const longProp = codeProp.replace(/Code$/, 'Long')
+        const codeValue = submitData[codeProp]
+        
+        // Long 字段设置为与 prop 字段相同的值（code 值）
+        if (codeValue !== undefined && codeValue !== null && codeValue !== '') {
+          submitData[longProp] = codeValue
+        }
+      })
+      
+      // ✅ 重新序列化JsonData字段
+      const jsonDataFields = []
+      tableConfig.value.columns.forEach(col => {
+        // 检查是否是从JsonData解析出的列或前端新增的列（通过检查是否在原有列中）
+        const isOriginalColumn = mappedColumns.value.some(originalCol => originalCol.prop === col.prop)
+        if (!isOriginalColumn) {
+          const jsonField = {
+            prop: col.prop,
+            label: col.label,
+            uiType: col.type === 'string' ? 'Input' : col.type === 'switch' ? 'Switch' : col.type === 'select' ? 'Select' : col.type,
+            show: col.show,
+            isReadOnly: col.isReadOnly,
+            required: col.required, // 根据列的required属性来判断是否必填
+            value: row[col.prop]
+          }
+          // 只有Select类型才需要options字段
+          if (col.type === 'select') {
+            jsonField.options = col.staticOptions && Array.isArray(col.staticOptions) ? col.staticOptions : []
+          }
+          jsonDataFields.push(jsonField)
+          // 从submitData中移除JsonData列对应的属性，只在JsonData中保存
+          delete submitData[col.prop]
+        }
+      })
+      
+      // 更新JsonData字段
+      if (jsonDataFields.length > 0) {
+        submitData.JsonData = JSON.stringify(jsonDataFields)
+      } else {
+        // 如果没有JsonData列，设置为空数组
+        submitData.JsonData = '[]'
+      }
+      
       if (_isNew) {
         // ---> 新增 (POST)
-        promises.push(axios.post(`/api/Dict/${props.dictId}`, submitData))
+        const apiPath = props.dictId.startsWith('part-') ? `/api/Dictpiping` : `/api/Dict`
+        promises.push(axios.post(`${apiPath}/${props.dictId}`, submitData))
         hasChanges = true
-      } else if (isModified(row)) {
-        // ---> 修改 (PUT)
+      } else if (isModified(row) || hasNewColumns) {
+        // ---> 修改 (PUT)，如果有新增的列也视为修改
         // 兼容 ID 的多种写法 (id, Id, ID)
         const id = row.id || row.Id || row.ID
         
         if (id) {
-          promises.push(axios.put(`/api/Dict/${props.dictId}/${id}`, submitData))
+          const apiPath = props.dictId.startsWith('part-') ? `/api/Dictpiping` : `/api/Dict`
+          promises.push(axios.put(`${apiPath}/${props.dictId}/${id}`, submitData))
           hasChanges = true
         } else {
           console.error('❌ 无法获取行ID，跳过该行保存:', row)
@@ -520,53 +830,103 @@ const handleSave = async () => {
   }
 }
 
+// 分页事件处理函数
+const handleSizeChange = (size) => {
+  pageSize.value = size
+  currentPage.value = 1 // 重置到第一页
+}
+
+const handleCurrentChange = (current) => {
+  currentPage.value = current
+}
+
+// 获取下拉框显示的label值
+const getSelectLabel = (col, value) => {
+  if (value === undefined || value === null || value === '') {
+    return ''
+  }
+  
+  const options = optionsMap.value[col.prop] || []
+  const option = options.find(opt => opt.value === value)
+  return option ? option.label : value
+}
+
 const openAddColumnDialog = () => {
   // 重置表单
   addColForm.title = ''
   addColForm.uiType = 'Input'
-  addColForm.options = ''
+  addColForm.options = []
   addColForm.isRequired = false
   addColVisible.value = true
 }
-const submitAddColumn = async () => {
+const submitAddColumn = () => {
   if (!addColForm.title) return ElMessage.warning('请输入列名称')
-  if (addColForm.uiType === 'Select' && !addColForm.options) return ElMessage.warning('下拉框必须填写选项')
-
-  addingCol.value = true
-  try {
-    // 调用我们在后端新写的接口
-    await axios.post(`/api/dict-config/columns/${props.dictId}`, {
-      title: addColForm.title,
-      uiType: addColForm.uiType,
-      isRequired: addColForm.isRequired,
-      options: addColForm.options // 字符串 "A,B,C"
-    })
-
-    ElMessage.success('列添加成功')
-    addColVisible.value = false
-
-    const wasEdit = isEdit.value
-    await new Promise(resolve => setTimeout(resolve, 800))
-    // 刷新整个表格，获取新列配置
-    await fetchData()
-    if (wasEdit) {
-      await toggleEdit() // 完美复用 toggleEdit，它会自动帮你把新列的 options 拉取下来并进入编辑态
+  if (addColForm.uiType === 'Select') {
+    if (addColForm.options.length === 0) return ElMessage.warning('下拉框必须至少有一个选项')
+    // 检查每个选项是否有值
+    const hasEmptyOption = addColForm.options.some(option => !option.trim())
+    if (hasEmptyOption) return ElMessage.warning('下拉框选项不能为空')
+    // 检查是否有重复选项
+    const trimmedOptions = addColForm.options.map(option => option.trim())
+    const uniqueOptions = new Set(trimmedOptions)
+    if (uniqueOptions.size !== trimmedOptions.length) {
+      return ElMessage.warning('下拉框选项不能重复')
     }
-    
-  } catch (error) {
-    console.error(error)
-    ElMessage.error(error.response?.data?.message || '添加失败')
-  } finally {
-    addingCol.value = false
   }
+
+  // 生成唯一的prop名称
+  const prop = `custom_${Date.now()}`
+  
+  // 前端直接添加列配置
+  const newColumn = {
+    prop: prop,
+    label: addColForm.title,
+    type: mapUiType(addColForm.uiType),
+    show: true,
+    isReadOnly: false,
+    required: addColForm.isRequired,
+    staticOptions: addColForm.options
+  }
+  
+  // 添加到表格配置中
+  tableConfig.value.columns.push(newColumn)
+  
+  // 为select类型添加选项
+  if (addColForm.uiType === 'Select' && addColForm.options.length > 0) {
+    optionsMap.value[prop] = addColForm.options.map(opt => ({ label: opt, value: opt }))
+  }
+  
+  // 更新表格数据，为每一行添加新列的默认值
+  tableConfig.value.list.forEach(row => {
+    row[prop] = null
+  })
+  
+  ElMessage.success('列添加成功')
+  addColVisible.value = false
+  
+  // 重新生成表格key，强制重新渲染
+  tableKey.value++
 }
+// 计算属性：处理表格数据的搜索过滤和分页显示
 const displayData = computed(() => {
   const rawData = tableConfig.value.list || [] 
   const keyword = searchKeyword.value.trim().toLowerCase()
-  if (!keyword) return rawData
-  return rawData.filter(row => 
-    Object.values(row).some(val => String(val).toLowerCase().includes(keyword))
-  )
+  let filteredData = rawData
+  
+  // 搜索过滤
+  if (keyword) {
+    filteredData = rawData.filter(row => 
+      Object.values(row).some(val => String(val).toLowerCase().includes(keyword))
+    )
+  }
+  
+  // 更新总条数
+  total.value = filteredData.length
+  
+  // 分页处理
+  const startIndex = (currentPage.value - 1) * pageSize.value
+  const endIndex = startIndex + pageSize.value
+  return filteredData.slice(startIndex, endIndex)
 })
 </script>
 
@@ -692,12 +1052,29 @@ const displayData = computed(() => {
                 size="small"
                 style="--el-switch-off-color: #dcdfe6;"
               />
+              <span v-else-if="col.type === 'select'">
+                {{ getSelectLabel(col, scope.row[col.prop]) }}
+              </span>
               <span v-else>{{ scope.row[col.prop] }}</span>
             </span>
           </template>
         </el-table-column>
       </template>
     </el-table>
+    
+    <!-- 分页组件 -->
+    <div class="pagination-container" style="margin-top: 16px; display: flex; justify-content: flex-end; align-items: center;">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </div>
+    
     <el-dialog v-model="addColVisible" title="添加自定义列" width="400px" append-to-body>
       <el-form label-position="top">
         <el-form-item label="列名称 (中文标题)">
@@ -710,8 +1087,12 @@ const displayData = computed(() => {
             <el-option label="开关 (Switch)" value="Switch" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="addColForm.uiType === 'Select'" label="选项列表 (用逗号分隔)">
-          <el-input v-model="addColForm.options" placeholder="例如：高,中,低" />
+        <el-form-item v-if="addColForm.uiType === 'Select'" label="选项列表">
+          <div v-for="(option, index) in addColForm.options" :key="index" class="option-item" style="width: 100%;display: flex; align-items: center; margin-bottom: 8px;">
+            <el-input v-model="addColForm.options[index]" placeholder="请输入选项" style="flex: 3; margin-right: 8px;" />
+            <el-button type="danger" @click="addColForm.options.splice(index, 1)" style="flex: 1;">删除</el-button>
+          </div>
+          <el-button type="primary" @click="addColForm.options.push('')" style="width: 100%; margin-top: 8px;">添加选项</el-button>
         </el-form-item>
         <el-form-item>
           <el-checkbox v-model="addColForm.isRequired">是否必填</el-checkbox>

@@ -169,6 +169,25 @@ export const db = {
     }]
   },
 
+  // 10. Elbow (弯头)
+  'part-elbow': {
+    title: 'Elbow (弯头) 配置',
+    columns: [
+      { prop: 'id', label: 'ID', required: true, isPrimaryKey: true, isReadOnly: true },
+      { prop: 'standard', label: '标准', required: true },
+      { prop: 'type', label: '类型', required: true },
+      { prop: 'description', label: '中文描述', required: true },
+      { prop: 'mainMaterial', label: '主材料', required: true }
+    ],
+    'data|10': [{
+      'id|+1': 1,
+      'standard|1': ['ASME B16.9', 'GB/T 12459', 'EN 10253-2', 'JIS B2311'],
+      'type|1': ['45°', '90°', '180°', '3D', '5D'],
+      'description': '@ctitle(5, 10)',
+      'mainMaterial|1': ['碳钢', '不锈钢', '合金钢', '铜合金', '铝合金']
+    }]
+  },
+
   // 1. 弯管数据 (bend-pipe)
   'bend-pipe': {
     title: '部件库名称：PlainPipingGenericData',

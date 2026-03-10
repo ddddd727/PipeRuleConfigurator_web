@@ -114,7 +114,7 @@ export default {
         { 
           path: 'red', 
           component: DictTable, 
-          meta: { title: 'Red (大小头)', icon: 'Filter' }, 
+          meta: { title: 'Red (异径)', icon: 'Filter' }, 
           props: { dictId: 'part-red' } 
         },
         { 
