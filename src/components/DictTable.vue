@@ -76,7 +76,7 @@ const tableKey = ref(0)
 const { initSnapshot, isModified } = useDirtyData()
 
 // --- 核心状态 ---
-const tableConfig = ref({ title: '', columns: [], list: [] }) 
+const tableConfig = ref({ title: '', columns: [], list: [] })
 const loading = ref(false)
 const isEdit = ref(false)
 const searchKeyword = ref('')
@@ -85,6 +85,7 @@ const dataSnapshot = ref(null)
 const optionsMap = ref({}) 
 const loadingOptions = ref(false)
 const componentTypeList = ref([]) // 存储组件类型数据
+const mappedColumns = ref([]) // 存储原始列配置，用于判断哪些列是JsonData中的列
 
 // 分页相关状态
 const currentPage = ref(1)
@@ -95,7 +96,7 @@ const addColVisible = ref(false)
 const addColForm = reactive({
   title: '',
   uiType: 'Input',
-  options: '', // 逗号分隔字符串
+  options: [], // 选项数组
   isRequired: false
 })
 const addingCol = ref(false)
@@ -322,7 +323,7 @@ const fetchData = async () => {
       }
 
       // 1. 原有的列映射逻辑 (保持不变)
-      const mappedColumns = (backendData.columns || []).map(col => {
+      mappedColumns.value = (backendData.columns || []).map(col => {
         let finalProp = col.prop || col.DbField
         if (useCamelCase && finalProp) finalProp = toCamelCase(finalProp)
 
@@ -349,22 +350,83 @@ const fetchData = async () => {
         }
       })
 
+      // 2. 解析JsonData字段，添加动态列
+      const jsonDataColumns = []
+      const jsonDataProps = new Set()
+      
+      rawRows.forEach(row => {
+        if (row.JsonData) {
+          try {
+            const jsonData = JSON.parse(row.JsonData)
+            if (Array.isArray(jsonData)) {
+              jsonData.forEach(item => {
+                const prop = item.prop || item.DbField
+                if (prop && !jsonDataProps.has(prop)) {
+                  jsonDataProps.add(prop)
+                  jsonDataColumns.push({
+                    prop: prop,
+                    label: item.label || item.Title || '未命名',
+                    type: mapUiType(item.uiType || item.UiType),
+                    show: item.show !== undefined ? item.show : true,
+                    isReadOnly: item.isReadOnly !== undefined ? item.isReadOnly : (item.IsReadOnly || false),
+                    required: item.required !== undefined ? item.required : (item.IsRequired || false), // 使用JsonData中的required值
+                    staticOptions: item.options || (item.opions ? item.opions.split(';') : [])
+                  })
+                  // 为select类型添加选项
+                  if ((item.uiType === 'Select' || item.uiType === 'select' || item.UiType === 'select') && (item.options || item.opions)) {
+                    const options = Array.isArray(item.options) ? item.options : item.opions.split(';')
+                    optionsMap.value[prop] = options.map(opt => ({ label: opt, value: opt }))
+                  }
+                }
+              })
+            }
+          } catch (error) {
+            console.error('解析JsonData失败:', error)
+          }
+        }
+      })
+
+      // 合并原有列和JsonData解析出的列
+      const allColumns = [...mappedColumns.value, ...jsonDataColumns]
+
       // 🌟🌟🌟 新增的核心逻辑：印刷空模板 & 盖章合并 🌟🌟🌟
-      const baseRowTemplate = mappedColumns.reduce((acc, col) => {
+      const baseRowTemplate = allColumns.reduce((acc, col) => {
         acc[col.prop] = null // 让所有列（包括未来的新增列）都默认有一个 null 坑位
         return acc
       }, {})
 
-      const formattedRows = rawRows.map(row => ({
-        ...baseRowTemplate,  // 底层铺上全是 null 的空模板
-        ...row               // 表层盖上后端返回的真实数据
-      }))
+      const formattedRows = rawRows.map(row => {
+        const newRow = {
+          ...baseRowTemplate,  // 底层铺上全是 null 的空模板
+          ...row               // 表层盖上后端返回的真实数据
+        }
+        
+        // 解析JsonData并填充到对应列
+        if (row.JsonData) {
+          try {
+            const jsonData = JSON.parse(row.JsonData)
+            if (Array.isArray(jsonData)) {
+              jsonData.forEach(item => {
+                const prop = item.prop || item.DbField
+                if (prop) {
+                  // 直接使用value字段作为初始值
+                  newRow[prop] = item.value || item.DbField
+                }
+              })
+            }
+          } catch (error) {
+            console.error('解析JsonData失败:', error)
+          }
+        }
+        
+        return newRow
+      })
       // 🌟🌟🌟 新增结束 🌟🌟🌟
 
       // 2. 赋值给表格配置（注意 list 用的是 formattedRows）
       tableConfig.value = {
         title: backendData.DisplayName || backendData.displayName || dictType, 
-        columns: mappedColumns,
+        columns: allColumns,
         list: formattedRows
       }
 
@@ -398,8 +460,8 @@ const toggleEdit = async () => {
   if (isEdit.value) {
     handleCancel()
   } else {
-    // 筛选出所有需要加载数据的下拉框列
-    const selectColumns = tableConfig.value.columns.filter(col => col.type === 'select' && !col.isReadOnly)
+    // 筛选出所有需要加载数据的下拉框列（只处理有dataSource的列）
+    const selectColumns = tableConfig.value.columns.filter(col => col.type === 'select' && !col.isReadOnly && (col.dataSource || col.DataSource))
     
     if (selectColumns.length > 0) {
       loadingOptions.value = true 
@@ -436,7 +498,8 @@ const toggleEdit = async () => {
         selectColumns.forEach(col => {
           const options = optionsMap.value[col.prop] || []
           const ds = col.dataSource || col.DataSource
-          const labelField = ds.labelField || ds.LabelField
+          // 只有当ds存在时才获取labelField
+          const labelField = ds ? (ds.labelField || ds.LabelField) : undefined
           
           tableConfig.value.list.forEach(row => {
             const currentValue = row[col.prop]
@@ -668,6 +731,9 @@ const handleSave = async () => {
     const promises = []
     let hasChanges = false
     
+    // 检查是否有新增的列
+    const hasNewColumns = tableConfig.value.columns.length > mappedColumns.value.length
+    
     // 获取所有 Select 列
     const selectColumns = tableConfig.value.columns.filter(col => col.type === 'select' && !col.isReadOnly)
     
@@ -687,13 +753,46 @@ const handleSave = async () => {
         }
       })
       
+      // ✅ 重新序列化JsonData字段
+      const jsonDataFields = []
+      tableConfig.value.columns.forEach(col => {
+        // 检查是否是从JsonData解析出的列或前端新增的列（通过检查是否在原有列中）
+        const isOriginalColumn = mappedColumns.value.some(originalCol => originalCol.prop === col.prop)
+        if (!isOriginalColumn) {
+          const jsonField = {
+            prop: col.prop,
+            label: col.label,
+            uiType: col.type === 'string' ? 'Input' : col.type === 'switch' ? 'Switch' : col.type === 'select' ? 'Select' : col.type,
+            show: col.show,
+            isReadOnly: col.isReadOnly,
+            required: col.required, // 根据列的required属性来判断是否必填
+            value: row[col.prop]
+          }
+          // 只有Select类型才需要options字段
+          if (col.type === 'select') {
+            jsonField.options = col.staticOptions && Array.isArray(col.staticOptions) ? col.staticOptions : []
+          }
+          jsonDataFields.push(jsonField)
+          // 从submitData中移除JsonData列对应的属性，只在JsonData中保存
+          delete submitData[col.prop]
+        }
+      })
+      
+      // 更新JsonData字段
+      if (jsonDataFields.length > 0) {
+        submitData.JsonData = JSON.stringify(jsonDataFields)
+      } else {
+        // 如果没有JsonData列，设置为空数组
+        submitData.JsonData = '[]'
+      }
+      
       if (_isNew) {
         // ---> 新增 (POST)
         const apiPath = props.dictId.startsWith('part-') ? `/api/Dictpiping` : `/api/Dict`
         promises.push(axios.post(`${apiPath}/${props.dictId}`, submitData))
         hasChanges = true
-      } else if (isModified(row)) {
-        // ---> 修改 (PUT)
+      } else if (isModified(row) || hasNewColumns) {
+        // ---> 修改 (PUT)，如果有新增的列也视为修改
         // 兼容 ID 的多种写法 (id, Id, ID)
         const id = row.id || row.Id || row.ID
         
@@ -745,41 +844,57 @@ const openAddColumnDialog = () => {
   // 重置表单
   addColForm.title = ''
   addColForm.uiType = 'Input'
-  addColForm.options = ''
+  addColForm.options = []
   addColForm.isRequired = false
   addColVisible.value = true
 }
-const submitAddColumn = async () => {
+const submitAddColumn = () => {
   if (!addColForm.title) return ElMessage.warning('请输入列名称')
-  if (addColForm.uiType === 'Select' && !addColForm.options) return ElMessage.warning('下拉框必须填写选项')
-
-  addingCol.value = true
-  try {
-    // 调用我们在后端新写的接口
-    await axios.post(`/api/dict-config/columns/${props.dictId}`, {
-      title: addColForm.title,
-      uiType: addColForm.uiType,
-      isRequired: addColForm.isRequired,
-      options: addColForm.options // 字符串 "A,B,C"
-    })
-
-    ElMessage.success('列添加成功')
-    addColVisible.value = false
-
-    const wasEdit = isEdit.value
-    await new Promise(resolve => setTimeout(resolve, 800))
-    // 刷新整个表格，获取新列配置
-    await fetchData()
-    if (wasEdit) {
-      await toggleEdit() // 完美复用 toggleEdit，它会自动帮你把新列的 options 拉取下来并进入编辑态
+  if (addColForm.uiType === 'Select') {
+    if (addColForm.options.length === 0) return ElMessage.warning('下拉框必须至少有一个选项')
+    // 检查每个选项是否有值
+    const hasEmptyOption = addColForm.options.some(option => !option.trim())
+    if (hasEmptyOption) return ElMessage.warning('下拉框选项不能为空')
+    // 检查是否有重复选项
+    const trimmedOptions = addColForm.options.map(option => option.trim())
+    const uniqueOptions = new Set(trimmedOptions)
+    if (uniqueOptions.size !== trimmedOptions.length) {
+      return ElMessage.warning('下拉框选项不能重复')
     }
-    
-  } catch (error) {
-    console.error(error)
-    ElMessage.error(error.response?.data?.message || '添加失败')
-  } finally {
-    addingCol.value = false
   }
+
+  // 生成唯一的prop名称
+  const prop = `custom_${Date.now()}`
+  
+  // 前端直接添加列配置
+  const newColumn = {
+    prop: prop,
+    label: addColForm.title,
+    type: mapUiType(addColForm.uiType),
+    show: true,
+    isReadOnly: false,
+    required: addColForm.isRequired,
+    staticOptions: addColForm.options
+  }
+  
+  // 添加到表格配置中
+  tableConfig.value.columns.push(newColumn)
+  
+  // 为select类型添加选项
+  if (addColForm.uiType === 'Select' && addColForm.options.length > 0) {
+    optionsMap.value[prop] = addColForm.options.map(opt => ({ label: opt, value: opt }))
+  }
+  
+  // 更新表格数据，为每一行添加新列的默认值
+  tableConfig.value.list.forEach(row => {
+    row[prop] = null
+  })
+  
+  ElMessage.success('列添加成功')
+  addColVisible.value = false
+  
+  // 重新生成表格key，强制重新渲染
+  tableKey.value++
 }
 // 计算属性：处理表格数据的搜索过滤和分页显示
 const displayData = computed(() => {
@@ -958,8 +1073,12 @@ const displayData = computed(() => {
             <el-option label="开关 (Switch)" value="Switch" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="addColForm.uiType === 'Select'" label="选项列表 (用逗号分隔)">
-          <el-input v-model="addColForm.options" placeholder="例如：高,中,低" />
+        <el-form-item v-if="addColForm.uiType === 'Select'" label="选项列表">
+          <div v-for="(option, index) in addColForm.options" :key="index" class="option-item" style="width: 100%;display: flex; align-items: center; margin-bottom: 8px;">
+            <el-input v-model="addColForm.options[index]" placeholder="请输入选项" style="flex: 3; margin-right: 8px;" />
+            <el-button type="danger" @click="addColForm.options.splice(index, 1)" style="flex: 1;">删除</el-button>
+          </div>
+          <el-button type="primary" @click="addColForm.options.push('')" style="width: 100%; margin-top: 8px;">添加选项</el-button>
         </el-form-item>
         <el-form-item>
           <el-checkbox v-model="addColForm.isRequired">是否必填</el-checkbox>
