@@ -840,6 +840,17 @@ const handleCurrentChange = (current) => {
   currentPage.value = current
 }
 
+// 获取下拉框显示的label值
+const getSelectLabel = (col, value) => {
+  if (value === undefined || value === null || value === '') {
+    return ''
+  }
+  
+  const options = optionsMap.value[col.prop] || []
+  const option = options.find(opt => opt.value === value)
+  return option ? option.label : value
+}
+
 const openAddColumnDialog = () => {
   // 重置表单
   addColForm.title = ''
@@ -1041,6 +1052,9 @@ const displayData = computed(() => {
                 size="small"
                 style="--el-switch-off-color: #dcdfe6;"
               />
+              <span v-else-if="col.type === 'select'">
+                {{ getSelectLabel(col, scope.row[col.prop]) }}
+              </span>
               <span v-else>{{ scope.row[col.prop] }}</span>
             </span>
           </template>
