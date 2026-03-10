@@ -471,11 +471,11 @@ const LOCAL_COLUMNS = {
 }
 
 const LOCAL_TITLES = {
-  'bend-pipe': '弯管机参数',
-  'bend-parameter': '部件库名称：PipingBendParameterCodeConverted',
-  'wall-thickness-series': '部件库名称：PlainPipingGenericData',
-  'shortcode': '部件库名称：ShortCodeHierarchyRule',
-  'spec': '部件库名称：PipingCommodityFilter'
+  'bend-pipe': '弯管机数据',
+  'bend-parameter': '弯管参数',
+  'wall-thickness-series': '壁厚等级',
+  'shortcode': 'ShortCode细类',
+  'spec': 'ShortCode定义'
 }
 
 const WALL_THICKNESS_SCHEDULE_OPTIONS = ref([])
@@ -650,7 +650,7 @@ const treeData = ref([
       { id: 'wall-thickness-series', label: '壁厚等级', icon: Document },
       { id: 'shortcode-major', label: 'ShortCode大类', icon: Document },
       { id: 'shortcode', label: 'ShortCode细类', icon: Document },
-      { id: 'spec', label: 'Spec', icon: Document }
+      { id: 'spec', label: 'ShortCode定义', icon: Document }
     ]
   },
   {
@@ -769,7 +769,7 @@ const handleNodeClick = (node) => {
     if (node.id === 'shortcode-major') {
       configs['shortcode-major'] = {
         id: 'shortcode-major',
-        title: '部件库名称：ShortCodeHierarchyType',
+        title: 'ShortCode大类',
         selectedRows: [],
         columns: (LOCAL_COLUMNS['shortcode-major'] || []).map(col => ({
           ...col,

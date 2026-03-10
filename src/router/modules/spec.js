@@ -10,7 +10,7 @@ export default {
       path: 'index',
       name: 'SpecConfig',
       component: () => import('@/views/SpecConfig.vue'),
-      meta: { title: 'Spec列表' }
+      meta: { title: 'Spec列表', keepAlive: true }
     }
   ]
 }
