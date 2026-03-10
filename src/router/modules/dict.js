@@ -56,7 +56,7 @@ export default {
           path: 'mat-grade-rule', 
           name: 'MatGradeRule',
           component: DictTable, 
-          meta: { title: 'B3-牌号规则', icon: 'SetUp', hidden: true }, // 新增
+          meta: { title: 'B3-牌号规则', icon: 'SetUp'}, // 新增
           props: { dictId: 'mat-grade-rule' }
         },
         { 
