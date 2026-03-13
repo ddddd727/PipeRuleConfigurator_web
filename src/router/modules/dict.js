@@ -175,7 +175,7 @@ export default {
           path: 'blind', 
           component: DictPipingTable, 
           meta: { title: 'Blind (盲板)', icon: 'Remove' }, 
-          props: { dictId: 'part-blind-flange' } 
+          props: { dictId: 'part-blindFlange' } 
         },
         { 
           path: 'gasket', 
@@ -187,19 +187,19 @@ export default {
           path: 'bolts', 
           component: DictPipingTable, 
           meta: { title: 'Bolts (螺栓)', icon: 'Key' }, 
-          props: { dictId: 'part-bolts' } 
+          props: { dictId: 'part-bolt' } 
         },
         { 
           path: 'nuts', 
           component: DictPipingTable, 
           meta: { title: 'Nuts (螺母)', icon: 'Operation' }, 
-          props: { dictId: 'part-nuts' } 
+          props: { dictId: 'part-nut' } 
         },
         { 
           path: 'washers', 
           component: DictPipingTable, 
           meta: { title: 'Washers (垫圈)', icon: 'Sunny' }, 
-          props: { dictId: 'part-washers' } 
+          props: { dictId: 'part-washer' } 
         },
         { 
           path: 'accessories', 
