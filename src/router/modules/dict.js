@@ -6,7 +6,7 @@ export default {
   path: '/dict',
   component: MainLayout,
   meta: { title: '字典定义', icon: 'Reading' },
-  redirect: '/dict/attribute/std-series',
+  redirect: '/dict/attribute/piping-class',
   children: [
     // ============================================================
     // 分组 1: 业务属性 (对应后端 DictConfiguration)
@@ -15,15 +15,9 @@ export default {
       path: 'attribute',
       component: DictLayout,
       meta: { title: '业务属性定义', icon: 'Menu' },
-      redirect: '/dict/attribute/std-series',
+      redirect: '/dict/attribute/piping-class',
       children: [
-        { 
-          path: 'std-series', 
-          name: 'StdSeries',
-          component: DictTable, 
-          meta: { title: '标准系列', icon: 'List' }, 
-          props: { dictId: 'std-series' }
-        },
+        
         { 
           path: 'piping-class', 
           name: 'PipingClass',
@@ -49,14 +43,14 @@ export default {
           path: 'mat-grade', 
           name: 'MatGrade',
           component: DictTable, 
-          meta: { title: 'B3-牌号', icon: 'Ticket' }, 
+          meta: { title: '牌号', icon: 'Ticket' }, 
           props: { dictId: 'mat-grade' }
         },
         { 
           path: 'mat-grade-rule', 
           name: 'MatGradeRule',
           component: DictTable, 
-          meta: { title: 'B3-牌号规则', icon: 'SetUp'}, // 新增
+          meta: { title: '牌号规则', icon: 'SetUp'}, // 新增
           props: { dictId: 'mat-grade-rule' }
         },
         { 

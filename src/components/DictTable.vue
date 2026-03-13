@@ -97,8 +97,8 @@ const evaluateCondition = (rule, row) => {
 const shouldFilterOptions = (col) => {
   const ds = col.dataSource || col.DataSource
   if (!ds) return false
+  if (ds.filterUsed === false || ds.FilterUsed === false) return false
   const mapping = ds.valueMapping || ds.ValueMapping
-  // key=表单字段，检查 key 里是否有 _CL 结尾
   return mapping && Object.keys(mapping).some(k => /_?cl$/i.test(k))
 }
 
