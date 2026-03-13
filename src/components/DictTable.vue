@@ -63,7 +63,9 @@ const toCamelCase = (str) => {
 
 const findKey = (obj, targetKey) => {
   if (!obj || !targetKey) return null
+  // 精确匹配
   if (Object.prototype.hasOwnProperty.call(obj, targetKey)) return targetKey
+  // 大小写不敏感
   const lower = targetKey.toLowerCase()
   return Object.keys(obj).find(k => k.toLowerCase() === lower) || null
 }
@@ -96,7 +98,8 @@ const shouldFilterOptions = (col) => {
   const ds = col.dataSource || col.DataSource
   if (!ds) return false
   const mapping = ds.valueMapping || ds.ValueMapping
-  return mapping && Object.values(mapping).some(v => /_?cl$/i.test(v))
+  // key=表单字段，检查 key 里是否有 _CL 结尾
+  return mapping && Object.keys(mapping).some(k => /_?cl$/i.test(k))
 }
 
 const getVisibleOptions = (col, currentRow) => {
@@ -175,13 +178,13 @@ const handleSelectChange = async (val, row, col) => {
   const ds = col.dataSource || col.DataSource
   if (!ds) return
 
-  // 1. ValueMapping 赋值
+  // ✅ ValueMapping：key=表单字段，value=option字段
   const mapping = ds.valueMapping || ds.ValueMapping
   if (mapping && Object.keys(mapping).length > 0) {
     const options = optionsMap.value[col.prop] || []
     const selected = options.find(opt => opt.value === val)
     if (selected?.__raw) {
-      Object.entries(mapping).forEach(([sourceField, targetDbField]) => {
+      Object.entries(mapping).forEach(([targetDbField, sourceField]) => {
         const rawKey = findKey(selected.__raw, sourceField)
         if (!rawKey) return
         const targetProp = findKey(row, targetDbField)
@@ -192,14 +195,14 @@ const handleSelectChange = async (val, row, col) => {
     }
   }
 
-  // ✅ 2. DependsOn：找出依赖当前列的下级列，清空并重新拉取
+  // DependsOn：找出依赖当前列的下级列，清空并重新拉取
   const dependentCols = tableConfig.value.columns.filter(c => {
     const cds = c.dataSource || c.DataSource
     return cds?.dependsOn?.some(d => (d.field || d.Field) === col.prop)
   })
   if (dependentCols.length > 0) {
     for (const depCol of dependentCols) {
-      row[depCol.prop] = null  // 清空子级已选值
+      row[depCol.prop] = null
       optionsMap.value[depCol.prop] = []
 
       const depDs = depCol.dataSource || depCol.DataSource
