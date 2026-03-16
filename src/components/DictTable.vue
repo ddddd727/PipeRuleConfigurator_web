@@ -26,6 +26,43 @@ const {
 } = useDictCommon()
 toCamelCase
 // ...existing code...
+
+// ─────────────────────────────────────────────
+// ✅ 原生列头筛选逻辑
+// ─────────────────────────────────────────────
+// 1. 动态生成每一列的筛选项 (提取该列出现过的所有不重复的值)
+const getColumnFilters = (col) => {
+  // 如果后端配置了该列不可筛选，可以直接返回 undefined（可选）
+  // if (!col.isFilterable) return undefined
+
+  const list = tableConfig.value.list || []
+  const uniqueVals = new Set()
+  
+  list.forEach(row => {
+    const val = row[col.prop]
+    // 过滤掉空值，不作为筛选项
+    if (val !== null && val !== undefined && String(val).trim() !== '') {
+      uniqueVals.add(val)
+    }
+  })
+
+  return Array.from(uniqueVals).map(val => {
+    let text = String(val)
+    // 针对 switch 类型做文本友好显示
+    if (col.type === 'switch') {
+      text = val ? '是' : '否'
+    }
+    // 注意：如果是 select 类型，由于非编辑模式下 optionsMap 可能未加载，默认显示 value。
+    // 如果想要显示 label，可以通过 optionsMap 匹配。
+    return { text, value: val }
+  })
+}
+
+// 2. 原生筛选比对方法
+const filterHandler = (value, row, column) => {
+  const property = column['property']
+  return row[property] === value
+}
 // ✅ VisibleWhen 条件求值
 const evaluateCondition = (rule, row) => {
   if (!rule) return true
@@ -558,6 +595,8 @@ const canDelete = computed(() => tableMeta.value.permissions?.allowDelete !== fa
           show-overflow-tooltip
           :fixed="col.isPrimaryKey ? 'left' : false"
           :sortable="col.isSortable ? 'custom' : false"
+          :filters="getColumnFilters(col)"
+          :filter-method="filterHandler"
         >
           <!-- ✅ 列标题：必填标记 + Tooltip -->
           <template #header>

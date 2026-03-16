@@ -925,6 +925,38 @@ const displayData = computed(() => {
   const endIndex = startIndex + pageSize.value
   return filteredData.slice(startIndex, endIndex)
 })
+
+// ─────────────────────────────────────────────
+// ✅ 原生列头筛选逻辑
+// ─────────────────────────────────────────────
+const getColumnFilters = (col) => {
+  const list = tableConfig.value.list || []
+  const uniqueVals = new Set()
+  list.forEach(row => {
+    const val = row[col.prop]
+    if (val !== null && val !== undefined && String(val).trim() !== '') {
+      uniqueVals.add(val)
+    }
+  })
+  return Array.from(uniqueVals).map(val => {
+    let text = String(val)
+    if (col.type === 'switch') {
+      text = val ? '是' : '否'
+    } else if (col.type === 'select') {
+      const options = optionsMap.value[col.prop] || []
+      const option = options.find(opt => opt.value === val)
+      if (option && option.label) {
+        text = option.label
+      }
+    }
+    return { text, value: val }
+  })
+}
+
+const filterHandler = (value, row, column) => {
+  const property = column['property']
+  return row[property] === value
+}
 </script>
 
 <template>
@@ -972,13 +1004,13 @@ const displayData = computed(() => {
           v-if="col.show !== false"
           :prop="col.prop"
           :label="col.label"
-          
           :width="col.width"                 
           :min-width="col.width ? null : 150" 
-          
           show-overflow-tooltip
           :fixed="col.isPrimaryKey ? 'left' : false"
-          sortable 
+          sortable
+          :filters="getColumnFilters(col)"
+          :filter-method="filterHandler"
         >
           <template #header>
             <span>
