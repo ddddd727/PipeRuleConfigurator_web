@@ -5,6 +5,7 @@ import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import { useDirtyData } from '@/hooks/useDirtyData'
+import { useDictCommon } from '@/composables/useDictCommon'
 
 const props = defineProps({
   dictId: { type: String, required: true }
@@ -14,65 +15,18 @@ const tableKey = ref(0)
 const route = useRoute()
 const { initSnapshot, isModified } = useDirtyData()
 
-// --- 核心状态 ---
-const tableConfig = ref({ title: '', columns: [], list: [] })
 const tableMeta = ref({})   // ✅ 新增：存放 meta（权限/分页/排序/行操作）
-const loading = ref(false)
-const isEdit = ref(false)
-const searchKeyword = ref('')
-const selectedRows = ref([])
-const dataSnapshot = ref(null)
-const optionsMap = ref({})
-const loadingOptions = ref(false)
 
-const addColVisible = ref(false)
-const addColForm = reactive({
-  title: '',
-  uiType: 'Input',
-  options: '',
-  isRequired: false
-})
-const addingCol = ref(false)
-
-// ─────────────────────────────────────────────
-// 辅助函数
-// ─────────────────────────────────────────────
-
-const mapUiType = (backendUiType) => {
-  if (!backendUiType) return 'string'
-  switch (String(backendUiType).toLowerCase()) {
-    case 'switch':          return 'switch'
-    case 'select':          return 'select'
-    case 'multiselect':     return 'multiselect'
-    case 'treeselect':      return 'treeselect'
-    case 'textarea':        return 'textarea'
-    case 'number':          return 'number'
-    case 'datepicker':      return 'date'
-    case 'datetimepicker':  return 'datetime'
-    case 'upload':          return 'upload'
-    case 'jsoninput':
-    case 'json':            return 'json'
-    default:                return 'string'
-  }
-}
-
-const toCamelCase = (str) => {
-  if (!str) return str
-  return str.charAt(0).toLowerCase() + str.slice(1)
-}
-
-const findKey = (obj, targetKey) => {
-  if (!obj || !targetKey) return null
-  // 精确匹配
-  if (Object.prototype.hasOwnProperty.call(obj, targetKey)) return targetKey
-  // 大小写不敏感
-  const lower = targetKey.toLowerCase()
-  return Object.keys(obj).find(k => k.toLowerCase() === lower) || null
-}
-
-// ─────────────────────────────────────────────
+const {
+  tableConfig, loading, isEdit, searchKeyword, selectedRows,
+  dataSnapshot, optionsMap, loadingOptions,
+  addColVisible, addColForm, addingCol,
+  mapUiType, toCamelCase, findKey, getNextAvailableId,
+  getVisibleOptions, fetchSharedOptions, resetToSnapshot
+} = useDictCommon()
+toCamelCase
+// ...existing code...
 // ✅ VisibleWhen 条件求值
-// ─────────────────────────────────────────────
 const evaluateCondition = (rule, row) => {
   if (!rule) return true
   const val = row[rule.field ?? rule.Field]
@@ -90,88 +44,8 @@ const evaluateCondition = (rule, row) => {
     default:         return true
   }
 }
-
-// ─────────────────────────────────────────────
-// 下拉框过滤（已使用的选项不再显示）
-// ─────────────────────────────────────────────
-const shouldFilterOptions = (col) => {
-  const ds = col.dataSource || col.DataSource
-  if (!ds) return false
-  if (ds.filterUsed === false || ds.FilterUsed === false) return false
-  const mapping = ds.valueMapping || ds.ValueMapping
-  return mapping && Object.keys(mapping).some(k => /_?cl$/i.test(k))
-}
-
-const getVisibleOptions = (col, currentRow) => {
-  const allOptions = optionsMap.value[col.prop] || []
-  if (!shouldFilterOptions(col)) return allOptions
-  const usedValues = new Set(
-    (tableConfig.value.list || [])
-      .filter(r => r !== currentRow)
-      .map(r => r[col.prop])
-      .filter(v => v !== undefined && v !== null && v !== '')
-  )
-  return allOptions.filter(opt => !usedValues.has(opt.value))
-}
-
-// ─────────────────────────────────────────────
-// 按 URL 合并请求（含 DependsOn 参数支持）
-// ─────────────────────────────────────────────
-const fetchSharedOptions = async (url, columns, extraParams = {}) => {
-  try {
-    let requestUrl = url
-    if (!requestUrl.startsWith('http') && !requestUrl.startsWith('/api')) {
-      requestUrl = `/api/${requestUrl.startsWith('/') ? requestUrl.slice(1) : requestUrl}`
-    }
-
-    const res = await axios.get(requestUrl, { params: extraParams })
-    const rawData = res.data
-    const list = Array.isArray(rawData) ? rawData : (rawData.data || [])
-
-    if (!list || list.length === 0) {
-      columns.forEach(col => { optionsMap.value[col.prop] = [] })
-      return
-    }
-
-    if (typeof list[0] !== 'object' || list[0] === null) {
-      columns.forEach(col => {
-        optionsMap.value[col.prop] = list.map(v => ({ label: String(v), value: v, __raw: v }))
-      })
-      return
-    }
-
-    const firstItem = list[0]
-    const objKeys = Object.keys(firstItem)
-
-    columns.forEach(col => {
-      const ds = col.dataSource || col.DataSource
-      let labelKey = findKey(firstItem, ds.labelField || ds.LabelField)
-      let valueKey = findKey(firstItem, ds.valueField || ds.ValueField)
-
-      if (!labelKey) {
-        labelKey = objKeys.find(k => /^(long|name|title|displayname|desc|description)$/i.test(k)) ||
-                   objKeys.find(k => k.toLowerCase() === 'short') ||
-                   findKey(firstItem, 'label')
-      }
-      if (!valueKey) {
-        valueKey = objKeys.find(k => /^(value|id|key|code)$/i.test(k)) ||
-                   findKey(firstItem, 'value')
-      }
-
-      optionsMap.value[col.prop] = list.map(item => ({
-        label: String(labelKey ? item[labelKey] ?? '' : ''),
-        value: valueKey ? item[valueKey] : item,
-        disabled: false,
-        __raw: item
-      })).filter(opt => opt.value !== undefined && opt.value !== null)
-    })
-  } catch (error) {
-    console.error(`❌ 请求失败 [${url}]:`, error)
-    columns.forEach(col => { optionsMap.value[col.prop] = [] })
-  }
-}
-
-// ─────────────────────────────────────────────
+  
+// ...existing code...
 // 联动：Select 变化时映射其他字段 + 触发 DependsOn
 // ─────────────────────────────────────────────
 const handleSelectChange = async (val, row, col) => {
@@ -379,12 +253,7 @@ const toggleEdit = async () => {
 }
 
 const handleCancel = () => {
-  if (dataSnapshot.value) {
-    tableConfig.value = JSON.parse(JSON.stringify(dataSnapshot.value))
-    initSnapshot(tableConfig.value.list || [])
-  }
-  isEdit.value = false
-  selectedRows.value = []
+  resetToSnapshot(initSnapshot)
   ElMessage.info('已取消更改')
 }
 
@@ -395,29 +264,16 @@ const handleSelectionChange = (val) => { selectedRows.value = val }
 // ─────────────────────────────────────────────
 const handleAddRow = () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
-
   const newRow = { _isNew: true }
 
-  // 填缝 ID
-  let nextId = 1
-  const pkCol = tableConfig.value.columns.find(col => col.isPrimaryKey)
-  if (pkCol) {
-    const idSet = new Set(
-      tableConfig.value.list
-        .map(r => Number(r[pkCol.prop]))
-        .filter(n => !isNaN(n) && n > 0)
-    )
-    while (idSet.has(nextId)) nextId++
-  }
+  const nextId = getNextAvailableId(tableConfig.value.list, tableConfig.value.columns)
 
   tableConfig.value.columns.forEach(col => {
     if (col.isPrimaryKey) {
       newRow[col.prop] = nextId
     } else if (col.type === 'switch') {
-      // ✅ defaultValue 优先，否则 false
       newRow[col.prop] = col.defaultValue ?? false
     } else {
-      // ✅ 使用配置的 defaultValue
       newRow[col.prop] = col.defaultValue ?? null
     }
   })

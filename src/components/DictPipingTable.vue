@@ -3,6 +3,7 @@ import { ref, watch, onMounted, computed, reactive } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDirtyData } from '@/hooks/useDirtyData'
+import { useDictCommon } from '@/composables/useDictCommon'
 
 // 缓存管理函数
 const getCache = (key) => {
@@ -76,14 +77,7 @@ const tableKey = ref(0)
 const { initSnapshot, isModified } = useDirtyData()
 
 // --- 核心状态 ---
-const tableConfig = ref({ title: '', columns: [], list: [] })
-const loading = ref(false)
-const isEdit = ref(false)
-const searchKeyword = ref('')
-const selectedRows = ref([])
-const dataSnapshot = ref(null)
-const optionsMap = ref({}) 
-const loadingOptions = ref(false)
+
 const componentTypeList = ref([]) // 存储组件类型数据
 const mappedColumns = ref([]) // 存储原始列配置，用于判断哪些列是JsonData中的列
 
@@ -92,39 +86,16 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
-const addColVisible = ref(false)
-const addColForm = reactive({
-  title: '',
-  uiType: 'Input',
-  options: [], // 选项数组
-  isRequired: false
-})
-const addingCol = ref(false)
+const {
+  tableConfig, loading, isEdit, searchKeyword, selectedRows,
+  dataSnapshot, optionsMap, loadingOptions,
+  addColVisible, addColForm, addingCol,
+  mapUiType, toCamelCase, findKey, getNextAvailableId,
+  getVisibleOptions, fetchSharedOptions
+} = useDictCommon()
 
-// --- 辅助函数 ---
-const mapUiType = (backendUiType) => {
-  if (!backendUiType) return 'string'
-  const type = String(backendUiType).toLowerCase()
-  switch (type) {
-    case 'switch': return 'switch'
-    case 'select': return 'select'
-    case 'jsoninput': 
-    case 'json': return 'json'
-    default: return 'string'
-  }
-}
 
-const toCamelCase = (str) => {
-  if (!str) return str
-  return str.charAt(0).toLowerCase() + str.slice(1)
-}
 
-const findKey = (obj, targetKey) => {
-  if (!obj || !targetKey) return null
-  if (Object.prototype.hasOwnProperty.call(obj, targetKey)) return targetKey
-  const lowerTarget = targetKey.toLowerCase()
-  return Object.keys(obj).find(k => k.toLowerCase() === lowerTarget) || null
-}
 
 // 更新JsonData对象，确保数据变更同步到JsonData
 const updateJsonData = (row, prop) => {
@@ -164,122 +135,7 @@ const updateJsonData = (row, prop) => {
   }
 }
 
-// --- 1. 下拉框过滤逻辑 ---
-const shouldFilterOptions = (col) => {
-  const ds = col.dataSource || col.DataSource
-  if (!ds) return false
-  const mapping = ds.valueMapping || ds.ValueMapping
-  return mapping && Object.values(mapping).some(v => /_?cl$/i.test(v))
-}
 
-const getVisibleOptions = (col, currentRow) => {
-  const allOptions = optionsMap.value[col.prop] || []
-  if (!shouldFilterOptions(col)) return allOptions
-
-  const currentList = tableConfig.value.list || []
-  const usedValues = new Set()
-  
-  currentList.forEach(row => {
-    if (row === currentRow) return 
-    const val = row[col.prop]
-    if (val !== undefined && val !== null && val !== '') {
-      usedValues.add(val)
-    }
-  })
-
-  return allOptions.filter(opt => !usedValues.has(opt.value))
-}
-
-// --- 2. 核心优化：按 URL 合并请求 ---
-// url: 请求地址
-// columns: 使用该 URL 的所有列配置数组
-const fetchSharedOptions = async (url, columns) => {
-  try {
-    // 1. 统一处理 URL
-    let requestUrl = url
-    if (!requestUrl.startsWith('http') && !requestUrl.startsWith('/api')) {
-        requestUrl = `/api/${requestUrl.startsWith('/') ? requestUrl.slice(1) : requestUrl}`
-    }
-
-    // 2. 发起一次请求
-    console.log(`📡 发起合并请求: ${requestUrl} (服务于 ${columns.length} 个列)`)
-    const res = await axios.get(requestUrl)
-    const rawData = res.data
-    // 确保 list 是数组格式
-    let list = []
-    if (Array.isArray(rawData)) {
-      list = rawData
-    } else if (rawData && typeof rawData === 'object' && rawData.data) {
-      list = Array.isArray(rawData.data) ? rawData.data : []
-    } else if (rawData && typeof rawData === 'object' && rawData.rows) {
-      list = Array.isArray(rawData.rows) ? rawData.rows : []
-    }
-
-    // 空数据处理
-    if (!list || list.length === 0) {
-      columns.forEach(col => optionsMap.value[col.prop] = [])
-      return
-    }
-
-    // 简单数组处理
-    if (typeof list[0] !== 'object' || list[0] === null) {
-      columns.forEach(col => {
-        // 确保 list 是数组再调用 map
-        if (Array.isArray(list)) {
-          optionsMap.value[col.prop] = list.map(v => ({ label: String(v), value: v, __raw: v }))
-        } else {
-          optionsMap.value[col.prop] = []
-        }
-      })
-      return
-    }
-
-    // 3. 数据分发 (Distribute)
-    // 拿着同一份 list，为不同的列生成不同的 options
-    const firstItem = list[0]
-    const objKeys = Object.keys(firstItem)
-
-    columns.forEach(col => {
-      const ds = col.dataSource || col.DataSource
-      
-      // 针对当前列，计算 Label 和 Value 字段
-      let labelKey = findKey(firstItem, ds.labelField || ds.LabelField)
-      let valueKey = findKey(firstItem, ds.valueField || ds.ValueField)
-
-      if (!labelKey) {
-        labelKey = objKeys.find(k => /^(long|name|title|displayname|desc|description)$/i.test(k)) || 
-                   objKeys.find(k => k.toLowerCase() === 'short') || 
-                   findKey(firstItem, 'label')
-      }
-      if (!valueKey) {
-        valueKey = objKeys.find(k => /^(value|id|key|code)$/i.test(k)) || 
-                   findKey(firstItem, 'value')
-      }
-
-      // 映射数据
-      // 确保 list 是数组再调用 map
-      let safeOptions = []
-      if (Array.isArray(list)) {
-        safeOptions = list.map(item => {
-          const val = valueKey ? item[valueKey] : item
-          const lbl = labelKey ? item[labelKey] : (val !== undefined ? String(val) : '未命名')
-          return {
-            label: lbl !== undefined && lbl !== null ? String(lbl) : '',
-            value: val,
-            __raw: item // 保留原始数据用于联动
-          }
-        }).filter(opt => opt.value !== undefined && opt.value !== null)
-      }
-
-      optionsMap.value[col.prop] = safeOptions
-      console.log(`   ✅ 列 [${col.label}] 数据已装载`)
-    })
-
-  } catch (error) {
-    console.error(`❌ 请求失败 [${url}]:`, error)
-    columns.forEach(col => optionsMap.value[col.prop] = [])
-  }
-}
 
 // --- 3. 联动处理 ---
 const handleSelectChange = (val, row, col) => {
@@ -560,9 +416,7 @@ const handleAddRow = async () => {
   const newRow = { _isNew: true }
   
   // 2. 🟢 核心算法：寻找当前 ID 序列中的“最小空缺值”
-  let nextId = 1 // 默认从 1 开始试探
-  const pkCol = tableConfig.value.columns.find(col => col.isPrimaryKey)
-  
+  const nextId = getNextAvailableId(tableConfig.value.list, tableConfig.value.columns)
   if (pkCol) {
     // 提取当前表格里的所有合法正整数 ID，并放入 Set 中（查询速度 O(1)）
     const existingIds = tableConfig.value.list
