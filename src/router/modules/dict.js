@@ -1,6 +1,7 @@
 import MainLayout from '@/layout/MainLayout.vue'
 import DictLayout from '@/views/DictLayout.vue'
 import DictTable from '@/components/DictTable.vue'
+import DictPipingTable from '@/components/DictPipingTable.vue'
 
 export default {
   path: '/dict',
@@ -101,49 +102,49 @@ export default {
       children: [
         { 
           path: 'elbow', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Elbow (弯头)', icon: 'RefreshLeft' }, 
           props: { dictId: 'part-elbow' } 
         },
         { 
           path: 'red', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Red (异径)', icon: 'Filter' }, 
           props: { dictId: 'part-red' } 
         },
         { 
           path: 'tee', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Tee (三通)', icon: 'Share' }, 
           props: { dictId: 'part-tee' } 
         },
         { 
           path: 'sleeve', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Sleeve (套管)', icon: 'Coin' }, 
           props: { dictId: 'part-sleeve' } 
         },
         { 
           path: 'bosses', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Bosses (凸台)', icon: 'Aim' }, 
           props: { dictId: 'part-bosses' } 
         },
         { 
           path: 'saddles', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Saddles (鞍座)', icon: 'Magnet' }, 
           props: { dictId: 'part-saddles' } 
         },
         { 
           path: 'caps', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Caps (管帽)', icon: 'CircleClose' }, 
           props: { dictId: 'part-caps' } 
         },
         { 
           path: 'overpass', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Overpass (过桥)', icon: 'Top' }, 
           props: { dictId: 'part-overpass' } 
         }
@@ -160,49 +161,49 @@ export default {
       children: [
         { 
           path: 'flange', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Flange (法兰)', icon: 'CircleCheck' }, 
           props: { dictId: 'part-flange' } 
         },
         { 
           path: 'blind', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Blind (盲板)', icon: 'Remove' }, 
-          props: { dictId: 'part-blind-flange' } 
+          props: { dictId: 'part-blindFlange' } 
         },
         { 
           path: 'gasket', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Gasket (垫片)', icon: 'Help' }, 
           props: { dictId: 'part-gasket' } 
         },
         { 
           path: 'bolts', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Bolts (螺栓)', icon: 'Key' }, 
-          props: { dictId: 'part-bolts' } 
+          props: { dictId: 'part-bolt' } 
         },
         { 
           path: 'nuts', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Nuts (螺母)', icon: 'Operation' }, 
-          props: { dictId: 'part-nuts' } 
+          props: { dictId: 'part-nut' } 
         },
         { 
           path: 'washers', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Washers (垫圈)', icon: 'Sunny' }, 
-          props: { dictId: 'part-washers' } 
+          props: { dictId: 'part-washer' } 
         },
         { 
           path: 'accessories', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Accessories (附件)', icon: 'Suitcase' }, 
           props: { dictId: 'part-accessories' } 
         },
         { 
           path: 'joints', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Joints (接头)', icon: 'Switch' }, 
           props: { dictId: 'part-joints' } 
         }
