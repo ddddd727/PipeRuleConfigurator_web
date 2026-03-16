@@ -58,7 +58,7 @@ const handleSelectChange = async (val, row, col) => {
     const options = optionsMap.value[col.prop] || []
     const selected = options.find(opt => opt.value === val)
     if (selected?.__raw) {
-      Object.entries(mapping).forEach(([targetDbField, sourceField]) => {
+      Object.entries(mapping).forEach(([targetDbField, sourceField]) => { 
         const rawKey = findKey(selected.__raw, sourceField)
         if (!rawKey) return
         const targetProp = findKey(row, targetDbField)
