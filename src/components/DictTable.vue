@@ -559,7 +559,7 @@ const canDelete = computed(() => tableMeta.value.permissions?.allowDelete !== fa
           <el-button v-if="canCreate" type="primary" @click="handleAddRow" icon="Plus">新增行</el-button>
           <el-button type="primary" @click="openAddColumnDialog" icon="Plus">新增列</el-button>
           <el-button
-            v-if="canDelete"
+            v-if="false"
             type="danger"
             :disabled="selectedRows.length === 0"
             @click="handleBatchDelete"

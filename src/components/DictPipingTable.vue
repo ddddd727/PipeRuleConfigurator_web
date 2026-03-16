@@ -977,7 +977,7 @@ const filterHandler = (value, row, column) => {
         <template v-if="isEdit">
           <el-button type="primary" @click="handleAddRow" icon="Plus">新增行</el-button>
           <el-button type="primary" @click="openAddColumnDialog" icon="Plus">新增列</el-button>
-          <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
+          <el-button v-if="false" type="danger" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
             批量删除 ({{ selectedRows.length }})
           </el-button>
           <el-button @click="toggleEdit">取消</el-button>

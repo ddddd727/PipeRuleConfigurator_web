@@ -69,32 +69,15 @@ export default {
           props: { dictId: 'pressure-rating' }
         },
         { 
-          path: 'schedule-series', 
-          name: 'ScheduleSeries',
-          component: DictTable, 
-          meta: { title: '壁厚系列', icon: 'Files' }, // 新增
-          props: { dictId: 'schedule-series' }
-        },
-        { 
           path: 'schedule-thickness', 
           name: 'ScheduleThickness',
           component: DictTable, 
           meta: { title: '壁厚等级', icon: 'CopyDocument' }, // 替代原来的 schedule
           props: { dictId: 'schedule-thickness' }
-        },
-        { 
-          path: 'wall-thickness-data', 
-          name: 'WallThicknessData',
-          component: DictTable, 
-          meta: { title: '外径壁厚表', icon: 'DataBoard' }, // 新增
-          props: { dictId: 'wall-thickness-data' }
         }
       ]
     },
 
-    // ============================================================
-    // 分组 2: 管子连接件 (保留原有配置)
-    // ============================================================
     {
       path: 'fitting',
       component: DictLayout,
