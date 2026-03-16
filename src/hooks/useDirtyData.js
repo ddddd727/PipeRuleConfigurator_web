@@ -50,9 +50,9 @@ export function useDirtyData() {
     }
 
     // === 场景 B: 检查整行 (保存时调用) ===
-    // 遍历原始数据的所有 Key，看当前行是否有变化
-    const keys = Object.keys(originalRow)
-    return keys.some(key => {
+    // 遍历所有可能的 Key，包括原始数据和当前行的 Key
+    const allKeys = new Set([...Object.keys(originalRow), ...Object.keys(row)])
+    return Array.from(allKeys).some(key => {
       // 忽略前端内部字段 (如下划线开头的)
       if (key.startsWith('_') || key === 'children') return false
       return compareValues(originalRow[key], row[key])
