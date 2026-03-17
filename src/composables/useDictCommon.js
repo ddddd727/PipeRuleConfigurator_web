@@ -55,12 +55,18 @@ export function useDictCommon() {
     return str.charAt(0).toLowerCase() + str.slice(1)
   }
 
-  const findKey = (obj, targetKey) => {
-    if (!obj || !targetKey) return null
-    if (Object.prototype.hasOwnProperty.call(obj, targetKey)) return targetKey
-    const lowerTarget = targetKey.toLowerCase()
-    return Object.keys(obj).find(k => k.toLowerCase() === lowerTarget) || null
-  }
+const findKey = (obj, targetKey) => {
+  if (!obj || !targetKey) return null
+  // 精确匹配
+  if (Object.prototype.hasOwnProperty.call(obj, targetKey)) return targetKey
+  // 大小写不敏感
+  const lower = targetKey.toLowerCase()
+  const exact = Object.keys(obj).find(k => k.toLowerCase() === lower)
+  if (exact) return exact
+  // ✅ 去下划线匹配
+  const stripped = lower.replace(/_/g, '')
+  return Object.keys(obj).find(k => k.toLowerCase().replace(/_/g, '') === stripped) || null
+}
 
   // 计算填缝 ID (用于新增行时获取最小可用 ID)
   const getNextAvailableId = (list, columns) => {
@@ -179,7 +185,7 @@ export function useDictCommon() {
 
   // 提供重置/取消编辑的公共逻辑
   const resetToSnapshot = (initSnapshot) => {
-    if (dataSnapshot.value) {
+    if (dataSnapshot.value) {       
       tableConfig.value = JSON.parse(JSON.stringify(dataSnapshot.value))
       if (initSnapshot) initSnapshot(tableConfig.value.list || [])
     }

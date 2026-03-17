@@ -142,39 +142,41 @@ const handleSelectChange = (val, row, col) => {
   const ds = col.dataSource || col.DataSource
   
   const options = optionsMap.value[col.prop] || []
-  const selectedOption = options.find(opt => opt.value === val)
+  const selectedOption = options.find(opt => String(opt.value) === String(val))
   
   if (!selectedOption || !selectedOption.__raw) return
 
   const rawData = selectedOption.__raw
 
-  // 自动更新对应的 Long 字段为 code 值
+  // 自动更新对应的 Long 字段为文字（同时支持 Code 和 _CL 结尾的字段）
   const codeProp = col.prop
-  const longProp = codeProp.replace(/Code$/, 'Long')
+  const longProp = codeProp.replace(/Code$|_?CL$/i, 'Long')
   const targetProp = findKey(row, longProp)
   
-  if (targetProp) {
-    // Long 字段也设置为 code 值
-    row[targetProp] = val
+  // 如果当前选中的 option 有 label，我们就把 label 更新给 Long 字段！
+  if (targetProp && selectedOption.label) {
+    row[targetProp] = selectedOption.label
+  } else if (targetProp) {
+    row[targetProp] = val // 兜底：如果没有label，再赋val
   }
+  
+  // ⛔ 注意：这里已经删除了原来那段错误覆盖 row[targetProp] = val 的代码！
 
   // 处理 valueMapping 联动
   const mapping = ds?.valueMapping || ds?.ValueMapping
   if (!mapping || Object.keys(mapping).length === 0) return
 
-  Object.entries(mapping).forEach(([sourceField, targetDbField]) => {
+ Object.entries(mapping).forEach(([targetDbField, sourceField]) => {
     const rawKey = findKey(rawData, sourceField)
     if (!rawKey) return
-
     const sourceValue = rawData[rawKey]
     const targetProp = findKey(row, targetDbField)
-    
     if (targetProp) {
-      if (row[targetProp] !== sourceValue) {
-        row[targetProp] = sourceValue
-      }
+        if (row[targetProp] !== sourceValue) {
+            row[targetProp] = sourceValue
+        }
     }
-  })
+})
 }
 
 // 从后端获取表格数据，包括列配置和数据列表
@@ -212,10 +214,24 @@ const fetchData = async () => {
         }
       }
 
-      // 1. 原有的列映射逻辑 (保持不变)
+      
+      // 1. 原有的列映射逻辑 (修复大小写敏感问题)
       mappedColumns.value = (backendData.columns || []).map(col => {
-        let finalProp = col.prop || col.DbField
-        if (useCamelCase && finalProp) finalProp = toCamelCase(finalProp)
+        let finalProp = col.prop || col.DbField;
+        
+        // 🚨 终极修复：为了绝对安全，我们强制去第一行数据里找真正的 key 名字
+        if (rawRows.length > 0 && finalProp) {
+          const actualKeyInRow = Object.keys(rawRows[0]).find(
+            k => k.toLowerCase() === finalProp.toLowerCase()
+          );
+          if (actualKeyInRow) {
+            finalProp = actualKeyInRow; // 强行使用后端数据里的真实大小写名！
+          } else if (useCamelCase) {
+             finalProp = toCamelCase(finalProp);
+          }
+        } else if (useCamelCase) {
+           finalProp = toCamelCase(finalProp);
+        }
 
         let smartWidth = col.width
         if (!smartWidth && finalProp && finalProp.toLowerCase() === 'id') {
@@ -343,36 +359,33 @@ const toggleEdit = async () => {
         
         await Promise.all(promises)
 
-        // ✅ 修正 Select 列的数据：确保 prop 字段和 long 字段的值都是正确的 code 值
+        // ✅ 修正 Select 列的数据：解决 Number 和 String 类型不匹配导致的 el-select 回显 ID 问题
         selectColumns.forEach(col => {
           const options = optionsMap.value[col.prop] || []
-          const ds = col.dataSource || col.DataSource
-          // 只有当ds存在时才获取labelField
-          const labelField = ds ? (ds.labelField || ds.LabelField) : undefined
           
           tableConfig.value.list.forEach(row => {
             const currentValue = row[col.prop]
             if (currentValue === undefined || currentValue === null || currentValue === '') return
             
-            // 先尝试在 value 中查找
-            let matchedOption = options.find(opt => opt.value === currentValue)
+            // 1. 宽松匹配：使用 String() 包裹，忽略数字和字符串的类型差异 (例如让 12 等于 "12")
+            let matchedOption = options.find(opt => String(opt.value) === String(currentValue))
             
             if (!matchedOption) {
-              // 如果当前值不在 value 中，尝试在 label 中查找
+              // 2. 兜底匹配：如果 ID 没匹配上，尝试看能不能通过中文 Label 匹配
               matchedOption = options.find(opt => opt.label === currentValue)
-              if (matchedOption) {
-                // 修正为正确的 value (code)
-                row[col.prop] = matchedOption.value
-              }
             }
             
-            // 无论是否修正，都要同步 long 字段为 code 值
             if (matchedOption) {
+              // 3. 核心修复：强制把行数据里的值，重写为下拉选项的标准值（统一数据类型！）
+              row[col.prop] = matchedOption.value
+              
+              // 4. 同时确保 _CL 对应的 Long 字段存的是中文文本
               const codeProp = col.prop
-              const longProp = codeProp.replace(/Code$/, 'Long')
+              const longProp = codeProp.replace(/Code$|_?CL$/i, 'Long')
               const targetProp = findKey(row, longProp)
-              if (targetProp) {
-                row[targetProp] = matchedOption.value
+              
+              if (targetProp && matchedOption.label) {
+                row[targetProp] = matchedOption.label
               }
             }
           })
@@ -826,14 +839,35 @@ const handleCurrentChange = (current) => {
 }
 
 // 获取下拉框显示的label值
-const getSelectLabel = (col, value) => {
+const getSelectLabel = (col, value, row) => {
   if (value === undefined || value === null || value === '') {
     return ''
   }
   
+  // 1. 如果 optionsMap 中已经加载了字典选项（编辑模式）
   const options = optionsMap.value[col.prop] || []
-  const option = options.find(opt => opt.value === value)
-  return option ? option.label : value
+  const option = options.find(opt => String(opt.value) === String(value))
+  if (option && option.label) {
+    return option.label
+  }
+  
+  // 2. 非编辑状态，去 row 里面找 Long 结尾的字段
+  if (row) {
+    // 假设 col.prop 是 GeometricIndustryStandard_CL
+    // 我们把它变成 geometricIndustryStandardLong (忽略大小写去找)
+    let autoLongProp = col.prop.replace(/_?CL$/i, 'Long');
+    
+    // 安全地找 Key，忽略大小写
+    let actualKey = Object.keys(row).find(k => k.toLowerCase() === autoLongProp.toLowerCase());
+    
+    // 如果找到了，并且值是个字符串（排除奇怪的对象或数组）
+    if (actualKey && typeof row[actualKey] === 'string' && row[actualKey].trim() !== '') {
+      return row[actualKey];
+    }
+  }
+
+  // 3. 兜底，实在没辙就显示原值
+  return String(value);
 }
 
 const openAddColumnDialog = () => {
@@ -1068,6 +1102,9 @@ const filterHandler = (value, row, column) => {
                    <el-tag v-if="col.type === 'switch'" type="info" size="small" effect="plain">
                       {{ scope.row[col.prop] ? '是' : '否' }}
                    </el-tag>
+                   <span v-else-if="col.type === 'select'">
+                {{ getSelectLabel(col, scope.row[col.prop], scope.row) }}
+              </span>
                    <span v-else>{{ scope.row[col.prop] }}</span>
                 </span>
               </template>
@@ -1084,7 +1121,7 @@ const filterHandler = (value, row, column) => {
                 style="--el-switch-off-color: #dcdfe6;"
               />
               <span v-else-if="col.type === 'select'">
-                {{ getSelectLabel(col, scope.row[col.prop]) }}
+                {{ getSelectLabel(col, scope.row[col.prop], scope.row) }}
               </span>
               <span v-else>{{ scope.row[col.prop] }}</span>
             </span>
