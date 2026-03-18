@@ -2,8 +2,54 @@
  * src/composables/useDictCommon.js
  * 封装数据字典表格的公共状态和通用逻辑
  */
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import axios from 'axios'
+
+export function useDictTableView({ tableConfig, searchKeyword, optionsMap }) {
+  const filterHandler = (value, row, column) => {
+    const property = column?.property
+    return row?.[property] === value
+  }
+
+  const getColumnFilters = (col) => {
+    const list = tableConfig.value?.list || []
+    const uniqueVals = new Set()
+
+    list.forEach(row => {
+      const val = row?.[col.prop]
+      if (val !== null && val !== undefined && String(val).trim() !== '') {
+        uniqueVals.add(val)
+      }
+    })
+
+    return Array.from(uniqueVals).map(val => {
+      let text = String(val)
+      if (col.type === 'switch') {
+        text = val ? '是' : '否'
+      } else if (col.type === 'select') {
+        const opts = optionsMap.value?.[col.prop] || []
+        const option = opts.find(opt => String(opt.value) === String(val))
+        if (option?.label) text = option.label
+      }
+      return { text, value: val }
+    })
+  }
+
+  const filteredData = computed(() => {
+    const rawData = tableConfig.value?.list || []
+    const keyword = (searchKeyword.value || '').trim().toLowerCase()
+    if (!keyword) return rawData
+    return rawData.filter(row =>
+      Object.values(row || {}).some(val => String(val ?? '').toLowerCase().includes(keyword))
+    )
+  })
+
+  return {
+    displayData: filteredData,
+    getColumnFilters,
+    filterHandler
+  }
+}
 
 export function useDictCommon() {
   // ==========================

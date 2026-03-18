@@ -1,9 +1,9 @@
 <script setup>
-import { ref, watch, onMounted, computed, reactive } from 'vue'
+import { ref, watch, onMounted, reactive } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDirtyData } from '@/hooks/useDirtyData'
-import { useDictCommon } from '@/composables/useDictCommon'
+import { useDictCommon, useDictTableView } from '@/composables/useDictCommon'
 
 // 缓存管理函数
 const getCache = (key) => {
@@ -81,11 +81,6 @@ const { initSnapshot, isModified } = useDirtyData()
 const componentTypeList = ref([]) // 存储组件类型数据
 const mappedColumns = ref([]) // 存储原始列配置，用于判断哪些列是JsonData中的列
 
-// 分页相关状态
-const currentPage = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-
 const {
   tableConfig, loading, isEdit, searchKeyword, selectedRows,
   dataSnapshot, optionsMap, loadingOptions,
@@ -94,6 +89,11 @@ const {
   getVisibleOptions, fetchSharedOptions
 } = useDictCommon()
 
+const { displayData, getColumnFilters, filterHandler } = useDictTableView({
+  tableConfig,
+  searchKeyword,
+  optionsMap
+})
 
 
 
@@ -295,10 +295,6 @@ const fetchData = async () => {
         list: formattedRows
       }
 
-      // 重置分页状态
-      currentPage.value = 1
-      total.value = formattedRows.length
-
       tableKey.value++
       
       dataSnapshot.value = JSON.parse(JSON.stringify(tableConfig.value))
@@ -405,14 +401,8 @@ const toggleEdit = async () => {
 // 取消编辑操作，恢复数据并重新获取后端最新数据
 const handleCancel = async () => {
   if (dataSnapshot.value) {
-    // 保存当前页码，以便恢复后保持原位
-    const currentPageNum = currentPage.value
-    
     // 重新调用后端查询列表接口获取最新数据
     await fetchData()
-    
-    // 恢复到之前的页码
-    currentPage.value = currentPageNum
   }
   isEdit.value = false
   selectedRows.value = [] 
@@ -430,19 +420,6 @@ const handleAddRow = async () => {
   
   // 2. 🟢 核心算法：寻找当前 ID 序列中的“最小空缺值”
   const nextId = getNextAvailableId(tableConfig.value.list, tableConfig.value.columns)
-  if (pkCol) {
-    // 提取当前表格里的所有合法正整数 ID，并放入 Set 中（查询速度 O(1)）
-    const existingIds = tableConfig.value.list
-      .map(r => Number(r[pkCol.prop])) 
-      .filter(n => !isNaN(n) && n > 0) 
-      
-    const idSet = new Set(existingIds)
-    
-    // 从 1 开始往上数，只要集合里有这个数字，就看下一个，直到找到第一个没有的！
-    while (idSet.has(nextId)) {
-      nextId++
-    }
-  }
 
   // 3. 确保组件类型数据已加载
   if (props.dictId.startsWith('part-')) {
@@ -828,16 +805,6 @@ const handleSave = async () => {
   }
 }
 
-// 分页事件处理函数
-const handleSizeChange = (size) => {
-  pageSize.value = size
-  currentPage.value = 1 // 重置到第一页
-}
-
-const handleCurrentChange = (current) => {
-  currentPage.value = current
-}
-
 // 获取下拉框显示的label值
 const getSelectLabel = (col, value, row) => {
   if (value === undefined || value === null || value === '') {
@@ -938,59 +905,7 @@ const submitAddColumn = () => {
   // 重新生成表格key，强制重新渲染
   tableKey.value++
 }
-// 计算属性：处理表格数据的搜索过滤和分页显示
-const displayData = computed(() => {
-  const rawData = tableConfig.value.list || [] 
-  const keyword = searchKeyword.value.trim().toLowerCase()
-  let filteredData = rawData
-  
-  // 搜索过滤
-  if (keyword) {
-    filteredData = rawData.filter(row => 
-      Object.values(row).some(val => String(val).toLowerCase().includes(keyword))
-    )
-  }
-  
-  // 更新总条数
-  total.value = filteredData.length
-  
-  // 分页处理
-  const startIndex = (currentPage.value - 1) * pageSize.value
-  const endIndex = startIndex + pageSize.value
-  return filteredData.slice(startIndex, endIndex)
-})
-
-// ─────────────────────────────────────────────
-// ✅ 原生列头筛选逻辑
-// ─────────────────────────────────────────────
-const getColumnFilters = (col) => {
-  const list = tableConfig.value.list || []
-  const uniqueVals = new Set()
-  list.forEach(row => {
-    const val = row[col.prop]
-    if (val !== null && val !== undefined && String(val).trim() !== '') {
-      uniqueVals.add(val)
-    }
-  })
-  return Array.from(uniqueVals).map(val => {
-    let text = String(val)
-    if (col.type === 'switch') {
-      text = val ? '是' : '否'
-    } else if (col.type === 'select') {
-      const options = optionsMap.value[col.prop] || []
-      const option = options.find(opt => opt.value === val)
-      if (option && option.label) {
-        text = option.label
-      }
-    }
-    return { text, value: val }
-  })
-}
-
-const filterHandler = (value, row, column) => {
-  const property = column['property']
-  return row[property] === value
-}
+// displayData / getColumnFilters / filterHandler 已由 useDictTableView 提供
 </script>
 
 <template>
@@ -1129,20 +1044,7 @@ const filterHandler = (value, row, column) => {
         </el-table-column>
       </template>
     </el-table>
-    
-    <!-- 分页组件 -->
-    <div class="pagination-container" style="margin-top: 16px; display: flex; justify-content: flex-end; align-items: center;">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="total"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
-    
+
     <el-dialog v-model="addColVisible" title="添加自定义列" width="400px" append-to-body>
       <el-form label-position="top">
         <el-form-item label="列名称 (中文标题)">

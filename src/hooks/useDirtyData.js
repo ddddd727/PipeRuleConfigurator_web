@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { cloneDeep } from 'lodash-es'
+import { cloneDeep, isEqualWith } from 'lodash-es'
 
 /**
  * 脏数据检测 Hook (修复版)
@@ -11,9 +11,21 @@ export function useDirtyData() {
   const originalDataMap = ref(new Map())
 
   // 辅助函数：智能获取 ID (兼容后端各种大小写返回)
-  const getId = (row) => {
+  const getIdKey = (row) => {
     if (!row) return null
-    return row.id || row.Id || row.ID
+
+    // 常见命名
+    const direct = row.id ?? row.Id ?? row.ID
+    if (direct !== undefined && direct !== null && direct !== '') return String(direct)
+
+    // 兜底：按 key 名称大小写不敏感找 "id"
+    const idProp = Object.keys(row).find(k => k.toLowerCase() === 'id')
+    if (idProp) {
+      const val = row[idProp]
+      if (val !== undefined && val !== null && val !== '') return String(val)
+    }
+
+    return null
   }
 
   // 1. 初始化快照 (在获取数据成功、或保存成功后调用)
@@ -22,7 +34,7 @@ export function useDirtyData() {
     if (!dataList || !Array.isArray(dataList)) return
 
     dataList.forEach(row => {
-      const id = getId(row)
+      const id = getIdKey(row)
       // 只有已有 ID 的行才建立快照，新增行(无ID或临时ID)不需要
       if (id !== undefined && id !== null && !row._isNew) {
         originalDataMap.value.set(id, cloneDeep(row))
@@ -38,7 +50,7 @@ export function useDirtyData() {
     // 新增行不视为“脏数据”（它直接走新增接口，不需要比对）
     if (!row || row._isNew) return false
 
-    const id = getId(row)
+    const id = getIdKey(row)
     const originalRow = originalDataMap.value.get(id)
 
     // 如果找不到原始数据（可能是快照没初始化好），视为未修改，防止误操作
@@ -61,8 +73,28 @@ export function useDirtyData() {
 
   // 辅助对比函数
   const compareValues = (oldVal, newVal) => {
-    // 统一转字符串比对，避免 100 和 "100" 被算作修改
-    // 处理 null/undefined 转空字符串
+    // 对象/数组需要深比较，否则像 JsonData 这类嵌套结构的修改会被漏检
+    const isObj = (v) => v !== null && typeof v === 'object'
+
+    // null/undefined 视为同类空值
+    if (oldVal == null && newVal == null) return false
+
+    // 对象/数组：深比较；对原子值：按字符串比较，避免 100 vs "100" 被误判为修改
+    if (isObj(oldVal) || isObj(newVal)) {
+      const equal = isEqualWith(oldVal, newVal, (a, b) => {
+        const aIsObj = isObj(a)
+        const bIsObj = isObj(b)
+        if (!aIsObj && !bIsObj) {
+          const s1 = (a === null || a === undefined) ? '' : String(a)
+          const s2 = (b === null || b === undefined) ? '' : String(b)
+          return s1 === s2
+        }
+        // 其它情况交给 lodash 继续递归
+        return undefined
+      })
+      return !equal
+    }
+
     const s1 = (oldVal === null || oldVal === undefined) ? '' : String(oldVal)
     const s2 = (newVal === null || newVal === undefined) ? '' : String(newVal)
     return s1 !== s2

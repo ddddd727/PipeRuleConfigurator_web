@@ -5,7 +5,7 @@ import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import { useDirtyData } from '@/hooks/useDirtyData'
-import { useDictCommon } from '@/composables/useDictCommon'
+import { useDictCommon, useDictTableView } from '@/composables/useDictCommon'
 
 const props = defineProps({
   dictId: { type: String, required: true }
@@ -27,42 +27,11 @@ const {
 toCamelCase
 // ...existing code...
 
-// ─────────────────────────────────────────────
-// ✅ 原生列头筛选逻辑
-// ─────────────────────────────────────────────
-// 1. 动态生成每一列的筛选项 (提取该列出现过的所有不重复的值)
-const getColumnFilters = (col) => {
-  // 如果后端配置了该列不可筛选，可以直接返回 undefined（可选）
-  // if (!col.isFilterable) return undefined
-
-  const list = tableConfig.value.list || []
-  const uniqueVals = new Set()
-  
-  list.forEach(row => {
-    const val = row[col.prop]
-    // 过滤掉空值，不作为筛选项
-    if (val !== null && val !== undefined && String(val).trim() !== '') {
-      uniqueVals.add(val)
-    }
-  })
-
-  return Array.from(uniqueVals).map(val => {
-    let text = String(val)
-    // 针对 switch 类型做文本友好显示
-    if (col.type === 'switch') {
-      text = val ? '是' : '否'
-    }
-    // 注意：如果是 select 类型，由于非编辑模式下 optionsMap 可能未加载，默认显示 value。
-    // 如果想要显示 label，可以通过 optionsMap 匹配。
-    return { text, value: val }
-  })
-}
-
-// 2. 原生筛选比对方法
-const filterHandler = (value, row, column) => {
-  const property = column['property']
-  return row[property] === value
-}
+const { displayData, getColumnFilters, filterHandler } = useDictTableView({
+  tableConfig,
+  searchKeyword,
+  optionsMap
+})
 // ✅ VisibleWhen 条件求值
 const evaluateCondition = (rule, row) => {
   if (!rule) return true
@@ -514,17 +483,7 @@ const submitAddColumn = async () => {
   }
 }
 
-// ─────────────────────────────────────────────
-// 搜索过滤
-// ─────────────────────────────────────────────
-const displayData = computed(() => {
-  const rawData = tableConfig.value.list || []
-  const keyword = searchKeyword.value.trim().toLowerCase()
-  if (!keyword) return rawData
-  return rawData.filter(row =>
-    Object.values(row).some(val => String(val ?? '').toLowerCase().includes(keyword))
-  )
-})
+// displayData 已由 useDictTableView 提供（搜索过滤）
 
 // ─────────────────────────────────────────────
 // ✅ 权限计算属性（从 meta 读取）
