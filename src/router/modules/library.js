@@ -3,15 +3,38 @@ import MainLayout from '@/layout/MainLayout.vue'
 export default {
   path: '/library',
   component: MainLayout,
-  meta: { title: '基础库', icon: 'Box' }, // 对应截图名称
-  redirect: '/library/index',
+  meta: { title: '基础库', icon: 'Box' },
+  redirect: '/library/pipe',
   children: [
     {
-      path: 'index',
-      name: 'BasicLibrary',
-      // 如果没有这个页面，先用个临时组件占位，或者指向 BasicClass
+      path: 'codelist',
+      name: 'CodelistLibrary',
+      component: () => import('@/views/BasicLibrary.vue'),
+      meta: { title: 'Codelist管理', icon: 'Menu', keepAlive: true }
+    },
+    {
+      path: 'pipe',
+      name: 'PipeLibrary',
       component: () => import('@/views/BasicLibrary.vue'), 
-      meta: { title: '基础库列表' }
+      meta: { title: '管系专业', icon: 'Menu', keepAlive: true }
+    },
+    {
+      path: 'duct',
+      name: 'DuctLibrary',
+      component: () => import('@/views/BasicLibrary.vue'), 
+      meta: { title: '风管专业', icon: 'Menu', keepAlive: true }
+    },
+    {
+      path: 'electrical',
+      name: 'ElectricalLibrary',
+      component: () => import('@/views/BasicLibrary.vue'), 
+      meta: { title: '电气专业', icon: 'Menu', keepAlive: true }
+    },
+    {
+      path: 'outfitting',
+      name: 'OutfittingLibrary',
+      component: () => import('@/views/BasicLibrary.vue'), 
+      meta: { title: '铁舾&内装专业', icon: 'Menu', keepAlive: true }
     }
   ]
 }

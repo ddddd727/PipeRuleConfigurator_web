@@ -10,7 +10,7 @@ export default {
       path: 'index',
       name: 'PmcCode',
       component: () => import('@/views/PmcCode.vue'),
-      meta: { title: 'PMC规则' }
+      meta: { title: 'PMC规则', keepAlive: true }
     }
   ]
 }

@@ -20,26 +20,38 @@
     <div class="preview-content">
       <!-- 暂时空白占位，用于展示管系规格书内容 -->
       <div class="preview-placeholder">
-        <ExcelPreview :template-id="selectedTemplate" />
+        <ExcelPreview :template-id="props.templateId" :params="previewParams" />
       </div>
     </div>
   </el-dialog>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import ExcelPreview from '@/components/excel/ExcelPreview.vue'
 
 const props = defineProps({
   modelValue: {
     type: Boolean,
     default: false
+  },
+  pmcCode: {
+    type: String,
+    default: ''
+  },
+  templateId: {
+    type: String,
+    default: 'Pipe-Spec'
   }
 })
 
 const emit = defineEmits(['update:modelValue'])
 
-const selectedTemplate = ref('PipeSpecExample')
+const previewParams = computed(() => {
+  return {
+    pmcCode: props.pmcCode
+  }
+})
 
 const isVisible = computed({
   get() {

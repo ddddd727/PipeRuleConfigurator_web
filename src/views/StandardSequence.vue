@@ -364,6 +364,7 @@
   </div>
 </template>
 <script setup>
+defineOptions({ name: 'StandardSequence' })
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 

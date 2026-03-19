@@ -8,8 +8,19 @@
     <template #title>
       <div style="display:flex; align-items:center; gap:12px;">
         <span>{{ buttonLabel ? buttonLabel + ' - ' : '' }}标准文件选择与配置</span>
-        <el-select v-model="form.partType" placeholder="部件类型" size="small" style="width:160px">
-          <el-option v-for="pt in partTypes" :key="pt" :label="pt" :value="pt" />
+        <el-select 
+          v-model="form.componentTypeId" 
+          placeholder="部件类型" 
+          size="small" 
+          style="width:160px"
+          @change="handleComponentTypeChange"
+        >
+          <el-option 
+            v-for="pt in partTypes" 
+            :key="pt.id" 
+            :label="pt.componentTypeDescription || pt.componentTypeName" 
+            :value="pt.id" 
+          />
         </el-select>
       </div>
     </template>
@@ -19,159 +30,68 @@
       :rules="rules"
       label-width="120px"
       label-position="right">
-      <!-- 标准文件选择 -->
-      <el-form-item label="标准文件：">
+      <!-- 标准选择 -->
+      <el-form-item label="标准：" prop="standardNames">
         <el-select
-          v-model="form.standardFileIds"
+          v-model="form.standardNames"
           multiple
           filterable
           collapse-tags
           collapse-tags-tooltip
-          placeholder="请选择标准文件"
+          placeholder="请选择标准"
           style="width: 100%"
           :teleported="false"
-          @change="handleStandardFileChange"
-          :loading="standardFilesLoading"
-          :disabled="!form.partType"
+          @change="handleStandardChange"
+          :loading="specsLoading"
+          :disabled="!form.componentTypeId"
         >
           <el-option
-            v-for="file in standardFilesList"
-            :key="file.id"
-            :label="file.code"
-            :value="file.id"
+            v-for="spec in pipeFittingSpecs"
+            :key="spec.standardName"
+            :label="spec.standardName"
+            :value="spec.standardName"
           />
         </el-select>
-        <div class="tip-text" v-if="!form.partType">请先选择部件类型，再选择标准文件</div>
-        <div class="tip-text" v-else>可多选，已选择 {{ form.standardFileIds.length }} 个文件</div>
+        <div class="tip-text" v-if="!form.componentTypeId">请先选择部件类型，再选择标准</div>
+        <div class="tip-text" v-else>可多选，已选择 {{ form.standardNames.length }} 个标准</div>
       </el-form-item>
 
-      <!-- 标准文件与NPD范围对应关系配置 -->
-      <el-form-item label="NPD范围配置：" v-if="form.partType && form.standardFileConfigurations.length > 0">
+      <!-- 标准对应材料配置 -->
+      <el-form-item label="材料配置：" v-if="form.componentTypeId && form.standardConfigurations.length > 0">
         <div class="configuration-container">
-          <div v-for="config in form.standardFileConfigurations" :key="config.standardFile" class="config-item">
-            <div class="config-file-info">
-              <el-tag size="small" type="info">{{ getStandardFileName(config.standardFile) }}</el-tag>
+          <div v-for="config in form.standardConfigurations" :key="config.standardName" class="config-item" style="margin-bottom: 10px; display: flex; align-items: center;">
+            <div class="config-file-info" style="width: 120px; margin-right: 10px;">
+              <el-tag size="small" type="info">{{ config.standardName }}</el-tag>
             </div>
-            <div class="config-controls">
+            <div class="config-controls" style="display: flex; align-items: center;">
               <div class="material-selector">
                 <el-select
-                  v-model="config.material"
+                  v-model="config.materialName"
                   placeholder="选择材料"
-                  style="width: 150px; margin-right: 10px"
+                  style="width: 200px"
                 >
                   <el-option
-                    v-for="material in props.materials"
-                    :key="material.id"
-                    :label="material.name"
-                    :value="material.id"
+                    v-for="material in getMaterialsForStandard(config.standardName)"
+                    :key="material"
+                    :label="material"
+                    :value="material"
                   />
                 </el-select>
               </div>
-              <div class="npd-range-selectors">
-                <el-select
-                  v-model="config.minNpdValue"
-                  placeholder="选择最小NPD"
-                  style="width: 120px; margin-right: 10px"
-                >
-                  <el-option
-                    v-for="value in npdValues"
-                    :key="value"
-                    :label="`${value} mm`"
-                    :value="value"
-                  />
-                </el-select>
-                <span class="range-separator">-</span>
-                <el-select
-                  v-model="config.maxNpdValue"
-                  placeholder="选择最大NPD"
-                  style="width: 120px; margin-left: 10px"
-                >
-                  <el-option
-                    v-for="value in npdValues"
-                    :key="value"
-                    :label="`${value} mm`"
-                    :value="value"
-                  />
-                </el-select>
-              </div>
-              <div class="bend-radius-multiple" v-if="form.partType === 'Bend'">
-                <el-input
-                  v-model="config.bendRadiusMultiple"
-                  placeholder="弯管半径倍数"
-                  style="width: 150px"
-                />
-              </div>
-            </div>
-            <div class="bend-radius-hint" v-if="form.partType === 'Bend'">填写的值为弯管半径的倍数</div>
-          </div>
-        </div>
-        <div class="tip-text">请为每个选择的标准文件配置对应的NPD范围</div>
-      </el-form-item>
-
-      <!-- 重复通径范围配置 -->
-      <el-form-item label="重复通径范围：" v-if="form.partType && duplicateRanges.length > 0">
-        <div class="duplicate-ranges-container">
-          <div v-for="duplicate in duplicateRanges" :key="duplicate.rangeKey" class="duplicate-range-item">
-            <div class="duplicate-range-info">
-              <el-tag type="warning" size="small">
-                重叠区域：{{ duplicate.overlapMin }} mm - {{ duplicate.overlapMax }} mm
-              </el-tag>
-              <span class="duplicate-count">（{{ duplicate.standardFiles.length }} 个标准文件）</span>
-            </div>
-            <div class="duplicate-ranges-list">
-              <span class="duplicate-label">涉及的范围：</span>
-              <div class="ranges-list">
-                <el-tag
-                  v-for="(range, idx) in duplicate.ranges"
-                  :key="`${range.standardFile}-${idx}`"
-                  size="small"
-                  type="info"
-                  style="margin-right: 8px; margin-bottom: 4px"
-                >
-                  {{ getStandardFileName(range.standardFile) }}: {{ range.minNpdValue }} mm - {{ range.maxNpdValue }} mm
-                </el-tag>
-              </div>
-            </div>
-            <div class="duplicate-standard-files">
-              <span class="duplicate-label">涉及的标准文件：</span>
-              <el-tag
-                v-for="fileId in duplicate.standardFiles"
-                :key="fileId"
-                size="small"
-                type="info"
-                style="margin-right: 8px; margin-bottom: 4px"
-              >
-                {{ getStandardFileName(fileId) }}
-              </el-tag>
-            </div>
-            <div class="default-standard-selector">
-              <span class="duplicate-label">默认匹配标准：</span>
-              <el-select
-                :model-value="duplicate.defaultStandardFileId"
-                @update:model-value="(val) => updateDuplicateRangeDefault(duplicate.rangeKey, val)"
-                placeholder="请选择默认标准文件"
-                style="width: 200px"
-              >
-                <el-option
-                  v-for="fileId in duplicate.standardFiles"
-                  :key="fileId"
-                  :label="getStandardFileName(fileId)"
-                  :value="fileId"
-                />
-              </el-select>
+              <!-- 根据简化契约，移除弯管半径倍数配置 -->
             </div>
           </div>
         </div>
-        <div class="tip-text warning-text">检测到多个标准文件配置了重叠的通径范围，请为每个重叠范围选择默认匹配的标准文件</div>
       </el-form-item>
     </el-form>
 
     <template #footer>
       <span class="dialog-footer">
-        <el-button @click="handleClose">取消</el-button>
         <el-button type="primary" @click="handleSubmit" :loading="submitting">
           确认提交
         </el-button>
+        <el-button @click="handleReset" type="warning" plain style="float: left">重置配置</el-button>
+        <el-button @click="handleClose">取消</el-button>
       </span>
     </template>
   </el-dialog>
@@ -180,21 +100,18 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { pipeSpecConfigStore } from '@/constants/PipeSpec-item'
 
 const props = defineProps({
   modelValue: Boolean,
-  pathRanges: {
-    type: Array,
-    default: () => []
-  },
   buttonLabel: {
     type: String,
     default: ''
   },
-  materials: {
-    type: Array,
-    default: () => []
+  initialConfig: {
+    type: Object,
+    default: null
   }
 })
 
@@ -205,220 +122,116 @@ const dialogVisible = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
-// 表单数据 - 支持标准文件与NPD范围的一一对应
-const form = ref({
-  standardFileIds: [], // 选择的标准文件ID数组
-  standardFileConfigurations: [], // 每个元素包含standardFile、minNpdValue和maxNpdValue
-  partType: '',
-  duplicateRangeDefaults: [] // 存储重复通径范围的默认标准文件选择
-})
-
-// 表单验证规则
-const rules = {
-  standardFileIds: [
-    { required: true, message: '请选择标准文件', trigger: 'change' }
-  ]
-}
-
-// 标准文件列表
-const standardFilesList = ref([])
-const standardFilesLoading = ref(false)
-
-// 获取标准文件列表
-const fetchStandardFiles = async () => {
-  if (!form.value.partType) {
-    standardFilesList.value = []
-    return
-  }
-  standardFilesLoading.value = true
-  try {
-    const res = await axios.get('/api/pipe-spec/standard-files', {
-      params: { partType: form.value.partType }
-    })
-    if (res.data.code === 200) {
-      standardFilesList.value = res.data.data
-    } else {
-      ElMessage.error(res.data.msg || '获取标准文件列表失败')
-    }
-  } catch (error) {
-    console.error('获取标准文件列表错误:', error)
-    ElMessage.error('网络错误，获取标准文件列表失败')
-  } finally {
-    standardFilesLoading.value = false
-  }
-}
-
-// 获取所有可用的NPD值（从pathRanges中提取并去重）
-const npdValues = computed(() => {
-  const valueSet = new Set()
-  props.pathRanges.forEach(range => {
-    valueSet.add(range.minSize)
-    if (range.maxSize !== range.minSize) {
-      valueSet.add(range.maxSize)
-    }
+// 表单数据
+  const form = ref({
+    standardNames: [], // 选择的标准名称数组
+    standardConfigurations: [], // 每个元素包含standardName、materialName等
+    componentTypeId: null, // 部件类型ID
+    partType: '' // 部件类型名称（兼容旧逻辑）
   })
-  // 按升序排序
-  return Array.from(valueSet).sort((a, b) => a - b)
-})
 
-// 获取最小和最大NPD值
-const minNpdValue = computed(() => {
-  const values = npdValues.value
-  return values.length > 0 ? values[0] : null
-})
+  // 表单验证规则
+  const rules = {
+    componentTypeId: [
+      { required: true, message: '请选择部件类型', trigger: 'change' }
+    ],
+    standardNames: [
+      { required: true, message: '请选择标准', trigger: 'change' }
+    ]
+  }
 
-const maxNpdValue = computed(() => {
-  const values = npdValues.value
-  return values.length > 0 ? values[values.length - 1] : null
-})
+  // 标准规格列表 (包含标准名)
+  const pipeFittingSpecs = ref([])
+  const specsLoading = ref(false)
 
-// 处理标准文件选择变化
-const handleStandardFileChange = (value) => {
+  // 材料列表 (从后端获取的统一列表)
+  const materialsList = ref([])
+
+  // 获取材料列表
+  const fetchMaterials = async () => {
+    try {
+      const res = await axios.get('/api/PmcSpec/MaterialsGrades')
+      if (res.data.code === 200) {
+        materialsList.value = res.data.data || []
+      } else {
+        ElMessage.error(res.data.message || '获取材料列表失败')
+      }
+    } catch (error) {
+      console.error('获取材料列表错误:', error)
+      ElMessage.error('网络错误，获取材料列表失败')
+    }
+  }
+
+  // 获取管附件规格列表
+  const fetchPipeFittingSpecs = async () => {
+    if (!form.value.componentTypeId) {
+      pipeFittingSpecs.value = []
+      return
+    }
+    specsLoading.value = true
+    try {
+      const res = await axios.get('/api/PmcSpec/PipeFittingSpec', {
+        params: { 
+          componentTypeId: form.value.componentTypeId,
+          componentTypeName: form.value.partType // 兼容性保留
+        }
+      })
+      if (res.data.code === 200) {
+        // 后端返回的是字符串数组，需转换为对象结构以保持兼容
+        const standards = res.data.data || []
+        pipeFittingSpecs.value = standards.map(std => ({
+          standardName: std,
+          // materialList 不再从此处获取，而是使用统一的 materialsList
+        }))
+      } else {
+        ElMessage.error(res.data.message || '获取管附件规格失败')
+      }
+    } catch (error) {
+      console.error('获取管附件规格错误:', error)
+      ElMessage.error('网络错误，获取管附件规格失败')
+    } finally {
+      specsLoading.value = false
+    }
+  }
+
+// NPD logic removed
+
+// 处理标准选择变化
+const handleStandardChange = (value) => {
   if (!form.value.partType) {
-    form.value.standardFileIds = []
-    form.value.standardFileConfigurations = []
+    form.value.standardNames = []
+    form.value.standardConfigurations = []
     return
   }
-  // 更新选择的文件ID数组
-  form.value.standardFileIds = value
+  // 更新选择的标准名称数组
+  form.value.standardNames = value
   
-  // 初始化标准文件配置
+  // 初始化标准配置
   const newConfigurations = []
   
   // 保留已存在的配置
-  value.forEach(fileId => {
-    const existingConfig = form.value.standardFileConfigurations.find(config => config.standardFile === fileId)
+  value.forEach(stdName => {
+    const existingConfig = form.value.standardConfigurations.find(config => config.standardName === stdName)
     if (existingConfig) {
       newConfigurations.push(existingConfig)
     } else {
+      // 查找对应标准的默认材料（取全局材料列表第一个）
+      const defaultMaterial = materialsList.value.length > 0 ? materialsList.value[0] : ''
+      
       newConfigurations.push({
-        standardFile: fileId,
-        material: props.materials.length > 0 ? props.materials[0].id : null,
-        minNpdValue: minNpdValue.value,
-        maxNpdValue: maxNpdValue.value,
-        bendRadiusMultiple: null
+        standardName: stdName,
+        materialName: defaultMaterial
       })
     }
   })
   
-  form.value.standardFileConfigurations = newConfigurations
+  form.value.standardConfigurations = newConfigurations
 }
 
-// 标准文件ID -> 名称映射，减少重复查找
-const standardFilesMap = computed(() => {
-  const map = new Map()
-  standardFilesList.value.forEach(file => {
-    map.set(file.id, file.code)
-  })
-  return map
-})
-
-// 获取标准文件名称
-const getStandardFileName = (fileId) => {
-  return standardFilesMap.value.get(fileId) || ''
+// 获取指定标准的材料列表（统一使用全局材料列表）
+const getMaterialsForStandard = (standardName) => {
+  return materialsList.value
 }
-
-// 存储重复范围的默认标准文件选择（key: "minNpdValue-maxNpdValue", value: defaultStandardFileId）
-const duplicateRangeDefaultsMap = ref({})
-
-// 检查一个范围是否覆盖了某个区间
-const rangeCovers = (rangeMin, rangeMax, intervalMin, intervalMax) => {
-  // 范围覆盖区间，当且仅当：rangeMin <= intervalMin && rangeMax >= intervalMax
-  return rangeMin <= intervalMin && rangeMax >= intervalMax
-}
-
-// 检测重复的通径范围（找出所有有多个标准覆盖的子区间）
-const duplicateRanges = computed(() => {
-  // 收集所有有效的配置
-  const validConfigs = form.value.standardFileConfigurations.filter(
-    config => config.minNpdValue !== null && config.maxNpdValue !== null
-  )
-  
-  if (validConfigs.length < 2) {
-    return []
-  }
-  
-  // 找出所有范围的端点（最小值和最大值）
-  const endpoints = new Set()
-  validConfigs.forEach(config => {
-    endpoints.add(config.minNpdValue)
-    endpoints.add(config.maxNpdValue)
-  })
-  
-  // 将端点排序
-  const sortedEndpoints = Array.from(endpoints).sort((a, b) => a - b)
-  
-  // 找出所有有多个标准覆盖的区间
-  const duplicateIntervals = []
-  
-  // 遍历每两个相邻端点之间的区间
-  for (let i = 0; i < sortedEndpoints.length - 1; i++) {
-    const intervalMin = sortedEndpoints[i]
-    const intervalMax = sortedEndpoints[i + 1]
-    
-    // 检查哪些标准文件覆盖了这个区间
-    const coveringStandards = validConfigs.filter(config => 
-      rangeCovers(config.minNpdValue, config.maxNpdValue, intervalMin, intervalMax)
-    )
-    
-    // 只保留有2个或以上标准文件覆盖的区间
-    if (coveringStandards.length >= 2) {
-      // 收集涉及的标准文件ID
-      const standardFiles = [...new Set(coveringStandards.map(c => c.standardFile))]
-      
-      // 收集涉及的范围（用于显示）
-      const ranges = coveringStandards.map(c => ({
-        minNpdValue: c.minNpdValue,
-        maxNpdValue: c.maxNpdValue,
-        standardFile: c.standardFile
-      }))
-      
-      // 生成唯一标识
-      const rangeKey = `${intervalMin}-${intervalMax}-${[...standardFiles].sort().join(',')}`
-      
-      duplicateIntervals.push({
-        overlapMin: intervalMin,
-        overlapMax: intervalMax,
-        standardFiles,
-        ranges,
-        rangeKey
-      })
-    }
-  }
-  
-  // 为每个重叠区间添加默认标准文件ID
-  return duplicateIntervals.map(interval => {
-    const rangeKey = interval.rangeKey
-    let defaultStandardFileId = duplicateRangeDefaultsMap.value[rangeKey]
-    
-    // 如果没有设置，尝试从form.duplicateRangeDefaults中恢复
-    if (!defaultStandardFileId) {
-      const savedDefault = form.value.duplicateRangeDefaults?.find(
-        d => d.rangeKey === interval.rangeKey
-      )
-      if (savedDefault && savedDefault.defaultStandardFileId) {
-        defaultStandardFileId = savedDefault.defaultStandardFileId
-        duplicateRangeDefaultsMap.value[rangeKey] = defaultStandardFileId
-      } else if (interval.standardFiles.length > 0) {
-        // 默认选择第一个标准文件
-        defaultStandardFileId = interval.standardFiles[0]
-        duplicateRangeDefaultsMap.value[rangeKey] = defaultStandardFileId
-      }
-    }
-    
-    return {
-      ...interval,
-      defaultStandardFileId
-    }
-  })
-})
-
-// 更新重复范围的默认标准文件
-const updateDuplicateRangeDefault = (rangeKey, defaultStandardFileId) => {
-  duplicateRangeDefaultsMap.value[rangeKey] = defaultStandardFileId
-}
-
-
 
 // 提交状态
 const submitting = ref(false)
@@ -429,40 +242,55 @@ const partTypes = ref([])
 
 const fetchPartTypes = async () => {
   try {
-    const res = await axios.get('/api/pipe-spec/part-types')
-    // 兼容不同 mock 返回字段（code/data 或 msg/data）
-    if (res && res.data) {
-      const payload = res.data
-      partTypes.value = payload.data || []
+    const res = await axios.get('/api/PmcSpec/ComponentTypes')
+    if (res && res.data && res.data.code === 200) {
+      partTypes.value = res.data.data || []
+    } else {
+      ElMessage.error(res.data?.message || '获取部件类型失败')
     }
   } catch (error) {
     console.error('获取部件类型失败:', error)
+    ElMessage.error('网络错误，获取部件类型失败')
   }
 }
 
-// 监听重复范围变化，同步到 form.duplicateRangeDefaults
-watch([duplicateRanges, duplicateRangeDefaultsMap], () => {
-  form.value.duplicateRangeDefaults = duplicateRanges.value.map(range => ({
-    overlapMin: range.overlapMin,
-    overlapMax: range.overlapMax,
-    defaultStandardFileId: range.defaultStandardFileId,
-    ranges: range.ranges, // 保存所有原始范围信息
-    standardFiles: range.standardFiles, // 保存涉及的标准文件
-    rangeKey: range.rangeKey // 保存唯一标识
-  }))
-}, { deep: true })
+// 处理部件类型变更
+const handleComponentTypeChange = (val) => {
+  // 逻辑已移至 watch 统一处理
+}
 
-// 监听部件类型变化，重置标准文件配置并重新获取标准文件列表
-watch(() => form.value.partType, (newPartType, oldPartType) => {
-  if (newPartType === oldPartType) return
-  form.value.standardFileIds = []
-  form.value.standardFileConfigurations = []
-  form.value.duplicateRangeDefaults = []
-  duplicateRangeDefaultsMap.value = {}
-  if (newPartType) {
-    fetchStandardFiles()
+// 监听部件类型ID变化，重置标准配置并重新获取规格列表
+watch(() => form.value.componentTypeId, async (newId, oldId) => {
+  if (newId === oldId) return
+  
+  // 同步更新 partType 名称
+  const pt = partTypes.value.find(p => p.id === newId)
+  if (pt) {
+    form.value.partType = pt.componentTypeName
   } else {
-    standardFilesList.value = []
+    form.value.partType = ''
+  }
+
+  form.value.standardNames = []
+  form.value.standardConfigurations = []
+  
+  if (newId) {
+    await fetchPipeFittingSpecs()
+    
+    // 尝试从存储中加载已有配置 (基于 partType 名称)
+    if (form.value.partType && dialogVisible.value) {
+      const existingConfig = pipeSpecConfigStore.getConfigByPartType(form.value.partType)
+      
+      if (existingConfig) {
+        await nextTick()
+        form.value.standardNames = [...(existingConfig.standardNames || [])]
+        form.value.standardConfigurations = (existingConfig.standardConfigurations || []).map(config => ({
+          ...config
+        }))
+      }
+    }
+  } else {
+    pipeFittingSpecs.value = []
   }
 })
 
@@ -472,7 +300,7 @@ const handleSubmit = async () => {
   
   try {
     // 首先验证部件类型是否已选择
-    if (!form.value.partType) {
+    if (!form.value.componentTypeId) {
       ElMessage.error('请选择部件类型')
       return
     }
@@ -480,69 +308,28 @@ const handleSubmit = async () => {
     // 表单基本验证
     await formRef.value.validate()
     
-    // 验证每个标准文件是否都选择了有效的NPD范围
-    const invalidConfigs = form.value.standardFileConfigurations.filter(
-      config => config.minNpdValue === null || config.maxNpdValue === null || config.minNpdValue > config.maxNpdValue
-    )
-    
-    if (invalidConfigs.length > 0) {
-      ElMessage.error('请为所有选择的标准文件配置有效的NPD范围（最小值不能大于最大值）')
-      return
-    }
-    
-    // 验证重复通径范围是否都选择了默认标准文件
-    const unselectedDefaults = duplicateRanges.value.filter(
-      range => !range.defaultStandardFileId
-    )
-    
-    if (unselectedDefaults.length > 0) {
-      ElMessage.error('请为所有重复的通径范围选择默认匹配的标准文件')
-      return
-    }
-    
     submitting.value = true
     
-    // 准备提交数据 - 简化参数传递
+    // 准备提交数据
     const submitData = {
-      ...form.value,
-      // 转换为更友好的格式，传递数组即可
-      configurations: form.value.standardFileConfigurations.map(config => {
-        const material = props.materials.find(m => m.id === config.material)
+      componentTypeId: form.value.componentTypeId, // 新增 ID
+      partType: form.value.partType,
+      // 传递完整配置
+      configurations: form.value.standardConfigurations.map(config => {
         return {
-          standardFileId: config.standardFile,
-          standardFileName: getStandardFileName(config.standardFile),
-          materialId: config.material,
-          materialName: material ? material.name : '',
-          npdRange: [config.minNpdValue, config.maxNpdValue],
-          bendRadiusMultiple: config.bendRadiusMultiple
+          standardFileName: config.standardName, // 契约示例中使用 standardFileName
+          materialName: config.materialName
         }
       }),
-      // 包含重复通径范围的默认标准配置
-      duplicateRangeDefaults: duplicateRanges.value.map(range => ({
-        overlapMin: range.overlapMin,
-        overlapMax: range.overlapMax,
-        defaultStandardFileId: range.defaultStandardFileId,
-        defaultStandardFileName: getStandardFileName(range.defaultStandardFileId),
-        ranges: range.ranges, // 保存所有原始范围信息
-        standardFiles: range.standardFiles, // 保存涉及的标准文件
-        rangeKey: range.rangeKey // 保存唯一标识
-      }))
+      // 内部使用的字段
+      standardNames: form.value.standardNames,
+      standardConfigurations: form.value.standardConfigurations
     }
     
-    // 真实API调用
-    try {
-      const res = await axios.post('/api/pipe-spec/configure', submitData)
-      if (res.data.code === 200) {
-        emit('confirm', submitData)
-        dialogVisible.value = false
-        ElMessage.success('配置已保存！')
-      } else {
-        ElMessage.error(res.data.msg || '配置保存失败')
-      }
-    } catch (error) {
-      console.error('配置保存错误:', error)
-      ElMessage.error('网络错误，配置保存失败')
-    }
+    // 本地确认，不直接调用后端（由父组件处理最终保存）
+    emit('confirm', submitData)
+    dialogVisible.value = false
+    
   } catch (error) {
     console.error('表单验证失败:', error)
   } finally {
@@ -550,41 +337,99 @@ const handleSubmit = async () => {
   }
 }
 
-// 关闭对话框
-const handleClose = () => {
-  // 重置表单
+// 重置表单逻辑
+const resetForm = () => {
   if (formRef.value) {
     formRef.value.resetFields()
   }
-  // 清空选择的文件和配置
-  form.value.standardFileIds = []
-  form.value.standardFileConfigurations = []
-  form.value.duplicateRangeDefaults = []
-  duplicateRangeDefaultsMap.value = {}
+  form.value.standardNames = []
+  form.value.standardConfigurations = []
+  form.value.componentTypeId = null
+  form.value.partType = ''
+  pipeFittingSpecs.value = []
+}
+
+// 处理重置按钮点击
+const handleReset = () => {
+  ElMessageBox.confirm(
+    '确定要清空当前所有配置项吗？此操作将清除已选的标准和材料配置。',
+    '确认重置',
+    {
+      confirmButtonText: '确定重置',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  ).then(() => {
+    resetForm()
+    ElMessage.success('配置已重置')
+  }).catch(() => {})
+}
+
+// 关闭对话框
+const handleClose = () => {
+  resetForm()
   dialogVisible.value = false
 }
 
 // 监听对话框显示/隐藏
-watch(dialogVisible, (val) => {
+watch(dialogVisible, async (val) => {
   if (val) {
-    // 对话框打开时重置表单
-    nextTick(() => {
-      if (formRef.value) {
-        formRef.value.resetFields()
-      }
-      // 确保配置数组为空
-      form.value.standardFileConfigurations = []
-      form.value.duplicateRangeDefaults = []
-      duplicateRangeDefaultsMap.value = {}
-    })
-    fetchPartTypes()
+    // 获取部件类型列表
+    await fetchPartTypes()
+    // 获取材料列表
+    await fetchMaterials()
+    
+    // 如果有初始配置，进行回填
+    if (props.initialConfig) {
+      // 使用 nextTick 确保在 watch 的潜在干扰之后执行
+      nextTick(async () => {
+        const config = JSON.parse(JSON.stringify(props.initialConfig))
+        
+        // 1. 设置部件类型 ID
+        if (config.componentTypeId) {
+          form.value.componentTypeId = config.componentTypeId
+        } else if (config.partType) {
+          // 如果只有名称，尝试查找 ID
+          const pt = partTypes.value.find(p => p.componentTypeName === config.partType)
+          if (pt) form.value.componentTypeId = pt.id
+        }
+        
+        // 2. 等待 watch 及其内部逻辑执行
+        await nextTick()
+        await nextTick()
+        
+        // 3. 强制回填标准名称和配置
+        // 优先使用配置中的 standardNames，如果没有则从 configurations 推导
+        if (config.standardNames && config.standardNames.length > 0) {
+            form.value.standardNames = config.standardNames
+        } else if (config.configurations && config.configurations.length > 0) {
+            form.value.standardNames = [...new Set(config.configurations.map(c => c.standardFileName))]
+        } else {
+            form.value.standardNames = []
+        }
+        
+        // 恢复配置详情
+        if (config.configurations && config.configurations.length > 0) {
+           form.value.standardConfigurations = config.configurations.map(c => ({
+             standardName: c.standardFileName,
+             materialName: c.materialName
+           }))
+        } else {
+           form.value.standardConfigurations = []
+        }
+      })
+    } else {
+      // 没有初始配置，执行重置
+      resetForm()
+    }
   }
 })
 
-// 组件挂载时获取标准文件列表
+// 组件挂载时获取部件类型
 onMounted(() => {
   fetchPartTypes()
 })
+
 </script>
 
 <style scoped>
@@ -608,7 +453,6 @@ onMounted(() => {
 /* 配置项样式 */
 .config-item {
   display: flex;
-  flex-direction: column;
   margin-bottom: 10px;
   padding: 8px;
   background-color: #ffffff;
@@ -624,9 +468,6 @@ onMounted(() => {
 .config-file-info {
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
-  width: 100%;
-  overflow: hidden;
 }
 
 /* 配置控制区域样式 */
@@ -635,7 +476,7 @@ onMounted(() => {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  width: 100%;
+  flex: 1;
 }
 
 /* 材料选择器样式 */
@@ -652,33 +493,6 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-/* NPD范围选择器容器 */
-.npd-range-selectors {
-  display: flex;
-  align-items: center;
-  min-width: 260px;
-}
-
-/* 范围分隔符 */
-.range-separator {
-  margin: 0 5px;
-  color: #606266;
-  font-weight: bold;
-}
-
-/* 弯管半径倍数样式 */
-.bend-radius-multiple {
-  display: flex;
-  align-items: center;
-}
-
-/* 弯管半径提示文字 */
-.bend-radius-hint {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 5px;
-}
-
 :deep(.el-select__tags) {
   flex-wrap: nowrap;
   overflow: hidden;
@@ -689,93 +503,6 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* 重复通径范围容器样式 */
-.duplicate-ranges-container {
-  border: 1px solid #f0c78a;
-  border-radius: 4px;
-  padding: 15px;
-  background-color: #fef9e7;
-  margin-bottom: 10px;
-}
-
-/* 重复范围项样式 */
-.duplicate-range-item {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 15px;
-  padding: 12px;
-  background-color: #ffffff;
-  border-radius: 4px;
-  border: 1px solid #f0c78a;
-}
-
-.duplicate-range-item:last-child {
-  margin-bottom: 0;
-}
-
-/* 重复范围信息样式 */
-.duplicate-range-info {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
-  font-weight: 500;
-}
-
-.duplicate-count {
-  margin-left: 8px;
-  font-size: 12px;
-  color: #909399;
-}
-
-/* 涉及的范围列表样式 */
-.duplicate-ranges-list {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  margin-bottom: 10px;
-  padding: 8px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
-}
-
-.ranges-list {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  flex: 1;
-}
-
-/* 涉及的标准文件列表样式 */
-.duplicate-standard-files {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  margin-bottom: 10px;
-  padding: 8px;
-  background-color: #fafafa;
-  border-radius: 4px;
-}
-
-.duplicate-label {
-  font-size: 13px;
-  color: #606266;
-  margin-right: 8px;
-  font-weight: 500;
-}
-
-/* 默认标准选择器样式 */
-.default-standard-selector {
-  display: flex;
-  align-items: center;
-  margin-top: 8px;
-}
-
-/* 警告提示文字样式 */
-.warning-text {
-  color: #e6a23c;
-  font-weight: 500;
 }
 
 /* 对话框底部按钮样式 */

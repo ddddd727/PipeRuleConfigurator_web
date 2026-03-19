@@ -1,12 +1,13 @@
 import MainLayout from '@/layout/MainLayout.vue'
 import DictLayout from '@/views/DictLayout.vue'
 import DictTable from '@/components/DictTable.vue'
+import DictPipingTable from '@/components/DictPipingTable.vue'
 
 export default {
   path: '/dict',
   component: MainLayout,
   meta: { title: '字典定义', icon: 'Reading' },
-  redirect: '/dict/attribute/std-series',
+  redirect: '/dict/attribute/piping-class',
   children: [
     // ============================================================
     // 分组 1: 业务属性 (对应后端 DictConfiguration)
@@ -15,71 +16,68 @@ export default {
       path: 'attribute',
       component: DictLayout,
       meta: { title: '业务属性定义', icon: 'Menu' },
-      redirect: '/dict/attribute/std-series',
+      redirect: '/dict/attribute/piping-class',
       children: [
+        
         { 
-          path: 'std-series', 
-          name: 'StdSeries',
-          component: DictTable, 
-          meta: { title: '标准系列', icon: 'List' }, 
-          props: { dictId: 'std-series' } // ✅ 匹配后端: std-series
-        },
-        { 
-          path: 'piping-class', // 🔄 路径修正: pipe-grade -> piping-class
+          path: 'piping-class', 
           name: 'PipingClass',
           component: DictTable, 
-          meta: { title: 'A-管材等级', icon: 'Medal' }, 
-          props: { dictId: 'piping-class' } // ✅ 匹配后端: piping-class
+          meta: { title: '管材等级', icon: 'Medal' }, 
+          props: { dictId: 'piping-class' }
         },
         { 
-          path: 'mat-category', // 🔄 路径修正: main-material -> mat-category
+          path: 'mat-category', 
           name: 'MatCategory',
           component: DictTable, 
-          meta: { title: 'B1-主材料', icon: 'Box' }, 
-          props: { dictId: 'mat-category' } // ✅ 匹配后端: mat-category
+          meta: { title: '主材料', icon: 'Box' }, 
+          props: { dictId: 'mat-category' }
         },
         { 
-          path: 'piping-standard', // 🔄 路径修正: pipe-std -> piping-standard
+          path: 'piping-standard', 
           name: 'PipingStandard',
           component: DictTable, 
-          meta: { title: 'B2-管材标准', icon: 'Collection' }, 
-          props: { dictId: 'piping-standard' } // ✅ 匹配后端: piping-standard
+          meta: { title: '管材标准', icon: 'Collection' }, 
+          props: { dictId: 'piping-standard' }
         },
         { 
           path: 'mat-grade', 
           name: 'MatGrade',
           component: DictTable, 
-          meta: { title: 'B3-牌号', icon: 'Ticket' }, 
-          props: { dictId: 'mat-grade' } // ✅ 匹配后端: mat-grade
+          meta: { title: '牌号', icon: 'Ticket' }, 
+          props: { dictId: 'mat-grade' }
         },
         { 
-          path: 'flange-standard', // 🔄 路径修正: flange-std -> flange-standard
+          path: 'mat-grade-rule', 
+          name: 'MatGradeRule',
+          component: DictTable, 
+          meta: { title: '牌号规则', icon: 'SetUp'}, // 新增
+          props: { dictId: 'mat-grade-rule' }
+        },
+        { 
+          path: 'flange-standard', 
           name: 'FlangeStandard',
           component: DictTable, 
-          meta: { title: 'C1-法兰标准', icon: 'Notebook' }, 
-          props: { dictId: 'flange-standard' } // ✅ 匹配后端: flange-standard
+          meta: { title: '法兰等级标准', icon: 'Notebook' }, 
+          props: { dictId: 'flange-standard' }
         },
         { 
-          path: 'pressure-rating', // 🔄 路径修正: flange-rating -> pressure-rating
+          path: 'pressure-rating', 
           name: 'PressureRating',
           component: DictTable, 
-          meta: { title: 'C2-压力等级', icon: 'Odometer' }, 
-          props: { dictId: 'pressure-rating' } // ✅ 匹配后端: pressure-rating
+          meta: { title: '法兰压力等级', icon: 'Odometer' }, 
+          props: { dictId: 'pressure-rating' }
         },
         { 
-          path: 'schedule', // 🔄 路径修正: wall-thk -> schedule
-          name: 'Schedule',
+          path: 'schedule-thickness', 
+          name: 'ScheduleThickness',
           component: DictTable, 
-          meta: { title: 'D-壁厚等级', icon: 'CopyDocument' }, 
-          props: { dictId: 'schedule' } // ✅ 匹配后端: schedule
-        },
-        
+          meta: { title: '壁厚等级', icon: 'CopyDocument' }, // 替代原来的 schedule
+          props: { dictId: 'schedule-thickness' }
+        }
       ]
     },
 
-    // ============================================================
-    // 分组 2: 管子连接件 (保留原有配置，暂时未变)
-    // ============================================================
     {
       path: 'fitting',
       component: DictLayout,
@@ -87,49 +85,49 @@ export default {
       children: [
         { 
           path: 'elbow', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Elbow (弯头)', icon: 'RefreshLeft' }, 
           props: { dictId: 'part-elbow' } 
         },
         { 
           path: 'red', 
-          component: DictTable, 
-          meta: { title: 'Red (大小头)', icon: 'Filter' }, 
+          component: DictPipingTable, 
+          meta: { title: 'Red (异径)', icon: 'Filter' }, 
           props: { dictId: 'part-red' } 
         },
         { 
           path: 'tee', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Tee (三通)', icon: 'Share' }, 
           props: { dictId: 'part-tee' } 
         },
         { 
           path: 'sleeve', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Sleeve (套管)', icon: 'Coin' }, 
           props: { dictId: 'part-sleeve' } 
         },
         { 
           path: 'bosses', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Bosses (凸台)', icon: 'Aim' }, 
           props: { dictId: 'part-bosses' } 
         },
         { 
           path: 'saddles', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Saddles (鞍座)', icon: 'Magnet' }, 
           props: { dictId: 'part-saddles' } 
         },
         { 
           path: 'caps', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Caps (管帽)', icon: 'CircleClose' }, 
           props: { dictId: 'part-caps' } 
         },
         { 
           path: 'overpass', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Overpass (过桥)', icon: 'Top' }, 
           props: { dictId: 'part-overpass' } 
         }
@@ -137,7 +135,7 @@ export default {
     },
 
     // ============================================================
-    // 分组 3: 法兰连接 (保留原有配置，暂时未变)
+    // 分组 3: 法兰连接 (保留原有配置)
     // ============================================================
     {
       path: 'flange-conn',
@@ -146,49 +144,49 @@ export default {
       children: [
         { 
           path: 'flange', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Flange (法兰)', icon: 'CircleCheck' }, 
           props: { dictId: 'part-flange' } 
         },
         { 
           path: 'blind', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Blind (盲板)', icon: 'Remove' }, 
-          props: { dictId: 'part-blind-flange' } 
+          props: { dictId: 'part-blindFlange' } 
         },
         { 
           path: 'gasket', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Gasket (垫片)', icon: 'Help' }, 
           props: { dictId: 'part-gasket' } 
         },
         { 
           path: 'bolts', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Bolts (螺栓)', icon: 'Key' }, 
-          props: { dictId: 'part-bolts' } 
+          props: { dictId: 'part-bolt' } 
         },
         { 
           path: 'nuts', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Nuts (螺母)', icon: 'Operation' }, 
-          props: { dictId: 'part-nuts' } 
+          props: { dictId: 'part-nut' } 
         },
         { 
           path: 'washers', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Washers (垫圈)', icon: 'Sunny' }, 
-          props: { dictId: 'part-washers' } 
+          props: { dictId: 'part-washer' } 
         },
         { 
           path: 'accessories', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Accessories (附件)', icon: 'Suitcase' }, 
           props: { dictId: 'part-accessories' } 
         },
         { 
           path: 'joints', 
-          component: DictTable, 
+          component: DictPipingTable, 
           meta: { title: 'Joints (接头)', icon: 'Switch' }, 
           props: { dictId: 'part-joints' } 
         }
