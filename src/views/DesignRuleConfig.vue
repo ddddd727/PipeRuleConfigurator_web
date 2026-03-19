@@ -473,7 +473,7 @@ const LOCAL_COLUMNS = {
 const LOCAL_TITLES = {
   'bend-pipe': '弯管机数据',
   'bend-parameter': '弯管参数',
-  'wall-thickness-series': '壁厚等级',
+  'wall-thickness-series': '外径壁厚',
   'shortcode': 'ShortCode细类',
   'spec': 'ShortCode定义'
 }
@@ -621,6 +621,11 @@ const getComponentTypeId = (v) => {
 
 const toBool = (v) => v === true || v === 1 || v === '1' || v === 'true'
 
+const toNumberOrValue = (v) => {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : v
+}
+
 const getRowsFromResponse = (res) => {
   const payload = res?.data
   if (Array.isArray(payload)) return payload
@@ -647,7 +652,7 @@ const treeData = ref([
     icon: Folder,
     children: [
       { id: 'bend-parameter', label: '弯管参数', icon: Document },
-      { id: 'wall-thickness-series', label: '壁厚等级', icon: Document },
+      { id: 'wall-thickness-series', label: '外径壁厚', icon: Document },
       { id: 'shortcode-major', label: 'ShortCode大类', icon: Document },
       { id: 'shortcode', label: 'ShortCode细类', icon: Document },
       { id: 'spec', label: 'ShortCode定义', icon: Document }
@@ -870,7 +875,7 @@ const handleDeleteRows = (configId) => {
     if (configId === 'wall-thickness-series') {
       try {
         const deletePromises = config.selectedRows.map(row => 
-          axios.delete(`/api/S3dDictWallThickness/${row.id}`)
+          axios.delete(`/api/S3dCommonPlainPipingGenericData/${row.id}`)
         )
         await Promise.all(deletePromises)
         ElMessage.success(`成功删除 ${config.selectedRows.length} 行数据`)
@@ -1097,17 +1102,32 @@ const confirmBatchAdd = async () => {
       // 按顺序执行新增
       for (const row of batchAddData.value) {
         try {
+          const npdVal =
+            row.npd !== undefined && row.npd !== null && String(row.npd).trim() !== ''
+              ? row.npd
+              : row.nominalPipingDiameter
+          const ndpUnitVal =
+            row.ndpunit !== undefined && row.ndpunit !== null && String(row.ndpunit).trim() !== ''
+              ? row.ndpunit
+              : row.nominalDiameterUnits
+          const scheduleThicknessCl = toNumberOrValue(
+            getScheduleCode(row.scheduleThickness ?? row.scheduleThicknessCl)
+          )
+          const endStandardCl = toNumberOrValue(getEndStandardCode(row.endStandard ?? row.endStandardCl))
           const payload = {
-            ...row,
-            npd: String(row.npd || ''),
-            ndpunit: String(row.ndpunit || ''),
-            scheduleThicknessCl: getScheduleCode(row.scheduleThickness),
-            endStandardCl: getEndStandardCode(row.endStandard),
-            pipingOutsideDiameter: Number(row.pipingOutsideDiameter) || 0,
-            wallThickness: Number(row.wallThickness) || 0,
+            nominalPipingDiameter:
+              npdVal !== undefined && npdVal !== null && String(npdVal).trim() !== ''
+                ? Number(npdVal)
+                : null,
+            nominalDiameterUnits:
+              ndpUnitVal !== undefined && ndpUnitVal !== null ? String(ndpUnitVal) : '',
+            endStandardCl,
+            scheduleThicknessCl,
+            pipingOutsideDiameter: String(row.pipingOutsideDiameter ?? ''),
+            wallThickness: String(row.wallThickness ?? ''),
             status: toBool(row.status ?? true)
           }
-          await axios.post('/api/S3dDictWallThickness', payload)
+          await axios.post('/api/S3dCommonPlainPipingGenericData', payload)
           successCount++
         } catch (e) {
           console.error('新增单行失败:', e)
@@ -1318,17 +1338,36 @@ const confirmEdit = async () => {
       await fetchBendPipeData()
       ElMessage.success('更新成功')
     } else if (config.id === 'wall-thickness-series') {
+      const npdVal =
+        editRowData.value.npd !== undefined &&
+        editRowData.value.npd !== null &&
+        String(editRowData.value.npd).trim() !== ''
+          ? editRowData.value.npd
+          : editRowData.value.nominalPipingDiameter
+      const ndpUnitVal =
+        editRowData.value.ndpunit !== undefined &&
+        editRowData.value.ndpunit !== null &&
+        String(editRowData.value.ndpunit).trim() !== ''
+          ? editRowData.value.ndpunit
+          : editRowData.value.nominalDiameterUnits
+      const scheduleThicknessCl = toNumberOrValue(
+        getScheduleCode(editRowData.value.scheduleThickness ?? editRowData.value.scheduleThicknessCl)
+      )
+      const endStandardCl = toNumberOrValue(
+        getEndStandardCode(editRowData.value.endStandard ?? editRowData.value.endStandardCl)
+      )
       const payload = {
-        ...editRowData.value,
-        npd: String(editRowData.value.npd || ''),
-        ndpunit: String(editRowData.value.ndpunit || ''),
-        scheduleThicknessCl: getScheduleCode(editRowData.value.scheduleThickness),
-        endStandardCl: getEndStandardCode(editRowData.value.endStandard),
-        pipingOutsideDiameter: Number(editRowData.value.pipingOutsideDiameter) || 0,
-        wallThickness: Number(editRowData.value.wallThickness) || 0,
+        id: editRowData.value.id,
+        nominalPipingDiameter:
+          npdVal !== undefined && npdVal !== null && String(npdVal).trim() !== '' ? Number(npdVal) : null,
+        nominalDiameterUnits: ndpUnitVal !== undefined && ndpUnitVal !== null ? String(ndpUnitVal) : '',
+        endStandardCl,
+        scheduleThicknessCl,
+        pipingOutsideDiameter: String(editRowData.value.pipingOutsideDiameter ?? ''),
+        wallThickness: String(editRowData.value.wallThickness ?? ''),
         status: toBool(editRowData.value.status)
       }
-      await axios.put('/api/S3dDictWallThickness', payload)
+      await axios.put('/api/S3dCommonPlainPipingGenericData', payload)
       await fetchWallThicknessData()
       ElMessage.success('更新成功')
     } else if (config.id === 'bend-parameter') {
@@ -1529,7 +1568,7 @@ const fetchSpecData = async () => {
     cfg.data = rows
     configs['spec'] = cfg
   } catch (e) {
-    ElMessage.error(`Spec接口请求失败：${e?.message || '网络错误'}`)
+    ElMessage.error(`ShortCode定义接口请求失败：${e?.message || '网络错误'}`)
   }
 }
 
@@ -1574,18 +1613,49 @@ const fetchBendParameterData = async () => {
 
 const fetchWallThicknessData = async () => {
   try {
-    const res = await axios.get('/api/S3dCodeWallThickness')
+    const res = await axios.get('/api/S3dCodePlainPipingGenericData')
     let rows = getRowsFromResponse(res)
-    rows.forEach(r => {
-      if (r.status === undefined) {
-        r.status = true
-      } else {
-        r.status = toBool(r.status)
+    rows = rows.map(r => {
+      const getVal = (keys) => {
+        for (const k of keys) {
+          const val = getValueIgnoreCase(r, k)
+          if (val !== undefined && val !== null && String(val).trim() !== '') return val
+        }
+        return undefined
       }
+
+      const npdVal = getVal(['npd', 'NPD', 'nominalPipingDiameter', 'NominalPipingDiameter', 'nominalDiameter'])
+      const ndpUnitVal = getVal(['ndpunit', 'ndpUnit', 'NDPUnit', 'nominalDiameterUnits', 'NominalDiameterUnits', 'nominalUnits'])
+
+      const row = {
+        ...r,
+        id: getVal(['id', 'ID', 'Id']) ?? r.id,
+        npd: npdVal !== undefined && npdVal !== null ? String(npdVal) : '',
+        ndpunit: ndpUnitVal !== undefined && ndpUnitVal !== null ? String(ndpUnitVal) : '',
+        nominalPipingDiameter:
+          npdVal !== undefined && npdVal !== null && String(npdVal).trim() !== '' ? Number(npdVal) : null,
+        nominalDiameterUnits: ndpUnitVal !== undefined && ndpUnitVal !== null ? String(ndpUnitVal) : '',
+        scheduleThickness:
+          getVal(['scheduleThickness', 'ScheduleThickness', 'scheduleThicknessCl', 'ScheduleThicknessCl']) ??
+          r.scheduleThickness,
+        endStandard: getVal(['endStandard', 'EndStandard', 'endStandardCl', 'EndStandardCl']) ?? r.endStandard,
+        pipingOutsideDiameter:
+          getVal(['pipingOutsideDiameter', 'PipingOutsideDiameter', 'outsideDiameter', 'OutsideDiameter']) ??
+          r.pipingOutsideDiameter,
+        wallThickness: getVal(['wallThickness', 'WallThickness', 'thickness', 'Thickness']) ?? r.wallThickness
+      }
+
+      if (row.status === undefined) {
+        row.status = true
+      } else {
+        row.status = toBool(row.status)
+      }
+
+      return row
     })
     const cfg = configs['wall-thickness-series'] || {
       id: 'wall-thickness-series',
-      title: LOCAL_TITLES['wall-thickness-series'] || '壁厚等级',
+      title: LOCAL_TITLES['wall-thickness-series'] || '外径壁厚',
       selectedRows: [],
       columns: [],
       data: []
@@ -1594,7 +1664,7 @@ const fetchWallThicknessData = async () => {
     cfg.data = rows
     configs['wall-thickness-series'] = cfg
   } catch (e) {
-    ElMessage.error(`壁厚等级数据接口请求失败：${e?.message || '网络错误'}`)
+    ElMessage.error(`外径壁厚接口请求失败：${e?.message || '网络错误'}`)
   }
 }
 
