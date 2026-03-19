@@ -116,7 +116,7 @@ const menuList = computed(() => {
     </el-container>
 
     <div class="global-footer">
-      <span>***管系规格配置器  版权所有  ***有限公司</span>
+      <span>管系规格配置器  外高桥造船有限公司</span>
     </div>
 
   </div>

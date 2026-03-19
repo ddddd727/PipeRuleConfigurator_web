@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { Cpu, RefreshRight, Rank, Setting } from '@element-plus/icons-vue'
 
-const streamlitUrl = ref(localStorage.getItem('pmc_ai_url') || 'http://localhost:8501')
+const streamlitUrl = ref(localStorage.getItem('pmc_ai_url') || 'http://10.8.98.105:8501')
 const iframeRef = ref(null)
 const showSetting = ref(false)
 const inputUrl = ref('')
