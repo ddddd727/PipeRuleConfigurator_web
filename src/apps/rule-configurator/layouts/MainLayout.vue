@@ -97,10 +97,9 @@ const menuList = computed(() => {
 
           <el-main class="main-content">
             <router-view v-slot="{ Component, route }">
-           <keep-alive>
-         <component v-if="route && route.meta && route.meta.keepAlive" :is="Component" :key="route.fullPath" />
-          </keep-alive>
-         <component v-if="!(route && route.meta && route.meta.keepAlive)" :is="Component" :key="route.fullPath" />
+              <keep-alive :include="cachedViews">
+                <component :is="Component" :key="route.fullPath" />
+              </keep-alive>
             </router-view>
           </el-main>
 

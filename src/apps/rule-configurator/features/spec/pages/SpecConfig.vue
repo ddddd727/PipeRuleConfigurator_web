@@ -78,7 +78,8 @@
           <div class="right-pane">
             <div class="pane-toolbar" style="justify-content: flex-end;">             
                <span class="label">规则</span>
-              <el-select  v-model="selectedRuleB1B2B3D" placeholder="请选择" style="width: 120px;" @visible-change="handleRuleDropdownVisibleChangeB1B2B3D" @change="handleRuleChangeB1B2B3D">
+              <el-select  v-model="selectedRuleB1B2B3D" placeholder="请选择" style="width: 120px;" clearable filterable @visible-change="handleRuleDropdownVisibleChangeB1B2B3D" @change="handleRuleChangeB1B2B3D">
+                 <el-option label="-- 新建规则 --" value="" />
                  <el-option
                    v-for="rule in ruleOptionsB1B2B3D"
                    :key="rule"
@@ -86,7 +87,6 @@
                    :value="rule"
                  />
                </el-select>
-               <el-button type="primary"  icon="Plus"  @click="openSaveRuleModal">新增</el-button>
                <el-button type="danger" icon="Delete" :disabled="resultSelection.length === 0" @click="deleteResultData">删除数据</el-button>
               <el-button @click="confirmDeleteRule" :disabled="!selectedRuleB1B2B3D" type="danger" icon="Delete" >删除规则</el-button>
               <el-button type="primary" @click="saveData"  icon="Check" >保存</el-button>
@@ -94,7 +94,7 @@
             </div> 
             <div class="pane-content">
                <div class="panel full-height" style="width: 100%;">
-                  <div class="panel-header">B1B2B3D组合数据</div>
+                  <div class="panel-header">B1B2B3D组合数据 {{ selectedRuleB1B2B3D ? `(当前规则: ${selectedRuleB1B2B3D})` : '(未选择规则)' }}</div>
                   <div style="flex: 1; overflow: hidden;">
                     <el-table
                       ref="resultTableRef"
@@ -107,10 +107,10 @@
                     >
                       <el-table-column type="selection" width="32" align="center" />
                       <el-table-column prop="id" label="ID" width="50" align="center" />
-                      <el-table-column prop="b1Code" label="主材料" align="center" />
-                      <el-table-column prop="b2Code" label="管材标准"  align="center" />
-                      <el-table-column prop="b3Code" label="牌号" width="60" align="center" />
-                      <el-table-column prop="dCode" label="壁厚等级"  align="center" />
+                      <el-table-column prop="b1Code" label="主材料" min-width="120" align="center" />
+                      <el-table-column prop="b2Code" label="管材标准" min-width="120" align="center" />
+                      <el-table-column prop="b3Code" label="牌号" min-width="120" align="center" />
+                      <el-table-column prop="dCode" label="壁厚等级" min-width="120" align="center" />
                     </el-table>
                   </div>
                   <div class="pagination-toolbar" style="display: flex; justify-content: space-between; align-items: center; padding: 5px; border-top: 1px solid #dcdfe6;">
@@ -180,7 +180,8 @@
     <div class="right-pane">
       <div class="pane-toolbar" style="justify-content: flex-end;">
         <span class="label">规则</span>
-        <el-select v-model="selectedRuleC1C2" placeholder="请选择" style="width: 120px;" @visible-change="handleRuleDropdownVisibleChangeC1C2" @change="handleRuleChangeC1C2">
+        <el-select v-model="selectedRuleC1C2" placeholder="请选择" style="width: 120px;" clearable filterable @visible-change="handleRuleDropdownVisibleChangeC1C2" @change="handleRuleChangeC1C2">
+          <el-option label="-- 新建规则 --" value="" />
           <el-option
             v-for="rule in ruleOptionsC1C2"
             :key="rule"
@@ -188,7 +189,6 @@
             :value="rule"
           />
         </el-select>
-        <el-button type="primary" icon="Plus" @click="openSaveRuleModal">新增</el-button>
         <el-button type="danger" icon="Delete" :disabled="resultC1C2Selection.length === 0" @click="deleteC1C2ResultData">删除数据</el-button>       
         <el-button @click="confirmDeleteRule" :disabled="!selectedRuleC1C2" type="danger" icon="Delete">删除规则</el-button>
         <el-button type="primary" icon="Check" @click="saveC1C2Data">保存</el-button>          
@@ -196,7 +196,7 @@
       
       <div class="pane-content">
         <div class="panel full-height" style="width: 100%;">
-          <div class="panel-header">C1C2组合数据</div>
+          <div class="panel-header">C1C2组合数据 {{ selectedRuleC1C2 ? `(当前规则: ${selectedRuleC1C2})` : '(未选择规则)' }}</div>
           
           <!-- 表格区域 -->
           <div style="flex: 1; overflow: hidden;">
@@ -211,8 +211,8 @@
             >
               <el-table-column type="selection" width="32" align="center" />
               <el-table-column prop="id" label="ID" width="50" align="center" />
-              <el-table-column prop="c1Code" label="法兰标准" width="80" align="center" />
-              <el-table-column prop="c2Code" label="法兰压力等级" align="center" />
+              <el-table-column prop="c1Code" label="法兰标准" min-width="120" align="center" />
+              <el-table-column prop="c2Code" label="法兰压力等级" min-width="120" align="center" />
             </el-table>
           </div>
           
@@ -293,7 +293,8 @@
            <div class="right-pane">
              <div class="pane-toolbar" style="justify-content: flex-end;">
              <span class="label">规则</span>
-              <el-select v-model="selectedRuleLimit" placeholder="请选择" style="width: 120px;" @visible-change="handleRuleDropdownVisibleChangeLimit" @change="handleRuleChangeLimit">
+              <el-select v-model="selectedRuleLimit" placeholder="请选择" style="width: 120px;" clearable filterable @visible-change="handleRuleDropdownVisibleChangeLimit" @change="handleRuleChangeLimit">
+                 <el-option label="-- 新建规则 --" value="" />
                  <el-option
                    v-for="rule in ruleOptionsLimit"
                    :key="rule"
@@ -301,14 +302,13 @@
                    :value="rule"
                  />
                </el-select>
-               <el-button type="primary" icon="Plus" @click="openSaveRuleModal">新增</el-button>
                <el-button type="danger" icon="Delete" :disabled="resultLimitSelection.length === 0" @click="deleteLimitResultData">删除数据</el-button>
               <el-button type="danger" icon="Delete" :disabled="!selectedRuleLimit" @click="confirmDeleteRule">删除规则</el-button>
               <el-button type="primary" icon="Check" @click="saveLimitData">保存</el-button>
             </div>
             <div class="pane-content">
                <div class="panel full-height" style="width: 100%;">
-                  <div class="panel-header">AB2B3C2组合数据</div>
+                  <div class="panel-header">AB2B3C2组合数据 {{ selectedRuleLimit ? `(当前规则: ${selectedRuleLimit})` : '(未选择规则)' }}</div>
                   <div style="flex: 1; overflow: hidden;">
                     <el-table
                       ref="resultLimitTableRef"
@@ -321,10 +321,10 @@
                     >
                       <el-table-column type="selection" width="32" align="center" />
                       <el-table-column prop="id" label="ID" width="50" align="center" />
-                      <el-table-column prop="aCode" label="管材等级" width="70" align="center" />
-                      <el-table-column prop="b2Code" label="管材标准" width="70" align="center" />
-                      <el-table-column prop="b3Code" label="牌号" width="60" align="center" />
-                      <el-table-column prop="c2Code" label="法兰压力等级"  align="center" />
+                      <el-table-column prop="aCode" label="管材等级" min-width="120" align="center" />
+                      <el-table-column prop="b2Code" label="管材标准" min-width="120" align="center" />
+                      <el-table-column prop="b3Code" label="牌号" min-width="120" align="center" />
+                      <el-table-column prop="c2Code" label="法兰压力等级" min-width="120" align="center" />
                     </el-table>
                   </div>                
                    <div class="pagination-toolbar" style="display: flex; justify-content: space-between; align-items: center; padding: 5px; border-top: 1px solid #dcdfe6;">
@@ -335,50 +335,37 @@
         </div>
       </el-tab-pane>
     </el-tabs>
-    <!-- Save Rule Dialog -->
-    <el-dialog
-      v-model="saveRuleVisible"
-      title="新增规则"
-      width="400px"
-      center
-    >
-      <div style="display: flex; align-items: center; justify-content: center; padding: 20px 0;">
-        <span style="margin-right: 10px; font-weight: bold;">规则命名:</span>
-        <el-input v-model="ruleName" placeholder="" style="width: 200px;" />
-      </div>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button type="primary" @click="confirmSaveRule">确认</el-button>
-          <el-button @click="saveRuleVisible = false">取消</el-button>
-        </span>
-      </template>
-    </el-dialog>
-
     <!-- Save Confirm Dialog -->
     <el-dialog v-model="saveConfirmVisible" title="保存确认" width="400px" center>
-      <div style="text-align: center; padding: 20px;">
-        规则“{{ currentRuleNameForDialog }}”共包含 {{ currentCountForDialog }} 条数据，是否保存？
+      <div style="text-align: center; padding: 10px 20px;">
+        <div v-if="!currentRuleNameForDialog">
+          <div style="margin-bottom: 10px; color: #606266;">当前未选择规则，请输入新规则名称：</div>
+          <el-input v-model="newRuleNameForSave" placeholder="新规则名称" />
+        </div>
+        <div v-else style="color: #606266; font-size: 14px; line-height: 1.6;">
+          当前规则“<span style="color: #409EFF; font-weight: bold;">{{ currentRuleNameForDialog }}</span>”共包含 <span style="color: #F56C6C; font-weight: bold;">{{ currentCountForDialog }}</span> 条数据，是否确认保存？
+        </div>
       </div>
       <template #footer>
-        <span class="dialog-footer">
+        <div class="dialog-footer" style="display: flex; justify-content: center; gap: 12px;">
           <el-button @click="saveConfirmVisible = false">取消</el-button>
-          <el-button type="primary" plain @click="handleRenameSaveClick">重命名保存</el-button>
-          <el-button type="primary" @click="handleConfirmSave">确认</el-button>
-        </span>
+          <el-button v-if="currentRuleNameForDialog" type="warning" plain @click="handleSaveAsClick">另存为</el-button>
+          <el-button type="primary" @click="handleConfirmSave">确认保存</el-button>
+        </div>
       </template>
     </el-dialog>
 
-    <!-- Rename Save Dialog -->
-    <el-dialog v-model="renameSaveVisible" title="重命名保存" width="400px" center>
-      <div style="display: flex; align-items: center; justify-content: center; padding: 20px 0;">
-        <span style="margin-right: 10px; font-weight: bold;">新规则名:</span>
-        <el-input v-model="newRuleNameForSave" placeholder="请输入新规则名称" style="width: 200px;" />
+    <!-- Save As Dialog -->
+    <el-dialog v-model="saveAsVisible" title="另存为" width="400px" center>
+      <div style="padding: 10px 20px;">
+        <div style="margin-bottom: 10px; color: #606266;">请输入另存为的规则名称：</div>
+        <el-input v-model="newRuleNameForSave" placeholder="新规则名称" />
       </div>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="renameSaveVisible = false">取消</el-button>
-          <el-button type="primary" @click="performRenameSave">确认</el-button>
-        </span>
+        <div class="dialog-footer" style="display: flex; justify-content: center; gap: 12px;">
+          <el-button @click="saveAsVisible = false">取消</el-button>
+          <el-button type="primary" @click="performSaveAs">确认另存</el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -401,7 +388,7 @@ const ruleOptionsLimit = ref([])
 
 // Save Dialog State
 const saveConfirmVisible = ref(false)
-const renameSaveVisible = ref(false)
+const saveAsVisible = ref(false)
 const newRuleNameForSave = ref('')
 const pendingSaveType = ref('')
 
@@ -496,24 +483,99 @@ const resetRightPane = (type) => {
   }
 }
 
-const handleConfirmSave = () => {
+const handleConfirmSave = async () => {
+  let ruleName = currentRuleNameForDialog.value
+  if (!ruleName) {
+    if (!newRuleNameForSave.value.trim()) {
+      ElMessage.warning('请输入规则名称')
+      return
+    }
+    ruleName = newRuleNameForSave.value.trim()
+  }
+
+  let selectedData = []
   if (pendingSaveType.value === 'b1b2b3d') {
-     executeSave('b1b2b3d', selectedRuleB1B2B3D.value, resultSelection.value)
+    selectedData = resultSelection.value
   } else if (pendingSaveType.value === 'c1c2') {
-     executeSave('c1c2', selectedRuleC1C2.value, resultC1C2Selection.value)
+    selectedData = resultC1C2Selection.value
   } else if (pendingSaveType.value === 'limit') {
-     executeSave('limit', selectedRuleLimit.value, resultLimitSelection.value)
+    selectedData = resultLimitSelection.value
+  }
+
+  // 增加核查整套规则数据重复功能
+  const isDuplicate = await checkDuplicateRule(pendingSaveType.value, ruleName, selectedData)
+  if (isDuplicate) {
+    return // checkDuplicateRule 内部已经弹窗提示
+  }
+
+  if (pendingSaveType.value === 'b1b2b3d') {
+    selectedRuleB1B2B3D.value = ruleName
+    await executeSave('b1b2b3d', ruleName, selectedData)
+  } else if (pendingSaveType.value === 'c1c2') {
+    selectedRuleC1C2.value = ruleName
+    await executeSave('c1c2', ruleName, selectedData)
+  } else if (pendingSaveType.value === 'limit') {
+    selectedRuleLimit.value = ruleName
+    await executeSave('limit', ruleName, selectedData)
   }
   saveConfirmVisible.value = false
 }
 
-const handleRenameSaveClick = () => {
-  saveConfirmVisible.value = false
-  newRuleNameForSave.value = ''
-  renameSaveVisible.value = true
+// 核查整套规则数据重复功能
+const checkDuplicateRule = async (type, ruleName, selectedData) => {
+  try {
+    let url = ''
+    if (type === 'b1b2b3d') url = '/api/S3dCodeB1b2b3dView'
+    else if (type === 'c1c2') url = '/api/S3dCodeC1c2View'
+    else if (type === 'limit') url = '/api/S3dCodeAb2b3c2View'
+
+    // 这里假设有一个接口可以获取所有规则及其数据，或者逐个对比
+    // 为了前端演示，我们先获取所有规则名，然后对比数据
+    const ruleNamesRes = await axios.get(`${url.replace('View', '')}/rule-names`)
+    const allRuleNames = ruleNamesRes.data?.result || ruleNamesRes.data?.data || []
+    
+    // 过滤掉当前正在编辑的规则名（如果是修改的话）
+    const otherRules = allRuleNames.filter(name => name !== ruleName)
+
+    for (const otherRuleName of otherRules) {
+      const res = await axios.get(`${url}/${otherRuleName}`)
+      const otherData = res.data?.result || res.data?.data || []
+      
+      if (otherData.length === selectedData.length) {
+        // 简单对比逻辑：将数据转为字符串并排序后对比
+        const formatData = (data, t) => {
+          return data.map(item => {
+            if (t === 'b1b2b3d') return `${item.b1Cl || item.materialsCategoryCl}-${item.b2Cl || item.pipingStandardCl}-${item.b3Cl || item.materialsGradeCl}-${item.dCl || item.scheduleThicknessCl}`
+            if (t === 'c1c2') return `${item.c1Cl || item.geometricIndustryStandardCl}-${item.c2Cl || item.pressureRatingCl}`
+            if (t === 'limit') return `${item.aCl || item.pipingClassCl}-${item.b2Cl || item.geometricIndustryStandardCl}-${item.b3Cl || item.materialsGradeCl}-${item.c2Cl || item.pressureRatingCl}`
+            return ''
+          }).sort().join('|')
+        }
+
+        if (formatData(selectedData, type) === formatData(otherData, type)) {
+          await ElMessageBox.confirm(
+            `检测到当前数据与规则 "${otherRuleName}" 完全相同，是否继续保存？`,
+            '数据重复提醒',
+            { confirmButtonText: '继续保存', cancelButtonText: '取消', type: 'warning' }
+          )
+          return false // 用户选择继续
+        }
+      }
+    }
+    return false
+  } catch (error) {
+    console.error('核查重复失败:', error)
+    return false // 失败则不阻断
+  }
 }
 
-const performRenameSave = () => {
+const handleSaveAsClick = () => {
+  saveConfirmVisible.value = false
+  newRuleNameForSave.value = ''
+  saveAsVisible.value = true
+}
+
+const performSaveAs = () => {
   if (!newRuleNameForSave.value.trim()) {
     ElMessage.warning('请输入新规则名称')
     return
@@ -540,7 +602,7 @@ const performRenameSave = () => {
      executeSave('limit', newName, resultLimitSelection.value)
   }
   
-  renameSaveVisible.value = false
+  saveAsVisible.value = false
 }
 
 // Table Refs
@@ -790,13 +852,10 @@ const generateData = () => {
 
 const saveData = () => {
   if (resultSelection.value.length === 0) {
-    ElMessage.warning('请选择要保存的行')
+    ElMessage.warning('请选择要保存的数据（请勾选表格左侧复选框）')
     return
   }
-  if (!selectedRuleB1B2B3D.value) {
-    ElMessage.warning('请选择规则')
-    return
-  }
+  newRuleNameForSave.value = ''
   pendingSaveType.value = 'b1b2b3d'
   saveConfirmVisible.value = true
 }
@@ -846,7 +905,10 @@ const handleRuleDropdownVisibleChangeC1C2 = (visible) => {
 }
 
 const handleRuleChangeC1C2 = async (ruleName) => {
-  if (!ruleName) return
+  if (!ruleName) {
+    resetRightPane('c1c2')
+    return
+  }
   try {
     const res = await axios.get(`/api/S3dCodeC1c2View/${ruleName}`)
     const list = res.data?.result || res.data?.data || res.data || []
@@ -875,7 +937,10 @@ const handleRuleDropdownVisibleChangeLimit = (visible) => {
 }
 
 const handleRuleChangeB1B2B3D = async (ruleName) => {
-  if (!ruleName) return
+  if (!ruleName) {
+    resetRightPane('b1b2b3d')
+    return
+  }
   try {
     const res = await axios.get(`/api/S3dCodeB1b2b3dView/${ruleName}`)
     const list = res.data?.result || res.data?.data || res.data || []
@@ -905,7 +970,10 @@ const handleRuleChangeB1B2B3D = async (ruleName) => {
 }
 
 const handleRuleChangeLimit = async (ruleName) => {
-  if (!ruleName) return
+  if (!ruleName) {
+    resetRightPane('limit')
+    return
+  }
   try {
     const res = await axios.get(`/api/S3dCodeAb2b3c2View/${ruleName}`)
     const list = res.data?.result || res.data?.data || res.data || []
@@ -1158,13 +1226,10 @@ const generateC1C2Data = () => {
 
 const saveC1C2Data = () => {
   if (resultC1C2Selection.value.length === 0) {
-    ElMessage.warning('请选择要保存的行')
+    ElMessage.warning('请选择要保存的数据（请勾选表格左侧复选框）')
     return
   }
-  if (!selectedRuleC1C2.value) {
-    ElMessage.warning('请选择规则')
-    return
-  }
+  newRuleNameForSave.value = ''
   pendingSaveType.value = 'c1c2'
   saveConfirmVisible.value = true
 }
@@ -1394,13 +1459,10 @@ const generateLimitData = () => {
 
 const saveLimitData = () => {
   if (resultLimitSelection.value.length === 0) {
-    ElMessage.warning('请选择要保存的行')
+    ElMessage.warning('请选择要保存的数据（请勾选表格左侧复选框）')
     return
   }
-  if (!selectedRuleLimit.value) {
-    ElMessage.warning('请选择规则')
-    return
-  }
+  newRuleNameForSave.value = ''
   pendingSaveType.value = 'limit'
   saveConfirmVisible.value = true
 }
@@ -1514,58 +1576,6 @@ const deleteLimitResultData = () => {
 }
 
 // Lifecycle
-
-// Save Rule Logic
-const saveRuleVisible = ref(false)
-const ruleName = ref('')
-
-const openSaveRuleModal = () => {
-  ruleName.value = ''
-  saveRuleVisible.value = true
-}
-
-const confirmSaveRule = () => {
-  if (!ruleName.value.trim()) {
-    ElMessage.warning('请输入规则名称')
-    return
-  }
-  
-  let selectedData = []
-  let type = ''
-  
-  if (activeTab.value === 'b1b2b3d') {
-    selectedData = resultSelection.value
-    type = 'B1B2B3D'
-    if (!ruleOptionsB1B2B3D.value.includes(ruleName.value)) {
-      ruleOptionsB1B2B3D.value.push(ruleName.value)
-    }
-    selectedRuleB1B2B3D.value = ruleName.value
-  } else if (activeTab.value === 'c1c2') {
-    selectedData = resultC1C2Selection.value
-    type = 'C1C2'
-    if (!ruleOptionsC1C2.value.includes(ruleName.value)) {
-      ruleOptionsC1C2.value.push(ruleName.value)
-    }
-    selectedRuleC1C2.value = ruleName.value
-  } else if (activeTab.value === 'limit') {
-    selectedData = resultLimitSelection.value
-    type = 'Limit'
-    if (!ruleOptionsLimit.value.includes(ruleName.value)) {
-      ruleOptionsLimit.value.push(ruleName.value)
-    }
-    selectedRuleLimit.value = ruleName.value
-  }
-  
-  // Simulation of saving
-  console.log('Saving Rule:', {
-    name: ruleName.value,
-    type: type,
-    data: selectedData
-  })
-  
-  ElMessage.success(`规则 "${ruleName.value}" 保存成功，包含 ${selectedData.length} 条数据，已加入下拉框`)
-  saveRuleVisible.value = false
-}
 
 const confirmDeleteRule = () => {
   let currentRule = ''
