@@ -1,8 +1,8 @@
-import MainLayout from '@/apps/rule-configurator/layouts/MainLayout.vue'
+import AppLayout from '@/layouts/AppLayout.vue'
 
 export default {
   path: '/pmc',
-  component: MainLayout,
+  component: AppLayout,
   meta: { title: 'PMC编码', icon: 'Cpu' }, // 对应截图名称
   redirect: '/pmc/index',
   children: [

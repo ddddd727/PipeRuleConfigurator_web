@@ -1,11 +1,11 @@
-import MainLayout from '@/apps/rule-configurator/layouts/MainLayout.vue'
+import AppLayout from '@/layouts/AppLayout.vue'
 import DictLayout from '@/apps/rule-configurator/features/dict/pages/DictLayout.vue'
 import DictTable from '@/apps/rule-configurator/features/dict/components/DictTable.vue'
 import DictPipingTable from '@/apps/rule-configurator/features/dict/components/DictPipingTable.vue'
 
 export default {
   path: '/dict',
-  component: MainLayout,
+  component: AppLayout,
   meta: { title: '字典定义', icon: 'Reading' },
   redirect: '/dict/attribute/piping-class',
   children: [

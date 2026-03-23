@@ -1,8 +1,8 @@
-import MainLayout from '@/apps/rule-configurator/layouts/MainLayout.vue'
+import AppLayout from '@/layouts/AppLayout.vue'
 
 export default {
   path: '/property',
-  component: MainLayout,
+  component: AppLayout,
   meta: {
     title: '属性管理',
     icon: 'Management'

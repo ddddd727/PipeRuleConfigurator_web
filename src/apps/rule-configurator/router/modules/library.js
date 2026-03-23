@@ -1,8 +1,8 @@
-import MainLayout from '@/apps/rule-configurator/layouts/MainLayout.vue'
+import AppLayout from '@/layouts/AppLayout.vue'
 
 export default {
   path: '/library',
-  component: MainLayout,
+  component: AppLayout,
   meta: { title: '基础库', icon: 'Box' },
   redirect: '/library/pipe',
   children: [

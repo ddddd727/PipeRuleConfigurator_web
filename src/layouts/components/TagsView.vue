@@ -45,7 +45,7 @@ const handleTabRemove = (targetPath) => {
 
 const openMenu = (tag, e) => {
   const menuMinWidth = 105
-  const maxLeft = window.innerWidth - menuMinWidth 
+  const maxLeft = window.innerWidth - menuMinWidth
   const leftPos = e.clientX + 5
   left.value = leftPos > maxLeft ? maxLeft : leftPos
   top.value = e.clientY
@@ -93,11 +93,11 @@ const closeAll = () => {
           v-for="item in visitedViews"
           :key="item.path"
           :name="item.path"
-          :closable="true" 
+          :closable="true"
         >
           <template #label>
-            <span 
-              class="tab-label-content" 
+            <span
+              class="tab-label-content"
               :class="{ 'is-pinned-label': item.pinned }"
               @contextmenu.prevent="openMenu(item, $event)"
             >
@@ -119,7 +119,6 @@ const closeAll = () => {
 </template>
 
 <style scoped>
-/* 1. 根容器 */
 .tags-container {
   height: 100%;
   width: 100%;
@@ -127,12 +126,10 @@ const closeAll = () => {
   display: flex;
   align-items: flex-end;
   padding: 0;
-  /* 【修改】底部边框加粗到 2px */
-  border-bottom: 2px solid #dcdfe6; 
+  border-bottom: 2px solid #dcdfe6;
   box-sizing: border-box;
 }
 
-/* 2. 左侧按钮 */
 .close-all-wrapper {
   width: 50px;
   height: 100%;
@@ -145,37 +142,32 @@ const closeAll = () => {
   transition: opacity 0.3s;
   background: #fff;
   z-index: 10;
-  
-  /* 【修改】默认透明，hover时显示 2px 边框 */
-  border-right: 2px solid transparent; 
+  border-right: 2px solid transparent;
   transition: border-color 0.3s, opacity 0.3s;
 }
 .close-all-wrapper:hover { color: #F56C6C; }
-.tags-container:hover .close-all-wrapper { 
-  opacity: 1; 
-  border-right-color: #dcdfe6; /* 2px 灰色 */
+.tags-container:hover .close-all-wrapper {
+  opacity: 1;
+  border-right-color: #dcdfe6;
 }
 
-/* 3. 标签页容器 */
 .tabs-wrapper {
   flex: 1;
   width: 0;
   height: 100%;
 }
 
-/* --- Element Plus 样式覆盖 --- */
 .tags-tabs { height: 100%; border: none !important; }
 :deep(.el-tabs__header) { margin: 0; border: none !important; height: 100%; }
 :deep(.el-tabs__nav-wrap) { height: 100%; margin: 0; padding: 0; }
 :deep(.el-tabs__nav-scroll) { height: 100%; }
-:deep(.el-tabs__nav) { 
-  border: none !important; 
-  height: 100%; 
+:deep(.el-tabs__nav) {
+  border: none !important;
+  height: 100%;
   display: flex;
-  align-items: flex-end; 
+  align-items: flex-end;
 }
 
-/* --- 标签项：默认状态 --- */
 :deep(.el-tabs__item) {
   height: 100% !important;
   display: flex;
@@ -183,47 +175,32 @@ const closeAll = () => {
   justify-content: center;
   margin: 0 !important;
   padding: 0 20px !important;
-  
   background: #fff;
   color: #606266;
   font-size: 13px;
-  
   border: none !important;
-  
-  /* 【修改】默认 2px 透明右边框 */
-  border-right: 2px solid transparent !important; 
-  
+  border-right: 2px solid transparent !important;
   border-radius: 0 !important;
   transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
   box-sizing: border-box;
   position: relative;
 }
 
-/* 鼠标进入组件时，显示 2px 分割线 */
 .tags-container:hover :deep(.el-tabs__item) {
   border-right-color: #dcdfe6 !important;
 }
 
-/* --- 标签项：选中状态 --- */
 :deep(.el-tabs__item.is-active) {
   background-color: var(--primary-color) !important;
   color: #fff !important;
   border-radius: 8px 8px 0 0 !important;
-  
-  /* 选中时无边框 */
-  border: none !important; 
-
-  /* 【修改】高度和下边距调整以覆盖 2px 底线 */
-  /* 高度 = 100% + 2px */
-  height: calc(100% + 2px) !important; 
-  /* 向下偏移 2px */
-  margin-bottom: -2px !important;      
-  
+  border: none !important;
+  height: calc(100% + 2px) !important;
+  margin-bottom: -2px !important;
   z-index: 2;
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
 }
 
-/* 图标等样式保持不变 */
 :deep(.el-tabs__item.is-active .el-icon-close) {
   color: #fff !important;
   width: 16px;

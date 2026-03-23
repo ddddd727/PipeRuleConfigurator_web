@@ -1,8 +1,8 @@
-import MainLayout from '@/apps/rule-configurator/layouts/MainLayout.vue'
+import AppLayout from '@/layouts/AppLayout.vue'
 
 export default {
   path: '/standard-sequence',
-  component: MainLayout,
+  component: AppLayout,
   meta: { title: '标准简选', icon: 'List' },
   redirect: '/standard-sequence/config',
   children: [

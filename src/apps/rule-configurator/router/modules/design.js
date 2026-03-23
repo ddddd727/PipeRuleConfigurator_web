@@ -1,8 +1,8 @@
-import MainLayout from '@/apps/rule-configurator/layouts/MainLayout.vue'
+import AppLayout from '@/layouts/AppLayout.vue'
 
 export default {
   path: '/design',
-  component: MainLayout,
+  component: AppLayout,
   redirect: '/design/index',
   children: [
     {

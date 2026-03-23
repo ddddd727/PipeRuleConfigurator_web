@@ -398,7 +398,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { db } from '@/mock/index.js'
+import { db } from '@/apps/rule-configurator/mock/index.js'
 import Mock from 'mockjs'
 import axios from 'axios'
 import {
