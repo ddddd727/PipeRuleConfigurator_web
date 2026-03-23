@@ -1,3 +1,649 @@
+<script setup>
+import { ref, computed, onMounted, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  fetchProperties,
+  createProperty,
+  updateProperty,
+  deleteProperty as deletePropertyApi,
+  fetchObjectTypes,
+  createObjectType,
+  addInterfaceToObjectType,
+  removeInterfaceFromObjectType,
+  deleteObjectType as deleteObjectTypeApi,
+  exportPropertyData
+} from '@/apps/rule-configurator/features/property/api/property'
+
+// 属性列表
+const propertyList = ref([])
+
+// 目录树数据
+const treeData = ref([])
+
+// 树组件引用
+const treeRef = ref(null)
+
+// 树搜索文本
+const treeSearchText = ref('')
+
+// 标签页激活状态
+const activeTab = ref('property')
+
+// 映射Object Type和Interface的配置数据
+const objectTypeConfigList = ref([])
+
+// 搜索文本
+const searchText = ref('')
+
+// 加载状态
+const loading = ref(false)
+
+// 当前选中的Interface
+const selectedInterface = ref('')
+
+// 分页状态（后台支持分页，前端当前按单页展示）
+const pagination = ref({
+  page: 1,
+  pageSize: 20,
+  total: 0
+})
+
+// 对象类型列表（从现有数据提取）
+const objectTypeList = computed(() =>
+  objectTypeConfigList.value.map(item => item.objectType).sort()
+)
+
+// 根据选中的对象类型获取接口列表
+const interfaceList = computed(() => {
+  if (!formData.value.objectType) return []
+  const matched = objectTypeConfigList.value.find(
+    item => item.objectType === formData.value.objectType
+  )
+  return matched ? [...matched.interfaces] : []
+})
+
+// 根据当前选中的Interface推导所属对象类型（用于API过滤）
+const selectedObjectType = computed(() => {
+  if (!selectedInterface.value) return ''
+  const matched = objectTypeConfigList.value.find(item =>
+    Array.isArray(item.interfaces) && item.interfaces.includes(selectedInterface.value)
+  )
+  return matched?.objectType || ''
+})
+
+// 对话框控制
+const dialogVisible = ref(false)
+const isEdit = ref(false)
+const formRef = ref(null)
+
+// 表单数据
+const formData = ref({
+  id: null,
+  objectType: '',
+  interfaceName: '',
+  categoryName: '',
+  attributeName: '',
+  attributeUserName: '',
+  type: '',
+  unitsType: '',
+  primaryUnits: '',
+  codelist: '',
+  codelistNamespace: '',
+  onPropertyPage: false,
+  readOnly: false,
+  symbolParameter: '',
+  version: 1,
+  createdTime: '',
+  updatedTime: '',
+  modifier: 'admin'
+})
+
+// 表单验证规则
+const rules = {
+  interfaceName: [{ required: true, message: '请输入Interface Name', trigger: 'blur' }],
+  attributeName: [{ required: true, message: '请输入Attribute Name', trigger: 'blur' }],
+  type: [{ required: true, message: '请输入Type', trigger: 'blur' }]
+}
+
+// 过滤后的属性列表
+const filteredPropertyList = computed(() => {
+  let list = propertyList.value
+  
+  // 先按选中的Interface过滤
+  if (selectedInterface.value) {
+    list = list.filter(item => item.interfaceName === selectedInterface.value)
+  }
+  
+  // 再按搜索文本过滤
+  if (!searchText.value) return list
+  return list.filter(item => {
+    const text = searchText.value.toLowerCase()
+    return (
+      item.interfaceName.toLowerCase().includes(text) ||
+      item.categoryName.toLowerCase().includes(text) ||
+      item.attributeName.toLowerCase().includes(text) ||
+      item.attributeUserName.toLowerCase().includes(text) ||
+      item.type.toLowerCase().includes(text)
+    )
+  })
+})
+
+// 统计数据
+const totalCount = computed(() => propertyList.value.length)
+
+const enabledCount = computed(() => 
+  propertyList.value.filter(p => p.onPropertyPage).length
+)
+
+const readOnlyCount = computed(() => 
+  propertyList.value.filter(p => p.readOnly).length
+)
+
+const symbolCount = computed(() => 
+  propertyList.value.filter(p => p.symbolParameter).length
+)
+
+const interfaceCount = computed(() => {
+  const interfaces = new Set(propertyList.value.map(p => p.interfaceName))
+  return interfaces.size
+})
+
+const typeCount = computed(() => {
+  const types = new Set(propertyList.value.map(p => p.type))
+  return types.size
+})
+
+/**
+ * 搜索处理
+ */
+function onSearch() {
+  // 计算属性会自动更新
+}
+
+/**
+ * 树节点过滤方法
+ */
+function filterTreeNode(value, data) {
+  if (!value) return true
+  return data.label.toLowerCase().includes(value.toLowerCase())
+}
+
+/**
+ * 监听树搜索文本变化
+ */
+watch(treeSearchText, (val) => {
+  treeRef.value?.filter(val)
+})
+
+/**
+ * 构建目录树数据：优先使用对象类型配置中的Interface列表
+ */
+function buildTreeData() {
+  const propertyMap = new Map()
+  propertyList.value.forEach(item => {
+    const interfaceName = item.interfaceName || 'UnknownInterface'
+    if (!propertyMap.has(interfaceName)) {
+      propertyMap.set(interfaceName, [])
+    }
+    propertyMap.get(interfaceName).push(item)
+  })
+
+  let propertyNodeSeed = 0
+  const buildPropertyNodes = (objectType, interfaceName, props = []) =>
+    props.map(prop => {
+      const suffix = prop.id ?? `${interfaceName}-${propertyNodeSeed++}`
+      return {
+        id: `${objectType}-${interfaceName}-${suffix}`,
+        label: prop.attributeUserName || prop.attributeName || `属性 ${suffix}`
+      }
+    })
+
+  if (objectTypeConfigList.value.length) {
+    const coveredInterfaces = new Set()
+    const tree = objectTypeConfigList.value
+      .slice()
+      .sort((a, b) => (a.objectType || '').localeCompare(b.objectType || ''))
+      .map(typeItem => {
+        const typeName = typeItem.objectType || 'UnknownObjectType'
+        const interfaces = Array.isArray(typeItem.interfaces)
+          ? typeItem.interfaces.filter(Boolean)
+          : []
+        const interfaceChildren = interfaces
+          .sort((a, b) => a.localeCompare(b))
+          .map(iface => {
+            coveredInterfaces.add(iface)
+            const relatedProps = propertyMap.get(iface) || []
+            return {
+              id: `${typeName}-${iface}`,
+              label: relatedProps.length ? `${iface} (${relatedProps.length})` : iface,
+              children: buildPropertyNodes(typeName, iface, relatedProps)
+            }
+          })
+
+        return {
+          id: typeName,
+          label: `${typeName} (${interfaceChildren.length})`,
+          children: interfaceChildren
+        }
+      })
+
+    const extraInterfaces = []
+    propertyMap.forEach((props, iface) => {
+      if (!coveredInterfaces.has(iface)) {
+        extraInterfaces.push({
+          id: `Other-${iface}`,
+          label: props.length ? `${iface} (${props.length})` : iface,
+          children: buildPropertyNodes('Other', iface, props)
+        })
+      }
+    })
+
+    if (extraInterfaces.length) {
+      extraInterfaces.sort((a, b) => a.label.localeCompare(b.label))
+      tree.push({
+        id: 'Other',
+        label: `Other (${extraInterfaces.length})`,
+        children: extraInterfaces
+      })
+    }
+
+    treeData.value = tree
+    return
+  }
+
+  const fallbackMap = new Map()
+  propertyList.value.forEach(item => {
+    const objectType = item.interfaceName?.replace(/^IJ/, '') || 'Other'
+    if (!fallbackMap.has(objectType)) {
+      fallbackMap.set(objectType, new Map())
+    }
+    const interfaceMap = fallbackMap.get(objectType)
+    if (!interfaceMap.has(item.interfaceName)) {
+      interfaceMap.set(item.interfaceName, [])
+    }
+    interfaceMap.get(item.interfaceName).push(item)
+  })
+
+  const tree = []
+  Array.from(fallbackMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .forEach(([objectType, interfaceMap]) => {
+      const interfaceChildren = []
+      Array.from(interfaceMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .forEach(([interfaceName, properties]) => {
+          interfaceChildren.push({
+            id: `${objectType}-${interfaceName}`,
+            label: properties.length ? `${interfaceName} (${properties.length})` : interfaceName,
+            children: buildPropertyNodes(objectType, interfaceName, properties)
+          })
+        })
+      tree.push({
+        id: objectType,
+        label: `${objectType} (${interfaceMap.size})`,
+        children: interfaceChildren
+      })
+    })
+
+  treeData.value = tree
+}
+
+/**
+ * 树节点点击事件 - 三层结构处理
+ */
+function handleTreeNodeClick(data) {
+  const parts = data.id.split('-')
+  if (parts.length === 2) {
+    // 点击的是接口层（objectType-interfaceName）
+    const interfaceName = parts[1]
+    selectedInterface.value = interfaceName === selectedInterface.value ? '' : interfaceName
+  } else if (parts.length > 2) {
+    // 点击的是属性层或其他层，则选择对应的Interface
+    const interfaceName = parts[1]
+    selectedInterface.value = interfaceName
+  } else {
+    // 点击的是对象类型层，清空选择
+    selectedInterface.value = ''
+  }
+}
+
+/**
+ * 加载数据（使用真实 API）
+ */
+async function loadData() {
+  loading.value = true
+  try {
+    const data = await fetchProperties({
+      interfaceName: selectedInterface.value || undefined,
+      objectType: selectedObjectType.value || undefined,
+      search: searchText.value || undefined,
+      page: pagination.value.page,
+      pageSize: pagination.value.pageSize,
+      sortBy: 'id',
+      order: 'asc'
+    })
+
+    propertyList.value = (data?.items || []).map(normalizeProperty)
+    pagination.value = {
+      page: data?.pageIndex ?? data?.page ?? pagination.value.page,
+      pageSize: data?.pageSize ?? pagination.value.pageSize,
+      total: data?.totalCount ?? data?.total ?? (data?.items?.length || 0)
+    }
+
+    buildTreeData()
+  } catch (error) {
+    console.error('加载属性失败', error)
+    ElMessage.error('加载属性失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 归一化后端属性数据到前端字段
+ */
+function normalizeProperty(item) {
+  if (!item) return {}
+  const type = item.type || item.dataType || ''
+  return {
+    id: item.id,
+    interfaceId: item.interfaceId,
+    interfaceName: item.interfaceName,
+    categoryName: item.categoryName,
+    attributeName: item.attributeName,
+    attributeUserName: item.attributeUserName || item.attributeName,
+    type,
+    unitsType: item.unitsType || '',
+    primaryUnits: item.primaryUnits || '',
+    codelist: item.codelist ?? item.codelistName ?? '',
+    codelistNamespace: item.codelistNamespace || '',
+    onPropertyPage: Boolean(item.onPropertyPage),
+    readOnly: Boolean(item.readOnly),
+    symbolParameter: Boolean(item.symbolParameter),
+    version: item.version ?? 1,
+    createdTime: item.createdTime || item.createdAt || '',
+    updatedTime: item.updatedTime || item.updatedAt || '',
+    modifier: item.modifier || item.createdBy || ''
+  }
+}
+
+/**
+ * 加载对象类型配置
+ */
+async function loadObjectTypes() {
+  try {
+    const data = await fetchObjectTypes()
+    objectTypeConfigList.value = Array.isArray(data) ? data : []
+    buildTreeData()
+  } catch (error) {
+    console.error('加载对象类型失败', error)
+    ElMessage.error('加载对象类型失败，请稍后重试')
+  }
+}
+
+/**
+ * 添加新的Object Type
+ */
+function handleAddObjectType() {
+  ElMessageBox.prompt('请输入新的对象类型名称', '添加对象类型', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputPattern: /^[a-zA-Z][a-zA-Z0-9]*$/,
+    inputErrorMessage: '对象类型名仅能为字母数字'
+  })
+    .then(async ({ value }) => {
+      try {
+        await createObjectType({ objectType: value })
+        ElMessage.success('添加成功')
+        loadObjectTypes()
+      } catch (error) {
+        console.error('新增对象类型失败', error)
+        ElMessage.error('新增对象类型失败，请稍后重试')
+      }
+    })
+    .catch(() => {})
+}
+
+/**
+ * 为对象类型添加接口
+ */
+function handleAddInterface(objectType) {
+  ElMessageBox.prompt('请输入接口名称（应以IJ开头）', `为 ${objectType} 添加接口`, {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputPattern: /^IJ[a-zA-Z0-9]*$/,
+    inputErrorMessage: '接口名必须以IJ开头'
+  })
+    .then(async ({ value }) => {
+      try {
+        await addInterfaceToObjectType(objectType, { interfaceName: value })
+        ElMessage.success('添加成功')
+        loadObjectTypes()
+      } catch (error) {
+        console.error('添加接口失败', error)
+        ElMessage.error('添加接口失败，请稍后重试')
+      }
+    })
+    .catch(() => {})
+}
+
+/**
+ * 移除接口
+ */
+function handleRemoveInterface(objectType, iface) {
+  removeInterfaceFromObjectType(objectType, iface)
+    .then(() => {
+      ElMessage.success('删除成功')
+      loadObjectTypes()
+    })
+    .catch(error => {
+      console.error('删除接口失败', error)
+      ElMessage.error('删除接口失败，请稍后重试')
+    })
+}
+
+/**
+ * 删除Object Type
+ */
+function handleDeleteObjectType(objectType) {
+  ElMessageBox.confirm(`确定删除对象类型 "${objectType}" 吗?会同时删除其下所有接口`, '会议', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+    .then(async () => {
+      try {
+        await deleteObjectTypeApi(objectType)
+        ElMessage.success('删除成功')
+        loadObjectTypes()
+      } catch (error) {
+        console.error('删除对象类型失败', error)
+        ElMessage.error('删除对象类型失败，请稍后重试')
+      }
+    })
+    .catch(() => {})
+}
+
+/**
+ * 新增属性
+ */
+function handleAdd() {
+  isEdit.value = false
+  const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
+  formData.value = {
+    id: null,
+    objectType: '',
+    interfaceName: '',
+    categoryName: '',
+    attributeName: '',
+    attributeUserName: '',
+    type: '',
+    unitsType: '',
+    primaryUnits: '',
+    codelist: '',
+    codelistNamespace: '',
+    onPropertyPage: false,
+    readOnly: false,
+    symbolParameter: '',
+    version: 1,
+    createdTime: now,
+    updatedTime: now,
+    modifier: 'admin'
+  }
+  dialogVisible.value = true
+}
+
+/**
+ * 编辑属性
+ */
+function handleEdit(row) {
+  isEdit.value = true
+  const objectType = row.interfaceName.replace(/^IJ/, '') || 'Other'
+  formData.value = { 
+    ...row,
+    objectType: objectType
+  }
+  dialogVisible.value = true
+}
+
+/**
+ * 删除属性
+ */
+function handleDelete(row) {
+  ElMessageBox.confirm(
+    `确定删除属性 "${row.attributeUserName}" 吗？`,
+    '提示',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  )
+    .then(async () => {
+      loading.value = true
+      try {
+        await deletePropertyApi(row.id)
+        propertyList.value = propertyList.value.filter(item => item.id !== row.id)
+        buildTreeData()
+        ElMessage.success('删除成功')
+      } catch (error) {
+        console.error('删除失败', error)
+        ElMessage.error('删除失败，请稍后重试')
+      } finally {
+        loading.value = false
+      }
+    })
+    .catch(() => {
+      ElMessage.info('已取消删除')
+    })
+}
+
+/**
+ * 保存属性
+ */
+function handleSave() {
+  formRef.value.validate(async (valid) => {
+    if (!valid) return
+
+    loading.value = true
+    const payload = {
+      interfaceName: formData.value.interfaceName,
+      categoryName: formData.value.categoryName,
+      attributeName: formData.value.attributeName,
+      attributeUserName: formData.value.attributeUserName,
+      type: formData.value.type,
+      unitsType: formData.value.unitsType,
+      primaryUnits: formData.value.primaryUnits,
+      codelist: formData.value.codelist,
+      codelistNamespace: formData.value.codelistNamespace,
+      onPropertyPage: formData.value.onPropertyPage,
+      readOnly: formData.value.readOnly,
+      symbolParameter: formData.value.symbolParameter,
+      modifier: formData.value.modifier,
+      version: formData.value.version
+    }
+
+    try {
+      if (isEdit.value) {
+        const updated = await updateProperty(formData.value.id, payload)
+        const normalized = normalizeProperty(updated || formData.value)
+        const index = propertyList.value.findIndex(item => item.id === normalized.id)
+        if (index > -1) {
+          propertyList.value.splice(index, 1, normalized)
+        } else {
+          propertyList.value.unshift(normalized)
+        }
+        ElMessage.success('更新成功')
+      } else {
+        const created = await createProperty(payload)
+        propertyList.value.unshift(normalizeProperty(created))
+        ElMessage.success('新增成功')
+      }
+
+      buildTreeData()
+      loadObjectTypes()
+      dialogVisible.value = false
+    } catch (error) {
+      console.error('保存失败', error)
+      ElMessage.error('保存失败，请稍后重试')
+    } finally {
+      loading.value = false
+    }
+  })
+}
+
+function extractExportFileName(disposition) {
+  const fallback = `properties_${Date.now()}.csv`
+  if (!disposition) return fallback
+  const utfMatch = /filename\*=UTF-8''([^;]+)/i.exec(disposition)
+  const asciiMatch = /filename="?([^";]+)"?/i.exec(disposition)
+  const raw = utfMatch?.[1] || asciiMatch?.[1]
+  if (!raw) return fallback
+  try {
+    return decodeURIComponent(raw.replace(/"/g, ''))
+  } catch (error) {
+    console.warn('文件名解析失败，使用默认名称', error)
+    return fallback
+  }
+}
+
+/**
+ * 导出为Excel（使用 fetch 绕过 mockjs 对 XHR/blob 的干扰）
+ */
+async function handleExport() {
+  try {
+    const { blob, contentDisposition } = await exportPropertyData({
+      interfaceName: selectedInterface.value || undefined,
+      objectType: selectedObjectType.value || undefined,
+      search: searchText.value || undefined,
+      sortBy: 'id',
+      order: 'asc'
+    })
+    const fileName = extractExportFileName(contentDisposition)
+
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.href = url
+    link.download = fileName
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error(error?.message || '导出失败，请稍后重试')
+  }
+}
+
+// 页面加载时获取数据
+onMounted(() => {
+  loadData()
+  loadObjectTypes()
+})
+</script>
+
 <template>
   <div class="property-page">
     <div class="page-container">
@@ -330,7 +976,7 @@
         </el-form-item>
 
         <el-form-item label="SymbolParameter" prop="symbolParameter">
-          <el-switch v-model="formData.symbolParameter" />
+          <el-input v-model="formData.symbolParameter" placeholder="请输入symbolParameter"/>
         </el-form-item>
 
         <!-- 版本管理信息（仅读） -->
@@ -356,960 +1002,6 @@
     </el-dialog>
   </div>
 </template>
-
-<script setup>
-defineOptions({ name: 'PropertyManagement' })
-import { ref, computed, onMounted, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import * as XLSX from 'xlsx'
-
-// 属性列表
-const propertyList = ref([])
-
-// 目录树数据
-const treeData = ref([])
-
-// 树组件引用
-const treeRef = ref(null)
-
-// 树搜索文本
-const treeSearchText = ref('')
-
-// 标签页激活状态
-const activeTab = ref('property')
-
-// 映射Object Type和Interface的配置数据
-const objectTypeConfigList = ref([])
-
-// 搜索文本
-const searchText = ref('')
-
-// 加载状态
-const loading = ref(false)
-
-// 当前选中的Interface
-const selectedInterface = ref('')
-
-// 对象类型列表（从现有数据提取）
-const objectTypeList = computed(() => {
-  const types = new Set()
-  propertyList.value.forEach(item => {
-    const objectType = item.interfaceName.replace(/^IJ/, '') || 'Other'
-    types.add(objectType)
-  })
-  return Array.from(types).sort()
-})
-
-// 根据选中的对象类型获取接口列表
-const interfaceList = computed(() => {
-  if (!formData.value.objectType) return []
-  const interfaces = new Set()
-  propertyList.value.forEach(item => {
-    const objectType = item.interfaceName.replace(/^IJ/, '') || 'Other'
-    if (objectType === formData.value.objectType) {
-      interfaces.add(item.interfaceName)
-    }
-  })
-  return Array.from(interfaces).sort()
-})
-
-// 对话框控制
-const dialogVisible = ref(false)
-const isEdit = ref(false)
-const formRef = ref(null)
-
-// 表单数据
-const formData = ref({
-  id: null,
-  objectType: '',
-  interfaceName: '',
-  categoryName: '',
-  attributeName: '',
-  attributeUserName: '',
-  type: '',
-  unitsType: '',
-  primaryUnits: '',
-  codelist: '',
-  codelistNamespace: '',
-  onPropertyPage: false,
-  readOnly: false,
-  symbolParameter: false,
-  version: 1,
-  createdTime: '',
-  updatedTime: '',
-  modifier: 'admin'
-})
-
-// 表单验证规则
-const rules = {
-  interfaceName: [{ required: true, message: '请输入Interface Name', trigger: 'blur' }],
-  attributeName: [{ required: true, message: '请输入Attribute Name', trigger: 'blur' }],
-  type: [{ required: true, message: '请输入Type', trigger: 'blur' }]
-}
-
-// 过滤后的属性列表
-const filteredPropertyList = computed(() => {
-  let list = propertyList.value
-  
-  // 先按选中的Interface过滤
-  if (selectedInterface.value) {
-    list = list.filter(item => item.interfaceName === selectedInterface.value)
-  }
-  
-  // 再按搜索文本过滤
-  if (!searchText.value) return list
-  return list.filter(item => {
-    const text = searchText.value.toLowerCase()
-    return (
-      item.interfaceName.toLowerCase().includes(text) ||
-      item.categoryName.toLowerCase().includes(text) ||
-      item.attributeName.toLowerCase().includes(text) ||
-      item.attributeUserName.toLowerCase().includes(text) ||
-      item.type.toLowerCase().includes(text)
-    )
-  })
-})
-
-// 统计数据
-const totalCount = computed(() => propertyList.value.length)
-
-const enabledCount = computed(() => 
-  propertyList.value.filter(p => p.onPropertyPage).length
-)
-
-const readOnlyCount = computed(() => 
-  propertyList.value.filter(p => p.readOnly).length
-)
-
-const symbolCount = computed(() => 
-  propertyList.value.filter(p => p.symbolParameter).length
-)
-
-const interfaceCount = computed(() => {
-  const interfaces = new Set(propertyList.value.map(p => p.interfaceName))
-  return interfaces.size
-})
-
-const typeCount = computed(() => {
-  const types = new Set(propertyList.value.map(p => p.type))
-  return types.size
-})
-
-/**
- * 搜索处理
- */
-function onSearch() {
-  // 计算属性会自动更新
-}
-
-/**
- * 树节点过滤方法
- */
-function filterTreeNode(value, data) {
-  if (!value) return true
-  return data.label.toLowerCase().includes(value.toLowerCase())
-}
-
-/**
- * 监听树搜索文本变化
- */
-watch(treeSearchText, (val) => {
-  treeRef.value?.filter(val)
-})
-
-/**
- * 构建树形结构数据 - 三层结构：对象类型 -> 接口 -> 属性
- */
-function buildTreeData() {
-  const objectTypeMap = new Map()
-  
-  propertyList.value.forEach(item => {
-    // 从interfaceName提取objectType（去掉'IJ'前缀）
-    const objectType = item.interfaceName.replace(/^IJ/, '') || 'Other'
-    
-    if (!objectTypeMap.has(objectType)) {
-      objectTypeMap.set(objectType, new Map())
-    }
-    const interfaceMap = objectTypeMap.get(objectType)
-    if (!interfaceMap.has(item.interfaceName)) {
-      interfaceMap.set(item.interfaceName, [])
-    }
-    interfaceMap.get(item.interfaceName).push(item)
-  })
-  
-  const tree = []
-  // 按对象类型排序
-  Array.from(objectTypeMap.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .forEach(([objectType, interfaceMap]) => {
-      const interfaceChildren = []
-      // 按接口名排序
-      Array.from(interfaceMap.entries())
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .forEach(([interfaceName, properties]) => {
-          interfaceChildren.push({
-            id: `${objectType}-${interfaceName}`,
-            label: interfaceName,
-            children: properties.map((p, index) => ({
-              id: `${objectType}-${interfaceName}-${index}`,
-              label: p.attributeUserName || p.attributeName
-            }))
-          })
-        })
-      tree.push({
-        id: objectType,
-        label: `${objectType} (${interfaceMap.size})`,
-        children: interfaceChildren
-      })
-    })
-  
-  treeData.value = tree
-}
-
-/**
- * 树节点点击事件 - 三层结构处理
- */
-function handleTreeNodeClick(data) {
-  const parts = data.id.split('-')
-  if (parts.length === 2) {
-    // 点击的是接口层（objectType-interfaceName）
-    const interfaceName = parts[1]
-    selectedInterface.value = interfaceName === selectedInterface.value ? '' : interfaceName
-  } else if (parts.length > 2) {
-    // 点击的是属性层或其他层，则选择对应的Interface
-    const interfaceName = parts[1]
-    selectedInterface.value = interfaceName
-  } else {
-    // 点击的是对象类型层，清空选择
-    selectedInterface.value = ''
-  }
-}
-
-/**
- * 加载数据
- */
-function loadData() {
-  propertyList.value = [
-    {
-      id: 1,
-      interfaceName: 'IJPipeRun',
-      categoryName: 'BasicInfo',
-      attributeName: 'RunID',
-      attributeUserName: 'Run ID',
-      type: 'Integer',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false,
-      version: 1,
-      createdTime: '2026-01-01 10:00:00',
-      updatedTime: '2026-01-01 10:00:00'
-    },
-    {
-      id: 2,
-      interfaceName: 'IJPipeRun',
-      categoryName: 'BasicInfo',
-      attributeName: 'RunName',
-      attributeUserName: 'Run Name',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false,
-      version: 1,
-      createdTime: '2026-01-01 10:05:00',
-      updatedTime: '2026-01-01 10:05:00'
-    },
-    {
-      id: 3,
-      interfaceName: 'IJPipeRun',
-      categoryName: 'Specifications',
-      attributeName: 'NominalSize',
-      attributeUserName: 'Nominal Size',
-      type: 'Double',
-      unitsType: 'Length',
-      primaryUnits: 'mm',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: true,
-      symbolParameter: true
-    },
-    {
-      id: 4,
-      interfaceName: 'IJPipeRun',
-      categoryName: 'Specifications',
-      attributeName: 'WallThickness',
-      attributeUserName: 'Wall Thickness',
-      type: 'Double',
-      unitsType: 'Length',
-      primaryUnits: 'mm',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: true,
-      symbolParameter: true
-    },
-    {
-      id: 5,
-      interfaceName: 'IJMaterial',
-      categoryName: 'Properties',
-      attributeName: 'MaterialGrade',
-      attributeUserName: 'Material Grade',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: 'MaterialGrades',
-      codelistNamespace: 'com.smartplant.materials',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 6,
-      interfaceName: 'IJEquipment',
-      categoryName: 'Identification',
-      attributeName: 'EquipmentNumber',
-      attributeUserName: 'Equipment No.',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: true,
-      symbolParameter: false
-    },
-    {
-      id: 7,
-      interfaceName: 'IJPipeRun',
-      categoryName: 'Specifications',
-      attributeName: 'OuterDiameter',
-      attributeUserName: 'Outer Diameter',
-      type: 'Double',
-      unitsType: 'Length',
-      primaryUnits: 'mm',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: true
-    },
-    {
-      id: 8,
-      interfaceName: 'IJPipeRun',
-      categoryName: 'Specifications',
-      attributeName: 'PipeSchedule',
-      attributeUserName: 'Pipe Schedule',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: 'PipeSchedule',
-      codelistNamespace: 'com.smartplant.piping',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 9,
-      interfaceName: 'IJPipeRun',
-      categoryName: 'Design',
-      attributeName: 'DesignPressure',
-      attributeUserName: 'Design Pressure',
-      type: 'Double',
-      unitsType: 'Pressure',
-      primaryUnits: 'MPa',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 10,
-      interfaceName: 'IJPipeRun',
-      categoryName: 'Design',
-      attributeName: 'DesignTemperature',
-      attributeUserName: 'Design Temperature',
-      type: 'Double',
-      unitsType: 'Temperature',
-      primaryUnits: '°C',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 11,
-      interfaceName: 'IJMaterial',
-      categoryName: 'Properties',
-      attributeName: 'MaterialSpec',
-      attributeUserName: 'Material Spec',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: 'MaterialSpec',
-      codelistNamespace: 'com.smartplant.materials',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 12,
-      interfaceName: 'IJMaterial',
-      categoryName: 'Properties',
-      attributeName: 'Density',
-      attributeUserName: 'Density',
-      type: 'Double',
-      unitsType: 'Density',
-      primaryUnits: 'kg/m³',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: true,
-      symbolParameter: false
-    },
-    {
-      id: 13,
-      interfaceName: 'IJMaterial',
-      categoryName: 'Thermal',
-      attributeName: 'ThermalExpansion',
-      attributeUserName: 'Thermal Expansion',
-      type: 'Double',
-      unitsType: 'Coefficient',
-      primaryUnits: '1/°C',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: true,
-      symbolParameter: false
-    },
-    {
-      id: 14,
-      interfaceName: 'IJEquipment',
-      categoryName: 'Identification',
-      attributeName: 'EquipmentTag',
-      attributeUserName: 'Equipment Tag',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 15,
-      interfaceName: 'IJEquipment',
-      categoryName: 'Design',
-      attributeName: 'RatedCapacity',
-      attributeUserName: 'Rated Capacity',
-      type: 'Double',
-      unitsType: 'Volume',
-      primaryUnits: 'm³',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 16,
-      interfaceName: 'IJEquipment',
-      categoryName: 'Design',
-      attributeName: 'OperatingPressure',
-      attributeUserName: 'Operating Pressure',
-      type: 'Double',
-      unitsType: 'Pressure',
-      primaryUnits: 'MPa',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 17,
-      interfaceName: 'IJValve',
-      categoryName: 'BasicInfo',
-      attributeName: 'ValveType',
-      attributeUserName: 'Valve Type',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: 'ValveType',
-      codelistNamespace: 'com.smartplant.piping',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: true
-    },
-    {
-      id: 18,
-      interfaceName: 'IJValve',
-      categoryName: 'BasicInfo',
-      attributeName: 'ValveSize',
-      attributeUserName: 'Valve Size',
-      type: 'Double',
-      unitsType: 'Length',
-      primaryUnits: 'mm',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: true
-    },
-    {
-      id: 19,
-      interfaceName: 'IJValve',
-      categoryName: 'Specifications',
-      attributeName: 'EndConnection',
-      attributeUserName: 'End Connection',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: 'EndConnection',
-      codelistNamespace: 'com.smartplant.piping',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 20,
-      interfaceName: 'IJValve',
-      categoryName: 'Specifications',
-      attributeName: 'PressureRating',
-      attributeUserName: 'Pressure Rating',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: 'PressureRating',
-      codelistNamespace: 'com.smartplant.piping',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 21,
-      interfaceName: 'IJFitting',
-      categoryName: 'BasicInfo',
-      attributeName: 'FittingType',
-      attributeUserName: 'Fitting Type',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: 'FittingType',
-      codelistNamespace: 'com.smartplant.piping',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: true
-    },
-    {
-      id: 22,
-      interfaceName: 'IJFitting',
-      categoryName: 'BasicInfo',
-      attributeName: 'FittingSize',
-      attributeUserName: 'Fitting Size',
-      type: 'Double',
-      unitsType: 'Length',
-      primaryUnits: 'mm',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: true
-    },
-    {
-      id: 23,
-      interfaceName: 'IJFitting',
-      categoryName: 'Geometry',
-      attributeName: 'BendRadius',
-      attributeUserName: 'Bend Radius',
-      type: 'Double',
-      unitsType: 'Length',
-      primaryUnits: 'mm',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 24,
-      interfaceName: 'IJFitting',
-      categoryName: 'Geometry',
-      attributeName: 'BendAngle',
-      attributeUserName: 'Bend Angle',
-      type: 'Double',
-      unitsType: 'Angle',
-      primaryUnits: '°',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 25,
-      interfaceName: 'IJInstrument',
-      categoryName: 'Identification',
-      attributeName: 'TagNumber',
-      attributeUserName: 'Tag Number',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 26,
-      interfaceName: 'IJInstrument',
-      categoryName: 'Identification',
-      attributeName: 'ServiceDescription',
-      attributeUserName: 'Service Description',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 27,
-      interfaceName: 'IJInstrument',
-      categoryName: 'Specifications',
-      attributeName: 'MeasurementRange',
-      attributeUserName: 'Measurement Range',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: '',
-      codelistNamespace: '',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    },
-    {
-      id: 28,
-      interfaceName: 'IJInstrument',
-      categoryName: 'Specifications',
-      attributeName: 'SignalType',
-      attributeUserName: 'Signal Type',
-      type: 'String',
-      unitsType: '',
-      primaryUnits: '',
-      codelist: 'SignalType',
-      codelistNamespace: 'com.smartplant.instrument',
-      onPropertyPage: true,
-      readOnly: false,
-      symbolParameter: false
-    }
-  ]
-  
-  // 为所有记录添加版本管理字段
-  const now = new Date()
-  propertyList.value = propertyList.value.map((item, index) => {
-    const timestamp = new Date(now.getTime() - (propertyList.value.length - index) * 60000)
-    return {
-      ...item,
-      version: item.version || 1,
-      createdTime: item.createdTime || timestamp.toISOString().slice(0, 19).replace('T', ' '),
-      updatedTime: item.updatedTime || timestamp.toISOString().slice(0, 19).replace('T', ' '),
-      modifier: item.modifier || 'admin'
-    }
-  })
-  
-  // 构建 Object Type 配置映射
-  buildObjectTypeConfig()
-  
-  buildTreeData()
-  ElMessage.success('数据已加载')
-}
-
-/**
- * 构建 Object Type 配置映射
- */
-function buildObjectTypeConfig() {
-  const configMap = new Map()
-  
-  propertyList.value.forEach(item => {
-    const objectType = item.interfaceName.replace(/^IJ/, '') || 'Other'
-    if (!configMap.has(objectType)) {
-      configMap.set(objectType, new Set())
-    }
-    configMap.get(objectType).add(item.interfaceName)
-  })
-  
-  objectTypeConfigList.value = Array.from(configMap.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([objectType, interfaces]) => ({
-      objectType: objectType,
-      interfaces: Array.from(interfaces).sort()
-    }))
-}
-
-/**
- * 添加新的Object Type
- */
-function handleAddObjectType() {
-  ElMessageBox.prompt('请输入新的对象类型名称', '添加对象类型', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    inputPattern: /^[a-zA-Z][a-zA-Z0-9]*$/,
-    inputErrorMessage: '对象类型名仅能为字母数字'
-  })
-    .then(({ value }) => {
-      const exists = objectTypeConfigList.value.some(item => item.objectType === value)
-      if (exists) {
-        ElMessage.warning('该对象类型已存在')
-        return
-      }
-      objectTypeConfigList.value.push({ objectType: value, interfaces: [] })
-      objectTypeConfigList.value.sort((a, b) => a.objectType.localeCompare(b.objectType))
-      ElMessage.success('添加成功')
-    })
-    .catch(() => {})
-}
-
-/**
- * 为对象类型添加接口
- */
-function handleAddInterface(objectType) {
-  ElMessageBox.prompt('请输入接口名称（应以IJ开头）', `为 ${objectType} 添加接口`, {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    inputPattern: /^IJ[a-zA-Z0-9]*$/,
-    inputErrorMessage: '接口名必须以IJ开头'
-  })
-    .then(({ value }) => {
-      const config = objectTypeConfigList.value.find(item => item.objectType === objectType)
-      if (config) {
-        if (config.interfaces.includes(value)) {
-          ElMessage.warning('该接口已经存在')
-          return
-        }
-        config.interfaces.push(value)
-        config.interfaces.sort()
-        ElMessage.success('添加成功')
-      }
-    })
-    .catch(() => {})
-}
-
-/**
- * 移除接口
- */
-function handleRemoveInterface(objectType, iface) {
-  const config = objectTypeConfigList.value.find(item => item.objectType === objectType)
-  if (config) {
-    const index = config.interfaces.indexOf(iface)
-    if (index > -1) {
-      config.interfaces.splice(index, 1)
-      ElMessage.success('删除成功')
-    }
-  }
-}
-
-/**
- * 删除Object Type
- */
-function handleDeleteObjectType(objectType) {
-  ElMessageBox.confirm(`确定删除对象类型 "${objectType}" 吗?会同时删除其下所有接口`, '会议', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  })
-    .then(() => {
-      const index = objectTypeConfigList.value.findIndex(item => item.objectType === objectType)
-      if (index > -1) {
-        objectTypeConfigList.value.splice(index, 1)
-        ElMessage.success('删除成功')
-      }
-    })
-    .catch(() => {})
-}
-
-/**
- * 新增属性
- */
-function handleAdd() {
-  isEdit.value = false
-  const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
-  formData.value = {
-    id: null,
-    objectType: '',
-    interfaceName: '',
-    categoryName: '',
-    attributeName: '',
-    attributeUserName: '',
-    type: '',
-    unitsType: '',
-    primaryUnits: '',
-    codelist: '',
-    codelistNamespace: '',
-    onPropertyPage: false,
-    readOnly: false,
-    symbolParameter: false,
-    version: 1,
-    createdTime: now,
-    updatedTime: now,
-    modifier: 'admin'
-  }
-  dialogVisible.value = true
-}
-
-/**
- * 编辑属性
- */
-function handleEdit(row) {
-  isEdit.value = true
-  const objectType = row.interfaceName.replace(/^IJ/, '') || 'Other'
-  formData.value = { 
-    ...row,
-    objectType: objectType
-  }
-  dialogVisible.value = true
-}
-
-/**
- * 删除属性
- */
-function handleDelete(row) {
-  ElMessageBox.confirm(
-    `确定删除属性 "${row.attributeUserName}" 吗？`,
-    '提示',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  )
-    .then(() => {
-      const index = propertyList.value.findIndex(item => item.id === row.id)
-      if (index > -1) {
-        propertyList.value.splice(index, 1)
-        buildTreeData()
-      }
-      ElMessage.success('删除成功')
-    })
-    .catch(() => {
-      ElMessage.info('已取消删除')
-    })
-}
-
-/**
- * 保存属性
- */
-function handleSave() {
-  formRef.value.validate((valid) => {
-    if (!valid) return
-    
-    const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
-
-    if (isEdit.value) {
-      // 更新现有属性 - 增加版本号并更新修改人
-      const index = propertyList.value.findIndex(item => item.id === formData.value.id)
-      if (index > -1) {
-        const updated = { 
-          ...formData.value,
-          version: (formData.value.version || 1) + 1,
-          updatedTime: now,
-          modifier: formData.value.modifier || 'admin'
-        }
-        propertyList.value[index] = updated
-        buildTreeData()
-      }
-      ElMessage.success('更新成功，版本已升级')
-    } else {
-      // 新增属性
-      const newProperty = {
-        id: Math.max(...propertyList.value.map(p => p.id || 0), 0) + 1,
-        ...formData.value,
-        version: 1,
-        createdTime: now,
-        updatedTime: now,
-        modifier: formData.value.modifier || 'admin'
-      }
-      propertyList.value.push(newProperty)
-      buildTreeData()
-      ElMessage.success('新增成功')
-    }
-
-    dialogVisible.value = false
-  })
-}
-
-/**
- * 导出为Excel
- */
-function handleExport() {
-  try {
-    // 准备导出数据
-    const exportData = propertyList.value.map(item => ({
-      'Interface Name': item.interfaceName,
-      'Category Name': item.categoryName,
-      'Attribute Name': item.attributeName,
-      'Attribute UserName': item.attributeUserName,
-      'Type': item.type,
-      'Units Type': item.unitsType,
-      'Primary Units': item.primaryUnits,
-      'Codelist': item.codelist,
-      'CodeList Namespace': item.codelistNamespace,
-      'OnPropertyPage': item.onPropertyPage ? '是' : '否',
-      'ReadOnly': item.readOnly ? '是' : '否',
-      'SymbolParameter': item.symbolParameter ? '是' : '否'
-    }))
-
-    // 创建工作簿
-    const worksheet = XLSX.utils.json_to_sheet(exportData)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, '属性列表')
-
-    // 设置列宽
-    const columnWidths = [
-      { wch: 15 },  // Interface Name
-      { wch: 15 },  // Category Name
-      { wch: 15 },  // Attribute Name
-      { wch: 15 },  // Attribute UserName
-      { wch: 12 },  // Type
-      { wch: 12 },  // Units Type
-      { wch: 12 },  // Primary Units
-      { wch: 12 },  // Codelist
-      { wch: 20 },  // CodeList Namespace
-      { wch: 12 },  // OnPropertyPage
-      { wch: 10 },  // ReadOnly
-      { wch: 15 }   // SymbolParameter
-    ]
-    worksheet['!cols'] = columnWidths
-
-    // 导出文件
-    const fileName = `属性列表_${new Date().getTime()}.xlsx`
-    XLSX.writeFile(workbook, fileName)
-    
-    ElMessage.success('导出成功')
-  } catch (error) {
-    console.error('导出失败:', error)
-    ElMessage.error('导出失败，请重试')
-  }
-}
-
-// 页面加载时获取数据
-onMounted(() => {
-  loadData()
-})
-</script>
 
 <style scoped>
 .property-page {
