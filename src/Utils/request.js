@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { ElMessage } from 'element-plus';
+import router from '@/router';
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -20,35 +22,44 @@ request.interceptors.request.use((config) => {
 // 响应拦截器 - 统一处理API响应格式
 request.interceptors.response.use(
   (response) => {
-    const res = response.data;
+    const { config } = response;
 
-    // 统一处理成功响应
-    if (res.code === 200) {
-      return res.data;
+    // 文件下载等二进制响应直接透传，方便外层解析 headers
+    if (config?.responseType === 'blob') {
+      return response;
     }
 
-    // 业务错误处理
-    const errorMap = {
-      401: "未登录或登录已过期",
-      403: "没有权限访问",
-      404: "请求的资源不存在",
-      500: "服务器内部错误",
-    };
+    const res = response.data ?? {};
 
-    const message = res.message || errorMap[res.code] || "请求失败";
+    if (typeof res.code === 'number') {
+      if (res.code === 200) {
+        return res.data;
+      }
 
-    // 统一错误提示
-    ElMessage.error({
-      message: `${message} (${res.traceId})`,
-      duration: 5000,
-    });
+      const errorMap = {
+        401: "未登录或登录已过期",
+        403: "没有权限访问",
+        404: "请求的资源不存在",
+        500: "服务器内部错误",
+      };
 
-    // 401跳转到登录页
-    if (res.code === 401) {
-      router.push("/login");
+      const traceId = res.traceId ? ` (${res.traceId})` : '';
+      const message = res.message || errorMap[res.code] || "请求失败";
+
+      ElMessage.error({
+        message: `${message}${traceId}`,
+        duration: 5000,
+      });
+
+      if (res.code === 401) {
+        router.push("/login");
+      }
+
+      return Promise.reject(new Error(message));
     }
 
-    return Promise.reject(new Error(message));
+    // 兼容没有封装 code 的普通 REST 响应
+    return res;
   },
   (error) => {
     // 网络错误处理
