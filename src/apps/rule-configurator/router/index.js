@@ -10,7 +10,6 @@ import propertyRouter from './modules/property'
 import standardSequenceRouter from './modules/standardsequence'
 
 export const constantRoutes = [
-  { path: '/', redirect: '/dict/attribute/piping-class' },
   dictRouter,
   designRouter,
   specRouter,
@@ -18,8 +17,7 @@ export const constantRoutes = [
   pipeRouter,
   libraryRouter,
   propertyRouter,
-  standardSequenceRouter,
-  { path: '/:pathMatch(.*)*', redirect: '/' }
+  standardSequenceRouter
 ]
 
 const router = createRouter({
