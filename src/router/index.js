@@ -8,9 +8,10 @@ import pipeRouter from './modules/pipe'
 import libraryRouter from './modules/library'
 import propertyRouter from './modules/property'
 import standardSequenceRouter from './modules/standardsequence'
+import PortalLayout from '@/layout/PortalLayout.vue'
 export const constantRoutes = [
-  // 首页重定向到第一个菜单（字典定义的第一个页面）
-  { path: '/', redirect: '/dict/attribute/piping-class' },
+  // 首页直接进入门户页面，不再跳转到字典页
+  { path: '/', component: PortalLayout, hidden: true },
 
 
   dictRouter,
