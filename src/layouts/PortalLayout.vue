@@ -160,16 +160,7 @@ const handleSearch = () => {
           <h1 class="welcome-title">欢迎进入设计规则驱动管理系统</h1>
           <p class="welcome-desc">请选择您需要进入的功能模块。登录系统接入后将展示个性化信息。</p>
         </div>
-        <div class="welcome-right">
-          <div class="stat-pill">
-            <span class="stat-num">6</span>
-            <span class="stat-label">功能模块</span>
-          </div>
-          <div class="stat-pill">
-            <span class="stat-num">08:42</span>
-            <span class="stat-label">上次登录</span>
-          </div>
-        </div>
+
       </section>
 
       <!-- 模块卡片 -->
