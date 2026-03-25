@@ -3,8 +3,8 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Search, Document, Box, Connection,
-  Tickets, SetUp, Monitor, ArrowRight,
-  Bell, CaretBottom, User, Setting, SwitchButton
+  SetUp, Monitor, ArrowRight,
+  Bell, CaretBottom, User
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -12,69 +12,58 @@ const keyword = ref('')
 
 const modules = computed(() => [
   {
-    title: '管系规格书管理',
-    desc: '管理字典、材料编码规则、规格书配置与 PCF 规则。',
-    icon: Document,
-    mainPath: '/pipe-spec/index',
-    color: '#264f7b',
-    links: [
-      { label: '业务属性定义', path: '/dict/attribute/piping-class' },
-      { label: '材料编码规则', path: '/pmc/index' }
-    ]
-  },
-  {
-    title: '产品元件标准数据',
-    desc: '覆盖目录定义、分类层级、标准元件数据结构与维护。',
+    title: '产品元件标准数据管理',
+    desc: '覆盖目录定义、分类层级、标准元件数据结构与S3D基础库维护。',
     icon: Box,
-    mainPath: '/library/pipe',
+    mainPath: '/product-standard/catalog-definition/standard/piping',
     color: '#264f7b',
     links: [
-      { label: '管系专业库', path: '/library/pipe' },
-      { label: '风管专业库', path: '/library/duct' }
+      { label: 'S3D对象属性管理', path: '/product-standard/data-management/s3d-property' },
+      { label: 'S3D部件数据(管系)', path: '/product-standard/data-management/s3d-component/piping/spec' }
     ]
   },
   {
-    title: 'S3D 基础库与映射',
-    desc: '管理对象属性、数据字典、库规则与模板映射关系。',
-    icon: Connection,
-    mainPath: '/property/index',
+    title: '管系规格书管理',
+    desc: '管理业务属性字典、材料编码规则、管系规格书配置与PCF规则。',
+    icon: Document,
+    mainPath: '/pipe-spec/dict/attribute/piping-class',
     color: '#264f7b',
     links: [
-      { label: '属性管理', path: '/property/index' },
-      { label: 'Codelist', path: '/library/codelist' }
-    ]
-  },
-  {
-    title: '标准简选管理',
-    desc: '维护简选标准定义、数据结构和配置看板。',
-    icon: Tickets,
-    mainPath: '/standard-sequence/config',
-    color: '#264f7b',
-    links: [
-      { label: '简选序列配置', path: '/standard-sequence/config' },
-      { label: '简选看板', path: '/standard-sequence/dashboard' }
+      { label: '业务属性定义', path: '/pipe-spec/dict/attribute/piping-class' },
+      { label: '材料编码', path: '/pipe-spec/material-code/index' }
     ]
   },
   {
     title: '设计规则管理',
     desc: '对设计规则和生产规则进行统一配置与持续演进。',
     icon: SetUp,
-    mainPath: '/design/rule-config',
+    mainPath: '/design-rule/design/rule-config',
     color: '#264f7b',
     links: [
-      { label: '设计规则类', path: '/design/rule-config' },
-      { label: 'Spec 列表', path: '/spec/index' }
+      { label: '设计规则类', path: '/design-rule/design/rule-config' },
+      { label: 'Spec 列表', path: '/design-rule/design/spec-list' }
     ]
   },
   {
-    title: '工程与集成运维',
-    desc: '工程环境配置、资源看板、二开部署与运维工具入口。',
+    title: '工程基础管理',
+    desc: '工程环境配置与S3D项目服务器资源监控看板。',
     icon: Monitor,
-    mainPath: '/ops/index',
+    mainPath: '/engineering/s3d-env-config',
     color: '#264f7b',
     links: [
-      { label: 'S3D环境配置', path: '/ops/s3d-env' },
-      { label: '快速部署', path: '/ops/deploy' }
+      { label: 'S3D工程环境配置', path: '/engineering/s3d-env-config' },
+      { label: '服务器资源看板', path: '/engineering/s3d-server-dashboard' }
+    ]
+  },
+  {
+    title: '组件持续集成系统',
+    desc: '二次开发快速部署、操作速查手册与使用频次统计看板。',
+    icon: Connection,
+    mainPath: '/component-ci/rapid-deploy',
+    color: '#264f7b',
+    links: [
+      { label: '快速部署', path: '/component-ci/rapid-deploy' },
+      { label: '操作速查', path: '/component-ci/operation-guide' }
     ]
   }
 ])

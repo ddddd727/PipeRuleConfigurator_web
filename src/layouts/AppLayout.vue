@@ -16,20 +16,41 @@ const showAI = ref(false)
 const tagsStore = useTagsViewStore()
 const cachedViews = computed(() => tagsStore.cachedViews)
 
-const toggleCollapse = () => {
-  isCollapse.value = !isCollapse.value
+const toggleCollapse = () => { isCollapse.value = !isCollapse.value }
+const toggleAI      = () => { showAI.value = !showAI.value }
+
+// ── App 配置 ────────────────────────────────────────────────────
+const APP_PREFIXES = [
+  '/pipe-spec',
+  '/product-standard',
+  '/design-rule',
+  '/engineering',
+  '/component-ci'
+]
+
+const APP_CONFIG = {
+  '/pipe-spec':        { title: '管系规格书管理',       footer: '管系规格书管理系统 · 外高桥造船有限公司' },
+  '/product-standard': { title: '产品元件标准数据管理', footer: '产品元件标准数据管理系统 · 外高桥造船有限公司' },
+  '/design-rule':      { title: '设计规则管理',         footer: '设计规则管理系统 · 外高桥造船有限公司' },
+  '/engineering':      { title: '工程基础管理',         footer: '工程基础管理系统 · 外高桥造船有限公司' },
+  '/component-ci':     { title: '组件持续集成系统',     footer: '组件持续集成系统 · 外高桥造船有限公司' }
 }
 
-const toggleAI = () => {
-  showAI.value = !showAI.value
-}
+/** 当前所在 App 的路径前缀（如 '/pipe-spec'） */
+const currentAppPath = computed(() =>
+  APP_PREFIXES.find(p => route.path.startsWith(p)) ?? null
+)
 
+/** 当前 App 的标题 / 页脚文字 */
+const appTitle  = computed(() => APP_CONFIG[currentAppPath.value]?.title  ?? '规则配置器')
+const appFooter = computed(() => APP_CONFIG[currentAppPath.value]?.footer ?? '设计规则驱动管理系统 · 外高桥造船有限公司')
+
+/** 侧边栏只展示当前 App 下的子路由 */
 const menuList = computed(() => {
-  return (router.options.routes || []).filter(item => (
-    !item.hidden
-    && item.path !== '/'
-    && item.path !== '/:pathMatch(.*)*'
-  ))
+  const appPath = currentAppPath.value
+  if (!appPath) return []
+  const appRoute = router.options.routes.find(r => r.path === appPath)
+  return (appRoute?.children || []).filter(c => !c.meta?.hidden)
 })
 </script>
 
@@ -43,7 +64,7 @@ const menuList = computed(() => {
           <div v-if="!isCollapse" class="header-content expanded">
             <div class="logo-area">
               <el-icon :size="18"><Platform /></el-icon>
-              <span class="app-title">规则配置器</span>
+              <span class="app-title">{{ appTitle }}</span>
             </div>
             <div class="collapse-trigger" @click="toggleCollapse">
               <el-icon :size="16"><Fold /></el-icon>
@@ -51,7 +72,7 @@ const menuList = computed(() => {
           </div>
 
           <div v-else class="header-content collapsed" @click="toggleCollapse">
-             <el-icon :size="20"><Expand /></el-icon>
+            <el-icon :size="20"><Expand /></el-icon>
           </div>
         </div>
 
@@ -66,10 +87,10 @@ const menuList = computed(() => {
           active-text-color="#ffffff"
         >
           <sidebar-item
-            v-for="route in menuList"
-            :key="route.path"
-            :item="route"
-            :basePath="''"
+            v-for="item in menuList"
+            :key="item.path"
+            :item="item"
+            :basePath="currentAppPath"
           />
         </el-menu>
       </el-aside>
@@ -92,7 +113,7 @@ const menuList = computed(() => {
                   <el-icon :size="16"><Cpu /></el-icon>
                   <span style="margin-left: 4px; font-weight: 600; font-size: 13px;">AI 助手</span>
                 </div>
-               </el-tooltip>
+              </el-tooltip>
             </div>
           </div>
 
@@ -116,7 +137,7 @@ const menuList = computed(() => {
     </el-container>
 
     <div class="global-footer">
-      <span>管系规格配置器  外高桥造船有限公司</span>
+      <span>{{ appFooter }}</span>
     </div>
 
   </div>
@@ -200,10 +221,15 @@ const menuList = computed(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: bold;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.app-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .collapse-trigger {
@@ -212,6 +238,7 @@ const menuList = computed(() => {
   border-radius: 4px;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 .collapse-trigger:hover {
   background-color: rgba(255,255,255,0.2);

@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import PortalLayout from '@/layouts/PortalLayout.vue'
-import { constantRoutes as appRoutes } from '@/apps/rule-configurator/router'
+import pipeSpecRoute from '@/apps/pipe-spec/router'
+import productStandardRoute from '@/apps/product-standard/router'
+import designRuleRoute from '@/apps/design-rule/router'
+import engineeringRoute from '@/apps/engineering/router'
+import componentCiRoute from '@/apps/component-ci/router'
 
 export const constantRoutes = [
   {
@@ -10,7 +14,11 @@ export const constantRoutes = [
     hidden: true,
     meta: { title: '系统门户', hidden: true }
   },
-  ...appRoutes,
+  pipeSpecRoute,
+  productStandardRoute,
+  designRuleRoute,
+  engineeringRoute,
+  componentCiRoute,
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 
