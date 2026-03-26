@@ -37,11 +37,11 @@ const modules = computed(() => [
     title: '设计规则管理',
     desc: '对设计规则和生产规则进行统一配置与持续演进。',
     icon: SetUp,
-    mainPath: '/design-rule/design/rule-config',
+    mainPath: '/design-rule/rule-config',
     color: '#264f7b',
     links: [
-      { label: '设计规则类', path: '/design-rule/design/rule-config' },
-      { label: 'Spec 列表', path: '/design-rule/design/spec-list' }
+      { label: '设计规则', path: '/design-rule/rule-config' },
+      { label: '生产规则', path: '/design-rule/production' }
     ]
   },
   {

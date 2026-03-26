@@ -3,8 +3,8 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SidebarItem from '@/layouts/components/SidebarItem.vue'
 import TagsView from '@/layouts/components/TagsView.vue'
-import PMCAIAssistant from '@/apps/rule-configurator/shared/components/PMCAIAssistant.vue'
-import { Expand, Fold, Platform, Cpu } from '@element-plus/icons-vue'
+import PMCAIAssistant from '@/shared/components/PMCAIAssistant.vue'
+import { Expand, Fold, Platform, Cpu, HomeFilled } from '@element-plus/icons-vue'
 import { useTagsViewStore } from '@/stores/tagsView'
 
 const route = useRoute()
@@ -66,8 +66,15 @@ const menuList = computed(() => {
               <el-icon :size="18"><Platform /></el-icon>
               <span class="app-title">{{ appTitle }}</span>
             </div>
-            <div class="collapse-trigger" @click="toggleCollapse">
-              <el-icon :size="16"><Fold /></el-icon>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <el-tooltip content="返回主页" placement="right">
+                <div class="collapse-trigger" @click="router.push('/')">
+                  <el-icon :size="15"><HomeFilled /></el-icon>
+                </div>
+              </el-tooltip>
+              <div class="collapse-trigger" @click="toggleCollapse">
+                <el-icon :size="16"><Fold /></el-icon>
+              </div>
             </div>
           </div>
 

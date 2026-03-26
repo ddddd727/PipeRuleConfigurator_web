@@ -1,6 +1,6 @@
 import RouterPassthrough from '@/layouts/components/RouterPassthrough.vue'
-import DictTable from '@/apps/rule-configurator/features/dict/components/DictTable.vue'
-import DictPipingTable from '@/apps/rule-configurator/features/dict/components/DictPipingTable.vue'
+import DictTable from '@/apps/pipe-spec/features/dict/components/DictTable.vue'
+import DictPipingTable from '@/apps/pipe-spec/features/dict/components/DictPipingTable.vue'
 
 export default {
   path: 'dict',

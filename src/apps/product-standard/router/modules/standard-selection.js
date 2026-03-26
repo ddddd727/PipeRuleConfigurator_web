@@ -11,7 +11,7 @@ export default {
     {
       path: 'definition',
       name: 'StdSelectionDefinition',
-      component: () => import('@/apps/rule-configurator/features/standard-sequence/pages/StandardSequence.vue'),
+      component: () => import('@/apps/product-standard/features/standard-sequence/pages/StandardSequence.vue'),
       meta: { title: '简选标准定义', icon: 'List', keepAlive: true }
     },
     {

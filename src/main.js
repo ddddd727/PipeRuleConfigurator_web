@@ -4,13 +4,13 @@ import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
-import './apps/rule-configurator/mock/index.js'
+import './apps/design-rule/mock/index.js'
 import { createPinia } from 'pinia'
 import './assets/dirty-status.css'
 // 开发环境下启用本地 mock 数据
 if (import.meta.env.DEV) {
   // 动态导入以避免在生产环境中打包 mock
-  import('./apps/rule-configurator/mock')
+  import('./apps/design-rule/mock')
 }
 
 const app = createApp(App)
