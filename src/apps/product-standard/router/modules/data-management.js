@@ -12,7 +12,7 @@ export default {
     {
       path: 's3d-property',
       name: 'S3dPropertyMgmt',
-      component: () => import('@/apps/rule-configurator/features/property/pages/PropertyManagement.vue'),
+      component: Stub,
       meta: { title: 'S3D对象属性管理', icon: 'Management', keepAlive: true }
     },
 
@@ -63,13 +63,13 @@ export default {
             {
               path: 'spec',
               name: 'S3dCompPipingSpec',
-              component: () => import('@/apps/rule-configurator/features/library/pages/BasicLibrary.vue'),
+              component: Stub,
               meta: { title: 'SPEC类', icon: 'Document', keepAlive: true }
             },
             {
               path: 'part',
               name: 'S3dCompPipingPart',
-              component: () => import('@/apps/rule-configurator/features/library/pages/BasicLibrary.vue'),
+              component: Stub,
               meta: { title: 'PART类', icon: 'Box', keepAlive: true }
             }
           ]
