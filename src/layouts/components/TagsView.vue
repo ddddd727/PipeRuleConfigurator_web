@@ -9,7 +9,17 @@ const router = useRouter()
 const tagsStore = useTagsViewStore()
 
 const activePath = ref(route.path)
-const visitedViews = computed(() => tagsStore.visitedViews)
+
+const getAppRoot = (path = '') => {
+  if (!path || path === '/') return '/'
+  const seg = path.split('/').filter(Boolean)[0]
+  return seg ? `/${seg}` : '/'
+}
+
+const currentAppRoot = computed(() => getAppRoot(route.path))
+const visitedViews = computed(() =>
+  tagsStore.visitedViews.filter(v => (v.appRoot || getAppRoot(v.path)) === currentAppRoot.value)
+)
 
 const visible = ref(false)
 const top = ref(0)
@@ -67,8 +77,9 @@ const closeOthers = () => {
 }
 
 const closeAll = () => {
-  tagsStore.delAllViews()
-  const latestView = tagsStore.visitedViews.slice(-1)[0]
+  const currentTags = visitedViews.value
+  currentTags.filter(v => !v.pinned).forEach(v => tagsStore.delView(v))
+  const latestView = visitedViews.value.slice(-1)[0]
   router.push(latestView ? latestView.path : '/')
 }
 </script>

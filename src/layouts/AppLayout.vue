@@ -1,10 +1,21 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SidebarItem from '@/layouts/components/SidebarItem.vue'
 import TagsView from '@/layouts/components/TagsView.vue'
+import AppRail from '@/layouts/components/AppRail.vue'
 import PMCAIAssistant from '@/shared/components/PMCAIAssistant.vue'
-import { Expand, Fold, Platform, Cpu, HomeFilled } from '@element-plus/icons-vue'
+import {
+  Expand,
+  Fold,
+  Cpu,
+  House,
+  Document,
+  Collection,
+  SetUp,
+  Tools,
+  DataLine
+} from '@element-plus/icons-vue'
 import { useTagsViewStore } from '@/stores/tagsView'
 
 const route = useRoute()
@@ -13,13 +24,75 @@ const router = useRouter()
 const isCollapse = ref(false)
 const showAI = ref(false)
 
+const RAIL_OPEN_DELAY = 100
+const RAIL_CLOSE_DELAY = 150
+const RAIL_STATE = {
+  IDLE: 'idle',
+  OPENING: 'opening',
+  OPEN: 'open',
+  CLOSING: 'closing'
+}
+const railState = ref(RAIL_STATE.IDLE)
+const showAppRail = computed(() => railState.value !== RAIL_STATE.IDLE)
+
+let railTimer = null
+
 const tagsStore = useTagsViewStore()
-const cachedViews = computed(() => tagsStore.cachedViews)
+
+const clearRailTimer = () => {
+  if (railTimer) {
+    clearTimeout(railTimer)
+    railTimer = null
+  }
+}
+
+const scheduleRailOpen = () => {
+  if (railState.value === RAIL_STATE.OPEN || railState.value === RAIL_STATE.OPENING) return
+  clearRailTimer()
+  railState.value = RAIL_STATE.OPENING
+  railTimer = setTimeout(() => {
+    railState.value = RAIL_STATE.OPEN
+    railTimer = null
+  }, RAIL_OPEN_DELAY)
+}
+
+const scheduleRailClose = () => {
+  if (railState.value === RAIL_STATE.IDLE || railState.value === RAIL_STATE.CLOSING) return
+  clearRailTimer()
+  railState.value = RAIL_STATE.CLOSING
+  railTimer = setTimeout(() => {
+    railState.value = RAIL_STATE.IDLE
+    railTimer = null
+  }, RAIL_CLOSE_DELAY)
+}
+
+const handleRailTriggerByPointer = (event) => {
+  const container = leftNavGroupRef.value
+  if (!container) return
+
+  const rect = container.getBoundingClientRect()
+  const triggerStartX = rect.left - RAIL_TRIGGER_LEFT_DISTANCE
+  const shouldOpen = event.clientX >= triggerStartX && event.clientX <= rect.left
+
+  if (shouldOpen) {
+    scheduleRailOpen()
+  } else if (event.clientX > rect.right || event.clientX < triggerStartX) {
+    scheduleRailClose()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('mousemove', handleRailTriggerByPointer)
+})
+
+onBeforeUnmount(() => {
+  clearRailTimer()
+  window.removeEventListener('mousemove', handleRailTriggerByPointer)
+})
 
 const toggleCollapse = () => { isCollapse.value = !isCollapse.value }
-const toggleAI      = () => { showAI.value = !showAI.value }
+const toggleAI = () => { showAI.value = !showAI.value }
 
-// ── App 配置 ────────────────────────────────────────────────────
 const APP_PREFIXES = [
   '/pipe-spec',
   '/product-standard',
@@ -29,49 +102,100 @@ const APP_PREFIXES = [
 ]
 
 const APP_CONFIG = {
-  '/pipe-spec':        { title: '管系规格书管理',       footer: '管系规格书管理系统 · 外高桥造船有限公司' },
-  '/product-standard': { title: '产品元件标准数据管理', footer: '产品元件标准数据管理系统 · 外高桥造船有限公司' },
-  '/design-rule':      { title: '设计规则管理',         footer: '设计规则管理系统 · 外高桥造船有限公司' },
-  '/engineering':      { title: '工程基础管理',         footer: '工程基础管理系统 · 外高桥造船有限公司' },
-  '/component-ci':     { title: '组件持续集成系统',     footer: '组件持续集成系统 · 外高桥造船有限公司' }
+  '/pipe-spec': {
+    title: '管系规格书管理',
+    footer: '管系规格书管理系统 · 外高桥造船有限公司',
+    logo: Document
+  },
+  '/product-standard': {
+    title: '产品元件标准数据管理',
+    footer: '产品元件标准数据管理系统 · 外高桥造船有限公司',
+    logo: Collection
+  },
+  '/design-rule': {
+    title: '设计规则管理',
+    footer: '设计规则管理系统 · 外高桥造船有限公司',
+    logo: SetUp
+  },
+  '/engineering': {
+    title: '工程基础管理',
+    footer: '工程基础管理系统 · 外高桥造船有限公司',
+    logo: Tools
+  },
+  '/component-ci': {
+    title: '组件持续集成系统',
+    footer: '组件持续集成系统 · 外高桥造船有限公司',
+    logo: DataLine
+  }
 }
 
-/** 当前所在 App 的路径前缀（如 '/pipe-spec'） */
 const currentAppPath = computed(() =>
   APP_PREFIXES.find(p => route.path.startsWith(p)) ?? null
 )
 
-/** 当前 App 的标题 / 页脚文字 */
-const appTitle  = computed(() => APP_CONFIG[currentAppPath.value]?.title  ?? '规则配置器')
-const appFooter = computed(() => APP_CONFIG[currentAppPath.value]?.footer ?? '设计规则驱动管理系统 · 外高桥造船有限公司')
+const cachedViews = computed(() =>
+  tagsStore.cachedViews.filter(name =>
+    tagsStore.visitedViews.some(view => view.name === name && view.appRoot === currentAppPath.value)
+  )
+)
 
-/** 侧边栏只展示当前 App 下的子路由 */
+const appTitle = computed(() => APP_CONFIG[currentAppPath.value]?.title ?? '规则配置器')
+const appFooter = computed(() => APP_CONFIG[currentAppPath.value]?.footer ?? '设计规则驱动管理系统 · 外高桥造船有限公司')
+const currentAppLogo = computed(() => APP_CONFIG[currentAppPath.value]?.logo ?? House)
+
 const menuList = computed(() => {
   const appPath = currentAppPath.value
   if (!appPath) return []
   const appRoute = router.options.routes.find(r => r.path === appPath)
   return (appRoute?.children || []).filter(c => !c.meta?.hidden)
 })
+
+const appOptions = computed(() =>
+  APP_PREFIXES.map(path => ({
+    path,
+    title: APP_CONFIG[path]?.title || path,
+    logo: APP_CONFIG[path]?.logo || House
+  }))
+)
+
+const handleAppSwitch = (path) => {
+  if (!path || path === currentAppPath.value) return
+  router.push(path)
+}
+
+const gotoPortal = () => {
+  if (route.path === '/') return
+  router.push('/')
+}
 </script>
 
 <template>
   <div class="app-wrapper">
-
     <el-container class="layout-container">
+      <div class="left-nav-group" @mouseenter="scheduleRailOpen" @mouseleave="scheduleRailClose">
+        <app-rail
+          :visible="showAppRail"
+          :collapsed="isCollapse"
+          :is-portal-active="route.path === '/'"
+          :current-app-path="currentAppPath"
+          :app-options="appOptions"
+          @switch-app="handleAppSwitch"
+          @go-portal="gotoPortal"
+        />
 
-      <el-aside :width="isCollapse ? '64px' : '200px'" class="aside-wrap">
+        <el-aside
+          :width="isCollapse ? '64px' : '200px'"
+          class="aside-wrap"
+        >
         <div class="sidebar-header">
           <div v-if="!isCollapse" class="header-content expanded">
             <div class="logo-area">
-              <el-icon :size="18"><Platform /></el-icon>
+              <span class="logo-chip">
+                <el-icon :size="16"><component :is="currentAppLogo" /></el-icon>
+              </span>
               <span class="app-title">{{ appTitle }}</span>
             </div>
             <div style="display:flex;align-items:center;gap:4px;">
-              <el-tooltip content="返回主页" placement="right">
-                <div class="collapse-trigger" @click="router.push('/')">
-                  <el-icon :size="15"><HomeFilled /></el-icon>
-                </div>
-              </el-tooltip>
               <div class="collapse-trigger" @click="toggleCollapse">
                 <el-icon :size="16"><Fold /></el-icon>
               </div>
@@ -100,11 +224,11 @@ const menuList = computed(() => {
             :basePath="currentAppPath"
           />
         </el-menu>
-      </el-aside>
+        </el-aside>
+      </div>
 
       <div class="workspace-wrapper">
         <el-container class="center-container">
-
           <div class="navbar-container">
             <div class="tags-section">
               <tags-view />
@@ -131,7 +255,6 @@ const menuList = computed(() => {
               </keep-alive>
             </router-view>
           </el-main>
-
         </el-container>
 
         <transition name="slide-width">
@@ -139,14 +262,12 @@ const menuList = computed(() => {
             <PMCAIAssistant />
           </div>
         </transition>
-
       </div>
     </el-container>
 
     <div class="global-footer">
       <span>{{ appFooter }}</span>
     </div>
-
   </div>
 </template>
 
@@ -163,7 +284,7 @@ const menuList = computed(() => {
 .global-footer {
   width: 100%;
   height: 32px;
-  background-color:var(--primary-color);
+  background-color: var(--primary-color);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -177,11 +298,21 @@ const menuList = computed(() => {
   flex: 1;
   display: flex;
   flex-direction: row;
-  padding: 10px 10px 0 10px;
+  padding: 10px;
   box-sizing: border-box;
   gap: 10px;
   overflow: hidden;
   margin-bottom: 0;
+}
+
+.left-nav-group {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  margin-bottom: 0;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: stretch;
 }
 
 .aside-wrap {
@@ -189,10 +320,10 @@ const menuList = computed(() => {
   transition: width 0.3s;
   flex-shrink: 0;
   z-index: 2000;
-  height: calc(100% - 10px);
+  height: 100%;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
 }
@@ -220,8 +351,9 @@ const menuList = computed(() => {
   cursor: pointer;
   transition: background 0.3s;
 }
+
 .header-content.collapsed:hover {
-  background-color: rgba(255,255,255,0.1);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .logo-area {
@@ -230,13 +362,27 @@ const menuList = computed(() => {
   gap: 8px;
   font-size: 13px;
   font-weight: bold;
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.logo-chip {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
 }
 
 .app-title {
   overflow: hidden;
   text-overflow: ellipsis;
+  color: #ffffff;
 }
 
 .collapse-trigger {
@@ -247,8 +393,9 @@ const menuList = computed(() => {
   align-items: center;
   flex-shrink: 0;
 }
+
 .collapse-trigger:hover {
-  background-color: rgba(255,255,255,0.2);
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 .el-menu-vertical-demo {
@@ -268,14 +415,17 @@ const menuList = computed(() => {
   background-color: var(--primary-color) !important;
   color: #ffffff !important;
 }
+
 :deep(.el-menu-item:hover i),
 :deep(.el-sub-menu__title:hover i) {
   color: #ffffff !important;
 }
+
 :deep(.el-menu-item.is-active) {
   background-color: var(--primary-color) !important;
   color: #ffffff !important;
 }
+
 :deep(.el-menu-item.is-active i) {
   color: #ffffff !important;
 }
@@ -307,7 +457,7 @@ const menuList = computed(() => {
   align-items: center;
   padding: 0;
   height: 50px;
-  box-shadow: 0 1px 4px rgba(0,21,41,0.04);
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.04);
   overflow: hidden;
 }
 
@@ -339,10 +489,14 @@ const menuList = computed(() => {
   background: #f4f4f5;
 }
 
-.ai-trigger:hover { background-color: #e6f7ff; color: #409EFF; }
+.ai-trigger:hover {
+  background-color: #e6f7ff;
+  color: #409eff;
+}
+
 .ai-trigger.active {
   background: linear-gradient(135deg, #ecf5ff 0%, #d9ecff 100%);
-  color: #409EFF;
+  color: #409eff;
   border-color: #c6e2ff;
   box-shadow: 0 0 6px rgba(64, 158, 255, 0.25);
 }
@@ -353,7 +507,7 @@ const menuList = computed(() => {
   padding: 20px;
   flex: 1;
   overflow-y: auto;
-  box-shadow: 0 1px 4px rgba(0,21,41,0.04);
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.04);
   margin-bottom: 10px;
 }
 
@@ -364,7 +518,7 @@ const menuList = computed(() => {
   flex-shrink: 0;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
   margin-bottom: 10px;
 }
 
@@ -373,6 +527,10 @@ const menuList = computed(() => {
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
   overflow: hidden;
 }
+
 .slide-width-enter-from,
-.slide-width-leave-to { width: 0; opacity: 0; }
+.slide-width-leave-to {
+  width: 0;
+  opacity: 0;
+}
 </style>

@@ -1,5 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+
+const getAppRoot = (path = '') => {
+  if (!path || path === '/') return '/'
+  const seg = path.split('/').filter(Boolean)[0]
+  return seg ? `/${seg}` : '/'
+}
 
 export const useTagsViewStore = defineStore('tagsView', {
   state: () => ({
@@ -8,12 +13,16 @@ export const useTagsViewStore = defineStore('tagsView', {
   }),
   actions: {
     addView(view) {
+      const appRoot = view?.meta?.appRoot || getAppRoot(view?.path)
+      const viewPayload = Object.assign({}, view, {
+        title: view.meta.title || 'no-name',
+        pinned: false,
+        appRoot
+      })
+
       // 1. 处理 visitedViews (原有逻辑保持，但在 push 时增加 pinned 字段)
       if (!this.visitedViews.some(v => v.path === view.path)) {
-        this.visitedViews.push(Object.assign({}, view, {
-          title: view.meta.title || 'no-name',
-          pinned: false // [新增] 默认不固定
-        }))
+        this.visitedViews.push(viewPayload)
       }
       
       // [新增] 2. 排序：固定的排前面
