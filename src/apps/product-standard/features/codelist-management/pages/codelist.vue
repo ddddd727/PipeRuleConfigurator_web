@@ -168,7 +168,7 @@
                     v-model="codelistFilterText"
                     class="search-input"
                     style="width: 250px; margin-right: 10px"
-                    placeholder="搜索 ShortDescription / LongDescription"
+                    placeholder="搜索查找内容"
                   >
                     <template #append>
                       <el-button :icon="Search" />
@@ -209,7 +209,8 @@
                   <el-input
                     v-model="codelistFilterText"
                     class="search-input"
-                    placeholder="搜索 ShortDescription / LongDescription"
+                    style="width: 250px; margin-right: 10px"
+                    placeholder="搜索查找内容"
                   >
                     <template #append>
                       <el-button :icon="Search" />
@@ -258,12 +259,12 @@
           <el-form-item label="父级：">
             <el-input v-model="codelistAddForm.parent" readonly />
           </el-form-item>
-          <el-form-item label="长描述：">
-            <el-input v-model="codelistAddForm.longDesc" />
-          </el-form-item>
-          <el-form-item label="短描述：">
-            <el-input v-model="codelistAddForm.shortDesc" />
-          </el-form-item>
+        <el-form-item label="短描述：">
+          <el-input v-model="codelistAddForm.shortDesc" />
+        </el-form-item>
+        <el-form-item label="长描述：">
+          <el-input v-model="codelistAddForm.longDesc" />
+        </el-form-item>
           <el-form-item label="Codelist值：">
             <el-input v-model="codelistAddForm.codeNum" :placeholder="codelistAddPlaceholder" />
           </el-form-item>
@@ -381,37 +382,56 @@ const statusButtonIcon = computed(() => (
     : CircleClose
 ))
 
-const transformPathsToTree = (paths) => {
-  const root = []
+const majorLabelMap = {
+  C: '通用',
+  P: '管系',
+  E: '电气'
+}
 
-  paths.forEach((item) => {
-    const parts = [item.level1, item.level2, item.level3, item.level4].filter(Boolean)
-    if (!parts.length) return
+const majorDisplayOrder = ['C', 'P', 'E']
 
-    let currentLevelNodes = root
-    let fullPath = ''
+const getMajorLabel = (major) => {
+  const majorCode = String(major || '').trim().toUpperCase()
+  return majorLabelMap[majorCode] || majorCode || '未分类'
+}
 
-    parts.forEach((part, index) => {
-      fullPath = fullPath ? `${fullPath}|${part}` : part
-      let currentNode = currentLevelNodes.find((node) => node.label === part)
-      if (!currentNode) {
-        currentNode = {
-          label: part,
-          fullPath,
-          children: []
-        }
-        currentLevelNodes.push(currentNode)
-      }
+const buildCatalogTree = (catalogs = []) => {
+  const groupedMap = new Map()
 
-      if (index === parts.length - 1) {
-        currentNode.raw = item
-      }
+  catalogs.forEach((item) => {
+    const majorCode = String(item.major || '').trim().toUpperCase() || 'UNKNOWN'
+    const tableName = String(item.codeListTableName || '').trim()
+    if (!tableName) return
 
-      currentLevelNodes = currentNode.children
+    if (!groupedMap.has(majorCode)) {
+      groupedMap.set(majorCode, {
+        label: getMajorLabel(majorCode),
+        fullPath: majorCode,
+        major: majorCode,
+        children: []
+      })
+    }
+
+    groupedMap.get(majorCode).children.push({
+      label: tableName,
+      fullPath: `${majorCode}|${tableName}`,
+      raw: item
     })
   })
 
-  return root
+  return Array.from(groupedMap.entries())
+    .sort(([majorA], [majorB]) => {
+      const indexA = majorDisplayOrder.indexOf(majorA)
+      const indexB = majorDisplayOrder.indexOf(majorB)
+      const safeIndexA = indexA === -1 ? Number.MAX_SAFE_INTEGER : indexA
+      const safeIndexB = indexB === -1 ? Number.MAX_SAFE_INTEGER : indexB
+      if (safeIndexA !== safeIndexB) return safeIndexA - safeIndexB
+      return majorA.localeCompare(majorB)
+    })
+    .map(([, group]) => ({
+      ...group,
+      children: group.children.sort((a, b) => a.label.localeCompare(b.label))
+    }))
 }
 
 const filterNode = (value, data) => {
@@ -453,7 +473,7 @@ const loadTreeData = async () => {
   treeLoading.value = true
   try {
     const res = await getCodelistTree()
-    treeData.value = transformPathsToTree(res || [])
+    treeData.value = buildCatalogTree(res || [])
   } catch (error) {
     console.error('加载 Codelist 树失败:', error)
     treeData.value = []
@@ -472,10 +492,10 @@ const loadCodelistLevelData = async (level, parentShortDesc = '') => {
       const res = await getCodelistTableData(selectedNode.value.label)
       rows = res?.levelData || []
     } else if (level === 2) {
-      const res = await getCodelistChildData(levelNames.value.level1, parentShortDesc)
+      const res = await getCodelistChildData(parentShortDesc)
       rows = res?.levelData || []
     } else if (level === 3) {
-      const res = await getCodelistChildData(levelNames.value.level2, parentShortDesc)
+      const res = await getCodelistChildData(parentShortDesc)
       rows = res?.levelData || []
     }
 
@@ -519,8 +539,9 @@ const handleNodeClick = async (data) => {
   if (data.children?.length) return
 
   selectedNode.value = {
-    label: data.label,
+    label: data.raw?.codeListTableName || data.label,
     fullPath: data.fullPath,
+    major: data.raw?.major || '',
     category: '1'
   }
 
@@ -532,7 +553,7 @@ const handleNodeClick = async (data) => {
 
   codelistLoading.value = true
   try {
-    const res = await getCodelistTableData(data.label)
+    const res = await getCodelistTableData(data.raw?.codeListTableName || data.label)
     selectedNode.value.category = String(res?.count || 1)
     levelNames.value = {
       level1: res?.level1 || 'Level1',
@@ -601,16 +622,6 @@ const computeCodelistParent = () => {
   return '/'
 }
 
-const computeCodelistParentLabelName = () => {
-  if (!selectedNode.value) return ''
-  const category = String(selectedNode.value.category || '1')
-  if (category === '1') return ''
-  if (category === '2') return currentLevel.value === 2 ? String(levelNames.value.level1 || '').trim() : ''
-  if (currentLevel.value === 2) return String(levelNames.value.level1 || '').trim()
-  if (currentLevel.value === 3) return String(levelNames.value.level2 || '').trim()
-  return ''
-}
-
 const openCodelistAddDialog = async () => {
   codelistAddForm.value = {
     parent: computeCodelistParent(),
@@ -621,11 +632,7 @@ const openCodelistAddDialog = async () => {
   codelistAddDialogVisible.value = true
 
   try {
-    const res = await getNextCodelistNumber(
-      selectedNode.value?.label || '',
-      String(selectedNode.value?.category || ''),
-      codelistAddForm.value.parent === '/' ? '' : codelistAddForm.value.parent
-    )
+    const res = await getNextCodelistNumber()
     if (res?.nextCodeNum !== undefined && res?.nextCodeNum !== null) {
       codelistAddForm.value.codeNum = String(res.nextCodeNum)
       codelistAddPlaceholder.value = ''
@@ -641,6 +648,7 @@ const handleSaveCodelistAdd = async () => {
   const shortDesc = String(codelistAddForm.value.shortDesc || '').trim()
   const longDesc = String(codelistAddForm.value.longDesc || '').trim()
   const codeNum = String(codelistAddForm.value.codeNum || '').trim()
+  const parsedCodeNum = Number(codeNum)
 
   if (!shortDesc) {
     ElMessage.warning('Please enter short description')
@@ -650,13 +658,18 @@ const handleSaveCodelistAdd = async () => {
     ElMessage.warning('Please enter or confirm the codelist value')
     return
   }
+  if (Number.isNaN(parsedCodeNum)) {
+    ElMessage.warning('Codelist value must be a number')
+    return
+  }
 
   const payload = {
-    parentLabelName: computeCodelistParentLabelName(),
-    parentShortDesc: computeCodelistParent() === '/' ? '' : computeCodelistParent(),
-    shortDesc,
-    longDesc,
-    codeNum
+    codeListTableName: selectedNode.value?.label || '',
+    parentShortStringValue: computeCodelistParent() === '/' ? '' : computeCodelistParent(),
+    shortStringValue: shortDesc,
+    longStringValue: longDesc,
+    codeListNumber: parsedCodeNum,
+    status: true
   }
 
   try {
@@ -720,15 +733,22 @@ watch(filterText, (value) => {
 <style scoped>
 .basic-library-container {
   height: 100%;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
 }
 
 .main-layout {
-  height: calc(100vh - 120px);
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .tree-aside {
   border-right: 1px solid #ebeef5;
   background: #fff;
+  min-height: 0;
 }
 
 .tree-title {
@@ -771,6 +791,9 @@ watch(filterText, (value) => {
 
 .content-main {
   background: #f7f8fa;
+  padding: 16px;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .detail-container,
@@ -778,6 +801,12 @@ watch(filterText, (value) => {
 .table-section-container,
 .table-wrapper {
   height: 100%;
+}
+
+.detail-container,
+.codelist-card,
+.table-section-container {
+  min-height: 0;
 }
 
 .card-header,
@@ -806,8 +835,9 @@ watch(filterText, (value) => {
 }
 
 .header-center {
-  flex: 1;
-  justify-content: center;
+  flex: none;
+  justify-content: flex-end;
+  margin-left: auto;
 }
 
 .title {
@@ -827,6 +857,8 @@ watch(filterText, (value) => {
 .table-section-container {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .table-section-header {
@@ -839,7 +871,9 @@ watch(filterText, (value) => {
 }
 
 .table-wrapper {
-  min-height: 420px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .empty-state {
@@ -847,6 +881,24 @@ watch(filterText, (value) => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+:deep(.el-card) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.el-card__header) {
+  flex: none;
+}
+
+:deep(.el-card__body) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 :deep(.is-disabled-row) {

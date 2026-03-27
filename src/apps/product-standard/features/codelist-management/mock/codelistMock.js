@@ -1,10 +1,6 @@
 import Mock from 'mockjs'
 import { db } from '@/apps/design-rule/mock/index.js'
 
-Mock.mock(/\/api\/product-standard\/codelist\/tree/, 'get', () => {
-  return { code: 200, data: db['codelist-tree'].data, message: 'success' }
-})
-
 Mock.mock(/\/api\/product-standard\/codelist\/table-data/, 'get', (options) => {
   const url = new URL(options.url, 'http://localhost')
   const nodeLabel = url.searchParams.get('nodeLabel') || ''

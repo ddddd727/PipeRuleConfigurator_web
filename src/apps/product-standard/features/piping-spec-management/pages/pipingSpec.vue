@@ -544,15 +544,22 @@ watch(
 <style scoped>
 .piping-spec-page {
   height: 100%;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
 }
 
 .main-layout {
-  height: calc(100vh - 120px);
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .tree-aside {
   border-right: 1px solid #ebeef5;
   background: #fff;
+  min-height: 0;
 }
 
 .tree-title {
@@ -595,6 +602,8 @@ watch(
 
 .content-main {
   background: #f7f8fa;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .detail-container {
