@@ -58,7 +58,7 @@
             <div class="filter-section" v-loading="codelistUiLoading" element-loading-text="加载中...">
               <el-form label-width="180px" class="filter-form">
                 <el-form-item :label="`${levelNames.level1} :`">
-                  <el-select v-model="layerFilters.practice" placeholder="/" style="width: 100%" @change="recomputeCodelistView">
+                  <el-select v-model="layerFilters.practice" placeholder="/" style="width: 50%" @change="recomputeCodelistView">
                     <el-option label="/" value="/" />
                     <el-option
                       v-for="opt in practiceOptions"
@@ -69,7 +69,7 @@
                   </el-select>
                 </el-form-item>
                 <el-form-item :label="`${levelNames.level2} :`">
-                  <el-select v-model="layerFilters.category" placeholder="/" style="width: 100%" @change="recomputeCodelistView">
+                  <el-select v-model="layerFilters.category" placeholder="/" style="width: 50%" @change="recomputeCodelistView">
                     <el-option label="/" value="/" />
                     <el-option
                       v-for="opt in categoryOptions"
@@ -80,7 +80,7 @@
                   </el-select>
                 </el-form-item>
                 <el-form-item label="Codelist Number :">
-                  <el-input v-model="currentCodelistNumber" readonly />
+                  <el-input v-model="currentCodelistNumber" style="width: 50%" readonly />
                 </el-form-item>
               </el-form>
             </div>
@@ -142,7 +142,7 @@
             <div class="filter-section" v-loading="codelistUiLoading" element-loading-text="加载中...">
               <el-form label-width="180px" class="filter-form">
                 <el-form-item :label="`${levelNames.level1} :`">
-                  <el-select v-model="layerFilters.practice" placeholder="/" style="width: 100%" @change="recomputeCodelistView">
+                  <el-select v-model="layerFilters.practice" placeholder="/" style="width: 50%" @change="recomputeCodelistView">
                     <el-option label="/" value="/" />
                     <el-option
                       v-for="opt in practiceOptions"
@@ -153,7 +153,7 @@
                   </el-select>
                 </el-form-item>
                 <el-form-item label="Codelist Number :">
-                  <el-input v-model="currentCodelistNumber" readonly />
+                  <el-input v-model="currentCodelistNumber" style="width: 50%" readonly />
                 </el-form-item>
               </el-form>
             </div>
@@ -824,6 +824,7 @@ watch(filterText, (value) => {
 .codelist-header {
   justify-content: space-between;
   gap: 12px;
+  padding: 2px 0;
 }
 
 .header-left {
@@ -851,7 +852,20 @@ watch(filterText, (value) => {
 }
 
 .filter-section {
-  padding: 12px 0 8px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  background: #fafafa;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.filter-form :deep(.el-form-item) {
+  margin-bottom: 10px;
+}
+
+.filter-form :deep(.el-form-item:last-child) {
+  margin-bottom: 0;
 }
 
 .table-section-container {
@@ -859,10 +873,14 @@ watch(filterText, (value) => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  padding: 8px 16px 16px;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  background: #ffffff;
 }
 
 .table-section-header {
-  padding: 8px 0 12px;
+  padding: 4px 0 12px;
 }
 
 .table-title {
@@ -891,6 +909,8 @@ watch(filterText, (value) => {
 
 :deep(.el-card__header) {
   flex: none;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 :deep(.el-card__body) {
