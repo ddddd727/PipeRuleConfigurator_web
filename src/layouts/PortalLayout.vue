@@ -2,71 +2,15 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  Search, Document, Box, Connection,
-  SetUp, Monitor, ArrowRight,
+  Search, ArrowRight,
   Bell, CaretBottom, User
 } from '@element-plus/icons-vue'
+import { appNavigationRegistry } from '@/navigation'
 
 const router = useRouter()
 const keyword = ref('')
 
-const modules = computed(() => [
-  {
-    title: '产品元件标准数据管理',
-    desc: '覆盖目录定义、分类层级、标准元件数据结构与S3D基础库维护。',
-    icon: Box,
-    mainPath: '/product-standard/catalog-definition/standard/piping',
-    color: '#264f7b',
-    links: [
-      { label: 'S3D对象属性管理', path: '/product-standard/data-management/s3d-property' },
-      { label: 'S3D部件数据(管系)', path: '/product-standard/data-management/s3d-component/piping/spec' }
-    ]
-  },
-  {
-    title: '管系规格书管理',
-    desc: '管理业务属性字典、材料编码规则、管系规格书配置与PCF规则。',
-    icon: Document,
-    mainPath: '/pipe-spec/dict/attribute/piping-class',
-    color: '#264f7b',
-    links: [
-      { label: '业务属性定义', path: '/pipe-spec/dict/attribute/piping-class' },
-      { label: '材料编码', path: '/pipe-spec/material-code/index' }
-    ]
-  },
-  {
-    title: '设计规则管理',
-    desc: '对设计规则和生产规则进行统一配置与持续演进。',
-    icon: SetUp,
-    mainPath: '/design-rule/rule-config',
-    color: '#264f7b',
-    links: [
-      { label: '设计规则', path: '/design-rule/rule-config' },
-      { label: '生产规则', path: '/design-rule/production' }
-    ]
-  },
-  {
-    title: '工程基础管理',
-    desc: '工程环境配置与S3D项目服务器资源监控看板。',
-    icon: Monitor,
-    mainPath: '/engineering/s3d-env-config',
-    color: '#264f7b',
-    links: [
-      { label: 'S3D工程环境配置', path: '/engineering/s3d-env-config' },
-      { label: '服务器资源看板', path: '/engineering/s3d-server-dashboard' }
-    ]
-  },
-  {
-    title: '组件持续集成系统',
-    desc: '二次开发快速部署、操作速查手册与使用频次统计看板。',
-    icon: Connection,
-    mainPath: '/component-ci/rapid-deploy',
-    color: '#264f7b',
-    links: [
-      { label: '快速部署', path: '/component-ci/rapid-deploy' },
-      { label: '操作速查', path: '/component-ci/operation-guide' }
-    ]
-  }
-])
+const modules = computed(() => appNavigationRegistry.sort((a, b) => a.order - b.order))
 
 const go = (path) => router.push(path)
 const handleSearch = () => {
@@ -156,18 +100,18 @@ const handleSearch = () => {
       <section class="grid">
         <div
           v-for="mod in modules"
-          :key="mod.title"
+          :key="mod.id"
           class="card"
-          @click="go(mod.mainPath)"
+          @click="go(mod.entry)"
         >
           <div class="card-top">
             <div class="card-icon">
-              <el-icon :size="22"><component :is="mod.icon" /></el-icon>
+              <el-icon :size="22"><component :is="mod.logo" /></el-icon>
             </div>
             <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
           <div class="card-mid">
-            <h3 class="card-title">{{ mod.title }}</h3>
+            <h3 class="card-title">{{ mod.name }}</h3>
             <p class="card-desc">{{ mod.desc }}</p>
           </div>
           <div class="card-bottom" @click.stop>

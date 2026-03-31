@@ -1,5 +1,7 @@
 <script setup>
+import { computed } from 'vue'
 import { House } from '@element-plus/icons-vue'
+import { appNavigationRegistry } from '@/navigation'
 
 defineProps({
   visible: {
@@ -17,14 +19,13 @@ defineProps({
   currentAppPath: {
     type: String,
     default: null
-  },
-  appOptions: {
-    type: Array,
-    default: () => []
   }
 })
 
 const emit = defineEmits(['switch-app', 'go-portal'])
+
+const appOptions = computed(() => appNavigationRegistry.sort((a, b) => a.order - b.order))
+
 </script>
 
 <template>
@@ -47,15 +48,15 @@ const emit = defineEmits(['switch-app', 'go-portal'])
 
       <el-tooltip
         v-for="app in appOptions"
-        :key="app.path"
-        :content="app.title"
+        :key="app.id"
+        :content="app.name"
         placement="right"
       >
         <button
           class="rail-item"
-          :class="{ active: app.path === currentAppPath }"
+          :class="{ active: app.entry === currentAppPath }"
           type="button"
-          @click="emit('switch-app', app.path)"
+          @click="emit('switch-app', app.entry)"
         >
           <el-icon :size="18"><component :is="app.logo" /></el-icon>
         </button>
