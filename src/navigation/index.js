@@ -1,5 +1,5 @@
 import {
-  Box, Document, SetUp, Monitor, Connection
+  Box, Document, SetUp, Monitor, Connection, Management
 } from '@element-plus/icons-vue'
 
 export const appNavigationRegistry = [
@@ -66,6 +66,19 @@ export const appNavigationRegistry = [
     links: [
       { label: '快速部署', path: '/component-ci/rapid-deploy' },
       { label: '操作速查', path: '/component-ci/operation-guide' }
+    ]
+  },
+  {
+    id: 'code-management',
+    name: '编码管理平台',
+    entry: '/code-management/code-config',
+    enabled: true,
+    order: 6,
+    desc: '统一管理和维护各类编码规则、编码配置与编码查询。',
+    logo: Management,
+    links: [
+      { label: '编码配置', path: '/code-management/code-config' },
+      { label: '编码查询', path: '/code-management/code-query' }
     ]
   }
 ]
