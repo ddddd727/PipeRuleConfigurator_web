@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="basic-library-container">
     <el-container class="main-layout">
       <el-aside width="280px" class="tree-aside">
@@ -50,7 +50,7 @@
                 </div>
                 <div class="header-right">
                   <el-button :icon="Back" :disabled="currentLevel === 1" @click="handleBackLevel">返回上一级</el-button>
-                  <el-button type="info" plain :icon="Download">导出</el-button>
+                  <el-button :icon="Download" @click="handleExportCodelist">导出</el-button>
                 </div>
               </div>
             </template>
@@ -130,11 +130,11 @@
               <div class="card-header codelist-header">
                 <div class="header-left">
                   <span class="title">{{ selectedNode.label }}</span>
-                  <span class="subtitle">两层 Codelist</span>
+                  <span class="subtitle">二层 Codelist</span>
                 </div>
                 <div class="header-right">
                   <el-button :icon="Back" :disabled="currentLevel === 1" @click="handleBackLevel">返回上一级</el-button>
-                  <el-button type="info" plain :icon="Download">导出</el-button>
+          <el-button :icon="Download" @click="handleExportCodelist">导出</el-button>
                 </div>
               </div>
             </template>
@@ -220,7 +220,7 @@
                 <div class="header-right">
                   <el-button type="primary" :icon="Plus" @click="openCodelistAddDialog">新增</el-button>
                   <el-button :type="statusButtonType" :icon="statusButtonIcon" @click="handleToggleStatus">{{ statusButtonText }}</el-button>
-                  <el-button type="info" plain :icon="Download">导出</el-button>
+                  <el-button :icon="Download" @click="handleExportCodelist">导出</el-button>
                 </div>
               </div>
             </template>
@@ -298,6 +298,7 @@ import {
 import {
   disableRows,
   enableRows,
+  exportCodelistData,
   getCodelistChildData,
   getCodelistTableData,
   getCodelistTree,
@@ -392,7 +393,7 @@ const majorDisplayOrder = ['C', 'P', 'E']
 
 const getMajorLabel = (major) => {
   const majorCode = String(major || '').trim().toUpperCase()
-  return majorLabelMap[majorCode] || majorCode || '未分类'
+  return majorLabelMap[majorCode] || majorCode || '\u672a\u5206\u7c7b'
 }
 
 const buildCatalogTree = (catalogs = []) => {
@@ -622,6 +623,49 @@ const computeCodelistParent = () => {
   return '/'
 }
 
+const extractExportFileName = (contentDisposition, fallbackName) => {
+  if (!contentDisposition) return fallbackName
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1])
+  }
+
+  const plainMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+  if (plainMatch?.[1]) {
+    return plainMatch[1]
+  }
+
+  return fallbackName
+}
+
+const handleExportCodelist = async () => {
+  if (!selectedNode.value?.label) {
+    ElMessage.warning('请先选择一个代码列表')
+    return
+  }
+
+  try {
+    const { blob, contentDisposition } = await exportCodelistData(selectedNode.value.label)
+    const fallbackName = `${selectedNode.value.label}.xlsx`
+    const fileName = extractExportFileName(contentDisposition, fallbackName)
+
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.href = url
+    link.download = fileName
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+  }
+}
+
 const openCodelistAddDialog = async () => {
   codelistAddForm.value = {
     parent: computeCodelistParent(),
@@ -652,6 +696,10 @@ const handleSaveCodelistAdd = async () => {
 
   if (!shortDesc) {
     ElMessage.warning('Please enter short description')
+    return
+  }
+  if (!longDesc) {
+    ElMessage.warning('Please enter long description')
     return
   }
   if (!codeNum) {
@@ -699,16 +747,19 @@ const handleToggleStatus = async () => {
   try {
     if (enableMode) {
       await enableRows(codelistSelection.value)
-      codelistSelection.value.forEach((row) => {
-        row.status = 1
-      })
       ElMessage.success('Enabled successfully')
     } else {
       await disableRows(codelistSelection.value)
-      codelistSelection.value.forEach((row) => {
-        row.status = 0
-      })
       ElMessage.success('Disabled successfully')
+    }
+
+    codelistSelection.value = []
+    if (currentLevel.value === 1) {
+      await loadCodelistLevelData(1)
+    } else if (currentLevel.value === 2) {
+      await loadCodelistLevelData(2, layerFilters.value.practice)
+    } else {
+      await loadCodelistLevelData(3, layerFilters.value.category)
     }
   } catch (error) {
     console.error('切换状态失败:', error)
@@ -926,3 +977,4 @@ watch(filterText, (value) => {
   background: #f5f7fa;
 }
 </style>
+

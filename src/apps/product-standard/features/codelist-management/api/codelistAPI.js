@@ -2,11 +2,11 @@ import request from '@/Utils/request'
 
 /**
  * 获取所有代码列表目录。
- * 后端真实返回的是目录数组，外层可能带有 value 包装，这里统一展开成数组。
+ * 后端真实接口返回目录数组，外层也可能包一层 value，这里统一展开成数组。
  */
 export function getCodelistTree() {
   return request({
-    url: '/CodeListTableCatelog',
+    url: '/CodeListManagement',
     method: 'get'
   }).then((res) => {
     if (Array.isArray(res)) return res
@@ -66,23 +66,24 @@ const normalizeCombinedResponse = (res = {}) => {
 
 /**
  * 获取 Codelist 首层表格数据和层级信息。
- * 当前对接后端真实接口：/CodeListTableCatelog/combined/{codeListTableName}
+ * 当前对接后端真实接口：/CodeListManagement/combined/{codeListTableName}
  * @param {string} nodeLabel 当前节点名称
  */
 export function getCodelistTableData(nodeLabel) {
   return request({
-    url: `/CodeListTableCatelog/combined/${encodeURIComponent(nodeLabel)}`,
+    url: `/CodeListManagement/combined/${encodeURIComponent(nodeLabel)}`,
     method: 'get'
   }).then((res) => normalizeCombinedResponse(res))
 }
 
 /**
- * 根据父级层级名称和 shortDesc 查询子集数据。
+ * 根据父级 shortDesc 查询子集数据。
+ * 当前对接后端真实接口：/CodeListManagement/values/by-parent/{shortDesc}
  * @param {string} shortDesc 父级 shortDesc
  */
 export function getCodelistChildData(shortDesc) {
   return request({
-    url: `/CodeListTableCatelog/values/by-parent/${encodeURIComponent(shortDesc)}`,
+    url: `/CodeListManagement/values/by-parent/${encodeURIComponent(shortDesc)}`,
     method: 'get'
   }).then((res) => {
     const rows = Array.isArray(res) ? res : Array.isArray(res?.value) ? res.value : []
@@ -94,12 +95,12 @@ export function getCodelistChildData(shortDesc) {
 
 /**
  * 创建代码列表值。
- * 当前对接后端真实接口：/CodeListTableCatelog/values
+ * 当前对接后端真实接口：/CodeListManagement/values
  * @param {object} data 保存参数
  */
 export function saveCodelistItem(data) {
   return request({
-    url: '/CodeListTableCatelog/values',
+    url: '/CodeListManagement/values',
     method: 'post',
     data
   })
@@ -107,13 +108,11 @@ export function saveCodelistItem(data) {
 
 /**
  * 获取建议的下一个 Codelist 编码。
- * @param {string} nodeLabel 当前节点名称
- * @param {string|number} category 当前层级数
- * @param {string} parentShortDesc 父级 shortDesc
+ * 当前对接后端真实接口：/CodeListManagement/next-code
  */
 export function getNextCodelistNumber() {
   return request({
-    url: '/CodeListTableCatelog/next-code',
+    url: '/CodeListManagement/next-code',
     method: 'get'
   }).then((res) => {
     if (typeof res === 'number') return { nextCodeNum: res }
@@ -124,21 +123,56 @@ export function getNextCodelistNumber() {
 }
 
 /**
+ * 导出代码列表数据为 Excel。
+ * 当前对接后端真实接口：/CodeListManagement/export/{codeListTableName}
+ * @param {string} codeListTableName 当前代码列表表名
+ */
+export function exportCodelistData(codeListTableName) {
+  const token = localStorage.getItem('token')
+  const baseURL = import.meta.env.VITE_API_URL || '/api'
+
+  return fetch(`${baseURL}/CodeListManagement/export/${encodeURIComponent(codeListTableName)}`, {
+    method: 'GET',
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  }).then(async (response) => {
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(errorText || `导出失败 (${response.status})`)
+    }
+
+    return {
+      blob: await response.blob(),
+      contentDisposition: response.headers.get('content-disposition') || ''
+    }
+  })
+}
+
+/**
  * 禁用选中的行。
- * 当前仍是前端占位实现，后续可以替换成真实接口。
+ * 当前对接后端真实接口：/CodeListManagement/values/disable/{shortStringValue}
  * @param {Array} rows 选中的表格行
  */
 export function disableRows(rows) {
-  console.log('disableRows mock passthrough', rows)
-  return Promise.resolve({ code: 200, message: '操作成功' })
+  const rowList = Array.isArray(rows) ? rows : [rows]
+  return Promise.all(
+    rowList.map((row) => request({
+      url: `/CodeListManagement/values/disable/${encodeURIComponent(row.shortDesc)}`,
+      method: 'post'
+    }))
+  )
 }
 
 /**
  * 启用选中的行。
- * 当前仍是前端占位实现，后续可以替换成真实接口。
+ * 当前对接后端真实接口：/CodeListManagement/values/enable/{shortStringValue}
  * @param {Array} rows 选中的表格行
  */
 export function enableRows(rows) {
-  console.log('enableRows mock passthrough', rows)
-  return Promise.resolve({ code: 200, message: '操作成功' })
+  const rowList = Array.isArray(rows) ? rows : [rows]
+  return Promise.all(
+    rowList.map((row) => request({
+      url: `/CodeListManagement/values/enable/${encodeURIComponent(row.shortDesc)}`,
+      method: 'post'
+    }))
+  )
 }
