@@ -43,7 +43,7 @@
           :teleported="false"
           @change="handleStandardChange"
           :loading="specsLoading"
-          :disabled="!form.componentTypeId"
+          :disabled="!form.componentTypeId || !materialCategory"
         >
           <el-option
             v-for="spec in pipeFittingSpecs"
@@ -52,7 +52,8 @@
             :value="spec.standardName"
           />
         </el-select>
-        <div class="tip-text" v-if="!form.componentTypeId">请先选择部件类型，再选择标准</div>
+        <div class="tip-text" v-if="!materialCategory">当前PMC未解析出主材料，无法获取标准与材料牌号</div>
+        <div class="tip-text" v-else-if="!form.componentTypeId">请先选择部件类型，再选择标准</div>
         <div class="tip-text" v-else>可多选，已选择 {{ form.standardNames.length }} 个标准</div>
       </el-form-item>
 
@@ -109,6 +110,10 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  materialCategory: {
+    type: String,
+    default: ''
+  },
   initialConfig: {
     type: Object,
     default: null
@@ -149,8 +154,14 @@ const dialogVisible = computed({
 
   // 获取材料列表
   const fetchMaterials = async () => {
+    if (!props.materialCategory) {
+      materialsList.value = []
+      return
+    }
     try {
-      const res = await axios.get('/api/PmcSpec/MaterialsGrades')
+      const res = await axios.get('/api/PmcSpec/MaterialsGrades', {
+        params: { materialCategory: props.materialCategory }
+      })
       if (res.data.code === 200) {
         materialsList.value = res.data.data || []
       } else {
@@ -158,7 +169,7 @@ const dialogVisible = computed({
       }
     } catch (error) {
       console.error('获取材料列表错误:', error)
-      ElMessage.error('网络错误，获取材料列表失败')
+      ElMessage.error(error?.response?.data?.message || '网络错误，获取材料列表失败')
     }
   }
 
@@ -168,12 +179,17 @@ const dialogVisible = computed({
       pipeFittingSpecs.value = []
       return
     }
+    if (!props.materialCategory) {
+      pipeFittingSpecs.value = []
+      return
+    }
     specsLoading.value = true
     try {
       const res = await axios.get('/api/PmcSpec/PipeFittingSpec', {
         params: { 
           componentTypeId: form.value.componentTypeId,
-          componentTypeName: form.value.partType // 兼容性保留
+          componentTypeName: form.value.partType, // 兼容性保留
+          materialCategory: props.materialCategory
         }
       })
       if (res.data.code === 200) {
@@ -188,7 +204,7 @@ const dialogVisible = computed({
       }
     } catch (error) {
       console.error('获取管附件规格错误:', error)
-      ElMessage.error('网络错误，获取管附件规格失败')
+      ElMessage.error(error?.response?.data?.message || '网络错误，获取管附件规格失败')
     } finally {
       specsLoading.value = false
     }
@@ -279,7 +295,7 @@ watch(() => form.value.componentTypeId, async (newId, oldId) => {
     
     // 尝试从存储中加载已有配置 (基于 partType 名称)
     if (form.value.partType && dialogVisible.value) {
-      const existingConfig = pipeSpecConfigStore.getConfigByPartType(form.value.partType)
+      const existingConfig = pipeSpecConfigStore.getConfigByComponentTypeId(newId) || pipeSpecConfigStore.getConfigByPartType(form.value.partType)
       
       if (existingConfig) {
         await nextTick()
@@ -423,6 +439,13 @@ watch(dialogVisible, async (val) => {
       resetForm()
     }
   }
+})
+
+watch(() => props.materialCategory, async (newVal, oldVal) => {
+  if (newVal === oldVal) return
+  if (!dialogVisible.value) return
+  await fetchMaterials()
+  await fetchPipeFittingSpecs()
 })
 
 // 组件挂载时获取部件类型
