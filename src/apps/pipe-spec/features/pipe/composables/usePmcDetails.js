@@ -13,6 +13,7 @@ export const usePmcDetails = ({
     pipingMaterialClass: '',
     pipe: '',
     material: '',
+    materialCategory: '',
     pressureClass: '',
     wallThickness: ''
   })
@@ -33,6 +34,7 @@ export const usePmcDetails = ({
           pipingMaterialClass: baseInfo.pmcCode || code,
           pipe: baseInfo.pipeStandard || '',
           material: baseInfo.materialGrade || '',
+          materialCategory: baseInfo.materialCategory || '',
           pressureClass: baseInfo.pressureRating || '',
           wallThickness: baseInfo.wallThickness || ''
         }
@@ -52,7 +54,7 @@ export const usePmcDetails = ({
       }
     } catch (error) {
       console.error('获取编码详情错误:', error)
-      ElMessage.error('网络错误，获取编码详情失败')
+      ElMessage.error(error?.response?.data?.message || '网络错误，获取编码详情失败')
     }
   }
 
@@ -66,6 +68,7 @@ export const usePmcDetails = ({
         pipingMaterialClass: '',
         pipe: '',
         material: '',
+        materialCategory: '',
         pressureClass: '',
         wallThickness: ''
       }

@@ -40,7 +40,7 @@ export const usePmcVersions = () => {
       }
     } catch (error) {
       console.error('获取版本列表错误:', error)
-      ElMessage.error('网络错误，获取版本列表失败')
+      ElMessage.error(error?.response?.data?.message || '网络错误，获取版本列表失败')
     } finally {
       loadingVersions.value = false
     }
@@ -60,7 +60,7 @@ export const usePmcVersions = () => {
       }
     } catch (error) {
       console.error('获取版本详情错误:', error)
-      ElMessage.error('网络错误，获取版本详情失败')
+      ElMessage.error(error?.response?.data?.message || '网络错误，获取版本详情失败')
       return null
     }
   }
@@ -84,7 +84,7 @@ export const usePmcVersions = () => {
       }
     } catch (error) {
       console.error('版本回退错误:', error)
-      ElMessage.error('网络错误，版本回退失败')
+      ElMessage.error(error?.response?.data?.message || '网络错误，版本回退失败')
       return false
     }
   }
