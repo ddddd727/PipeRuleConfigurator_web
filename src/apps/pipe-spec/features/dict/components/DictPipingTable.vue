@@ -424,20 +424,21 @@ const handleSelectionChange = (val) => { selectedRows.value = val }
 // 添加新行，自动分配ID并填充默认值
 const handleAddRow = async () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
-  
+
   // 1. 核心标记：打上 _isNew 标记，告诉保存接口这是新数据
   const newRow = { _isNew: true }
-  
-  // 2. 🟢 核心算法：寻找当前 ID 序列中的“最小空缺值”
-  const nextId = getNextAvailableId(tableConfig.value.list, tableConfig.value.columns)
+
+  // 2. 🟢 核心算法：寻找当前 ID 序列中的”最小空缺值”
+  let nextId = getNextAvailableId(tableConfig.value.list, tableConfig.value.columns)
+  const pkCol = tableConfig.value.columns.find(col => col.isPrimaryKey)
   if (pkCol) {
     // 提取当前表格里的所有合法正整数 ID，并放入 Set 中（查询速度 O(1)）
     const existingIds = tableConfig.value.list
-      .map(r => Number(r[pkCol.prop])) 
-      .filter(n => !isNaN(n) && n > 0) 
-      
+      .map(r => Number(r[pkCol.prop]))
+      .filter(n => !isNaN(n) && n > 0)
+
     const idSet = new Set(existingIds)
-    
+
     // 从 1 开始往上数，只要集合里有这个数字，就看下一个，直到找到第一个没有的！
     while (idSet.has(nextId)) {
       nextId++
@@ -470,22 +471,18 @@ const handleAddRow = async () => {
     if (col.isPrimaryKey) {
         newRow[col.prop] = nextId // 👈 填入填缝 ID
     } else if (col.type === 'switch') {
-        newRow[col.prop] = false 
-    } else if (props.dictId.startsWith('part-')) {
-        // 填充默认值
-        if (componentType) {
-            if (col.prop === 'type' || col.prop === 'componentTypeName') {
-                newRow[col.prop] = componentType.ComponentTypeName
-            } else if (col.prop === 'description' || col.prop === 'componentTypeDescription') {
-                newRow[col.prop] = componentType.ComponentTypeDescription
-            } else {
-                newRow[col.prop] = null 
-            }
+        newRow[col.prop] = false
+    } else if (props.dictId.startsWith('part-') && componentType) {
+        // 仅对特定字段填充默认值，其他字段保持 null
+        if (col.prop === 'type' || col.prop === 'componentTypeName') {
+            newRow[col.prop] = componentType.ComponentTypeName
+        } else if (col.prop === 'description' || col.prop === 'componentTypeDescription') {
+            newRow[col.prop] = componentType.ComponentTypeDescription
         } else {
-            newRow[col.prop] = null 
+            newRow[col.prop] = null
         }
     } else {
-        newRow[col.prop] = null 
+        newRow[col.prop] = null
     }
   })
   

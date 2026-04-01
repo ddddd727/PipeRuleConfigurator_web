@@ -38,6 +38,8 @@ const showAppRail = computed(() => railState.value !== RAIL_STATE.IDLE)
 let railTimer = null
 
 const tagsStore = useTagsViewStore()
+const leftNavGroupRef = ref(null)
+const RAIL_TRIGGER_LEFT_DISTANCE = 50
 
 const clearRailTimer = () => {
   if (railTimer) {
@@ -172,7 +174,7 @@ const gotoPortal = () => {
 <template>
   <div class="app-wrapper">
     <el-container class="layout-container">
-      <div class="left-nav-group" @mouseenter="scheduleRailOpen" @mouseleave="scheduleRailClose">
+      <div class="left-nav-group" ref="leftNavGroupRef" @mouseenter="scheduleRailOpen" @mouseleave="scheduleRailClose">
         <app-rail
           :visible="showAppRail"
           :collapsed="isCollapse"
