@@ -43,7 +43,7 @@
           :teleported="false"
           @change="handleStandardChange"
           :loading="specsLoading"
-          :disabled="!form.componentTypeId || !materialCategory || materialCategory.trim() === ''"
+          :disabled="!form.componentTypeId || !materialCategory || (materialCategory && materialCategory.trim() === '')"
         >
           <el-option
             v-for="spec in pipeFittingSpecs"
@@ -52,7 +52,7 @@
             :value="spec.standardName"
           />
         </el-select>
-        <div class="tip-text" v-if="!materialCategory || materialCategory.trim() === ''">当前PMC未解析出主材料，无法获取标准与材料牌号</div>
+        <div class="tip-text" v-if="!materialCategory || (materialCategory && materialCategory.trim() === '')">当前PMC未解析出主材料，无法获取标准与材料牌号</div>
         <div class="tip-text" v-else-if="!form.componentTypeId">请先选择部件类型，再选择标准</div>
         <div class="tip-text" v-else>可多选，已选择 {{ form.standardNames.length }} 个标准</div>
       </el-form-item>
