@@ -1,6 +1,4 @@
-import RouterPassthrough from '@/layouts/components/RouterPassthrough.vue'
-
-const Stub = () => import('@/shared/components/StubPage.vue')
+﻿import RouterPassthrough from '@/layouts/components/RouterPassthrough.vue'
 
 export default {
   path: 'standard-selection',
@@ -15,16 +13,10 @@ export default {
       meta: { title: '简选标准定义', icon: 'List', keepAlive: true }
     },
     {
-      path: 'data-structure',
-      name: 'StdSelectionDataStructure',
-      component: Stub,
-      meta: { title: '简选标准数据结构定义', icon: 'DataLine' }
-    },
-    {
-      path: 'data-definition',
-      name: 'StdSelectionDataDefinition',
-      component: Stub,
-      meta: { title: '简选标准数据定义', icon: 'DocumentChecked' }
+      path: 'preview-dashboard',
+      name: 'StandardSequenceDashboard',
+      component: () => import('@/apps/product-standard/features/standard-sequence/pages/StandardSequence.vue'),
+      meta: { title: '简选标准预览看板', icon: 'DataBoard', keepAlive: true }
     }
   ]
 }

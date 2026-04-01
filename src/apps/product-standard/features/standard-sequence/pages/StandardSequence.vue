@@ -1,4 +1,4 @@
-<template>
+﻿﻿﻿﻿﻿﻿<template>
   <div class="standard-sequence-container">
     <el-container class="main-layout">
       <!-- 左侧目录树 -->
@@ -61,7 +61,7 @@
             >
               <template #default="{ node, data }">
                 <span class="custom-tree-node">
-                  <el-icon v-if="data.children" class="folder-icon"><Folder /></el-icon>
+                  <el-icon v-if="data.meta && data.meta.level < 3" class="folder-icon"><Folder /></el-icon>
                   <el-icon v-else class="file-icon"><Document /></el-icon>
                   <span>{{ node.label }}</span>
                 </span>
@@ -97,7 +97,7 @@
               <div class="content-header">
                 <div class="title-text">{{ formTitle }}</div>
                 <div class="action-btns">
-                  <el-button type="primary" size="small" @click="openAddRowDialog">新增</el-button>
+                  <el-button type="primary" size="small" @click="openAddDialog">新增</el-button>
                   <el-button
                     type="danger"
                     size="small"
@@ -118,32 +118,32 @@
                 >
                   <el-table-column type="selection" width="48" />
                   <el-table-column type="index" label="ID" width="70" />
-                  <el-table-column prop="materialGrade" label="材料牌号" width="150">
-                    <template #default="{ row }">
-                      <span>{{ row.materialGrade }}</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="thicknessLevel" label="壁厚等级" width="120">
+                  <el-table-column prop="thicknessLevel" label="壁厚等级编码" min-width="120">
                     <template #default="{ row }">
                       <span>{{ row.thicknessLevel }}</span>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="nominalDiameter" label="通径" width="120">
+                  <el-table-column prop="thicknessLevelDescription" label="壁厚等级描述" min-width="140">
+                    <template #default="{ row }">
+                      <span>{{ row.thicknessLevelDescription || '-' }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="nominalDiameter" label="通径" min-width="120">
                     <template #default="{ row }">
                       <span>{{ row.nominalDiameter }}</span>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="nominalDiameterUnit" label="通径单位" width="100">
+                  <el-table-column prop="nominalDiameterUnit" label="通径单位" width="110">
                     <template #default="{ row }">
                       <span>{{ row.nominalDiameterUnit }}</span>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="outerDiameter" label="外径" width="120">
+                  <el-table-column prop="outerDiameter" label="外径" min-width="120">
                     <template #default="{ row }">
                       <span>{{ row.outerDiameter }}</span>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="wallThickness" label="壁厚" width="120">
+                  <el-table-column prop="wallThickness" label="壁厚" min-width="120">
                     <template #default="{ row }">
                       <span>{{ row.wallThickness }}</span>
                     </template>
@@ -168,7 +168,7 @@
           <template v-else>
             <div class="content-inner">
               <div class="table-wrapper">
-                <el-table :data="dashboardTableData" border height="100%" style="width: 100%;">
+                <el-table :data="dashboardTableData" border height="100%" style="width: 100%;" @row-click="handleDashboardRowClick">
                   <el-table-column type="index" label="序号" width="60" />
                   <el-table-column prop="componentName" label="部件名称" />
                   <el-table-column prop="nominalDiameter" label="公称通径" width="140" />
@@ -200,28 +200,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="标准号" required>
-          <el-select
-            v-model="addNodeForm.standard"
-            filterable
-            allow-create
-            default-first-option
-            size="default"
-            style="width: 100%;"
-          >
-            <el-option v-for="opt in addNodeStandardOptions" :key="opt" :label="opt" :value="opt" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="材料牌号" required>
-          <el-select
-            v-model="addNodeForm.materialGrade"
-            filterable
-            allow-create
-            default-first-option
-            size="default"
-            style="width: 100%;"
-          >
-            <el-option v-for="opt in materialGradeOptions" :key="opt" :label="opt" :value="opt" />
-          </el-select>
+          <el-input v-model="addNodeForm.standard" />
         </el-form-item>
         <el-form-item label="序列版本号" required>
           <el-input-number v-model="addNodeForm.sequenceVersion" :min="1" controls-position="right" style="width: 100%;" />
@@ -249,12 +228,13 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="addRowDialogVisible" title="新增行" width="980px">
+    <el-dialog v-model="addRowDialogVisible" title="加载基础库数据" width="980px">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <div style="font-weight: 600;">
           {{ formTitle }}
         </div>
         <div style="display: flex; gap: 8px;">
+          <el-button type="primary" size="small" @click="loadBaseData(false)">加载基础库数据</el-button>
           <el-button size="small" @click="appendNewRow(false)">新增一行</el-button>
           <el-button size="small" @click="appendNewRow(true)" :disabled="newRowRows.length === 0">复制上一行</el-button>
           <el-button type="danger" size="small" @click="removeSelectedNewRows" :disabled="newRowSelection.length === 0">
@@ -268,81 +248,99 @@
         height="420px"
         style="width: 100%;"
         @selection-change="handleNewRowSelectionChange"
+        :show-header-overflow-tooltip="true"
       >
         <el-table-column type="selection" width="48" />
-        <el-table-column type="index" label="#" width="60" />
-        <el-table-column v-if="selectedLevel === 3" prop="materialGrade" label="材料牌号" width="170">
+        <el-table-column type="index" label="ID" width="60" show-overflow-tooltip />
+        <el-table-column prop="materialGrade" label="材料牌号" min-width="100" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-select
-              v-model="row.materialGrade"
-              filterable
-              allow-create
-              default-first-option
-              size="small"
-              style="width: 100%;"
-            >
-              <el-option v-for="opt in materialGradeOptions" :key="opt" :label="opt" :value="opt" />
+            <el-select v-model="row.materialGrade" size="small" @change="() => updateOuterDiameterAndWallThickness(row)">
+              <el-option
+                v-for="option in materialGradeSelectOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column prop="thicknessLevel" label="壁厚等级" width="140">
+        <el-table-column prop="thicknessLevel" label="壁厚等级编码" min-width="100" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-input v-model="row.thicknessLevel" size="small" />
+            <el-select v-model="row.thicknessLevel" size="small" @change="() => updateOuterDiameterAndWallThickness(row)">
+              <el-option
+                v-for="option in thicknessLevelSelectOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
           </template>
         </el-table-column>
-        <el-table-column prop="nominalDiameter" label="通径" width="140">
+        <el-table-column prop="thicknessLevelDescription" label="壁厚等级描述" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-input-number
-              v-model="row.nominalDiameter"
-              :min="0"
-              size="small"
-              controls-position="right"
-              style="width: 100%;"
-            />
+            <el-input v-model="row.thicknessLevelDescription" size="small" disabled />
           </template>
         </el-table-column>
-        <el-table-column prop="nominalDiameterUnit" label="通径单位" width="120">
+        <el-table-column prop="nominalDiameter" label="通径" min-width="100" show-overflow-tooltip>
+          <template #default="{ row }">
+            <el-select v-model="row.nominalDiameter" size="small" @change="() => updateOuterDiameterAndWallThickness(row)">
+              <el-option
+                v-for="option in nominalDiameterSelectOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column prop="nominalDiameterUnit" label="通径单位" min-width="90" show-overflow-tooltip>
           <template #default="{ row }">
             <el-input v-model="row.nominalDiameterUnit" size="small" />
           </template>
         </el-table-column>
-        <el-table-column prop="outerDiameter" label="外径" width="140">
+        <el-table-column prop="outerDiameter" label="外径" min-width="100" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-input-number
-              v-model="row.outerDiameter"
-              :min="0"
-              size="small"
-              controls-position="right"
-              style="width: 100%;"
-            />
+            <el-input v-model="row.outerDiameter" size="small" disabled />
           </template>
         </el-table-column>
-        <el-table-column prop="wallThickness" label="壁厚" width="140">
+        <el-table-column prop="wallThickness" label="壁厚" min-width="100" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-input-number
-              v-model="row.wallThickness"
-              :min="0"
-              size="small"
-              controls-position="right"
-              style="width: 100%;"
-            />
+            <el-input v-model="row.wallThickness" size="small" disabled />
           </template>
         </el-table-column>
-        <el-table-column prop="enabled" label="启用" width="90" align="center">
+        <el-table-column prop="enabled" label="启用" min-width="80" align="center" show-overflow-tooltip>
           <template #default="{ row }">
             <el-switch v-model="row.enabled" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="90" align="center">
-          <template #default="{ $index }">
-            <el-button type="danger" link size="small" @click="removeNewRowAt($index)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="addRowDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmAddRows" :disabled="newRowRows.length === 0">确定</el-button>
+          <el-button type="primary" @click="confirmLoadAndSaveRows" :disabled="newRowRows.length === 0">确定导入</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="dashboardDetailDialogVisible" title="明细查看" width="960px" :close-on-click-modal="false">
+      <el-table :data="dashboardDetailRows" border height="500px" style="width: 100%;">
+        <el-table-column type="index" label="序号" width="60" />
+        <el-table-column prop="materialGrade" label="材料牌号" min-width="100" />
+        <el-table-column prop="thicknessLevel" label="壁厚等级编码" min-width="110" />
+        <el-table-column prop="thicknessLevelDescription" label="壁厚等级描述" min-width="120" />
+        <el-table-column prop="nominalDiameter" label="通径" min-width="100" />
+        <el-table-column prop="nominalDiameterUnit" label="通径单位" width="90" />
+        <el-table-column prop="outerDiameter" label="外径" min-width="100" />
+        <el-table-column prop="wallThickness" label="壁厚" min-width="100" />
+        <el-table-column label="状态" width="80">
+          <template #default="{ row }">
+            {{ row.enabled ? '启用' : '禁用' }}
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="dashboardDetailDialogVisible = false">关闭</el-button>
         </span>
       </template>
     </el-dialog>
@@ -354,6 +352,7 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Document, Edit, Folder, Menu, Plus, Search, Upload } from '@element-plus/icons-vue'
+import { fetchThicknessLevelDescriptions } from '@/apps/product-standard/features/standard-sequence/api/standard-sequence'
 
 const route = useRoute()
 
@@ -377,6 +376,47 @@ const standardsByComponentType = {
 
 const materialGradeOptions = ['20#', 'Q235B', 'Q345B', '304', '316L', '321', '347H', '2205', 'S31803']
 
+const thicknessLevelDescriptionMap = ref({})
+
+const getThicknessLevelDescription = (code) => {
+  if (!code) return ''
+  return thicknessLevelDescriptionMap.value[code] || ''
+}
+
+// Mock 基础库数据接口
+const baseLibraryDataMock = {
+  'GB/T 8163': [
+    { materialGrade: '20#', thicknessLevel: 'D1', nominalDiameter: 10, nominalDiameterUnit: 'mm', outerDiameter: 17.5, wallThickness: 2.4 },
+    { materialGrade: '20#', thicknessLevel: 'D1', nominalDiameter: 12, nominalDiameterUnit: 'mm', outerDiameter: 21.3, wallThickness: 2.8 },
+    { materialGrade: '20#', thicknessLevel: 'D2', nominalDiameter: 14, nominalDiameterUnit: 'mm', outerDiameter: 22.2, wallThickness: 2.8 },
+    { materialGrade: '20#', thicknessLevel: 'D2', nominalDiameter: 16, nominalDiameterUnit: 'mm', outerDiameter: 25.4, wallThickness: 3.2 },
+    { materialGrade: 'Q235B', thicknessLevel: 'D1', nominalDiameter: 18, nominalDiameterUnit: 'mm', outerDiameter: 28.6, wallThickness: 3.2 },
+    { materialGrade: 'Q235B', thicknessLevel: 'D2', nominalDiameter: 20, nominalDiameterUnit: 'mm', outerDiameter: 30, wallThickness: 3.2 },
+    { materialGrade: 'Q345B', thicknessLevel: 'D1', nominalDiameter: 22, nominalDiameterUnit: 'mm', outerDiameter: 33.7, wallThickness: 3.6 },
+    { materialGrade: 'Q345B', thicknessLevel: 'D2', nominalDiameter: 25, nominalDiameterUnit: 'mm', outerDiameter: 38, wallThickness: 3.6 },
+    { materialGrade: '304', thicknessLevel: 'D1', nominalDiameter: 28, nominalDiameterUnit: 'mm', outerDiameter: 42.7, wallThickness: 3.2 },
+    { materialGrade: '304', thicknessLevel: 'D2', nominalDiameter: 32, nominalDiameterUnit: 'mm', outerDiameter: 48.3, wallThickness: 3.6 }
+  ],
+  'GB/T 5312': [
+    { materialGrade: 'Q235B', thicknessLevel: 'D1', nominalDiameter: 10, nominalDiameterUnit: 'mm', outerDiameter: 17.5, wallThickness: 2.0 },
+    { materialGrade: 'Q235B', thicknessLevel: 'D2', nominalDiameter: 16, nominalDiameterUnit: 'mm', outerDiameter: 25.4, wallThickness: 2.65 },
+    { materialGrade: 'Q345B', thicknessLevel: 'D1', nominalDiameter: 20, nominalDiameterUnit: 'mm', outerDiameter: 30, wallThickness: 2.75 },
+    { materialGrade: 'Q345B', thicknessLevel: 'D2', nominalDiameter: 25, nominalDiameterUnit: 'mm', outerDiameter: 38, wallThickness: 3.2 }
+  ],
+  'GB/T 14976': [
+    { materialGrade: '304', thicknessLevel: 'D1', nominalDiameter: 12, nominalDiameterUnit: 'mm', outerDiameter: 16, wallThickness: 1.5 },
+    { materialGrade: '304', thicknessLevel: 'D2', nominalDiameter: 16, nominalDiameterUnit: 'mm', outerDiameter: 20, wallThickness: 1.5 },
+    { materialGrade: '316L', thicknessLevel: 'D1', nominalDiameter: 20, nominalDiameterUnit: 'mm', outerDiameter: 25, wallThickness: 1.65 },
+    { materialGrade: '316L', thicknessLevel: 'D2', nominalDiameter: 25, nominalDiameterUnit: 'mm', outerDiameter: 32, wallThickness: 2.0 }
+  ],
+  'GB/T 12459': [
+    { materialGrade: '20#', thicknessLevel: 'D1', nominalDiameter: 32, nominalDiameterUnit: 'mm', outerDiameter: 45, wallThickness: 3.0 },
+    { materialGrade: '20#', thicknessLevel: 'D2', nominalDiameter: 40, nominalDiameterUnit: 'mm', outerDiameter: 53, wallThickness: 3.5 },
+    { materialGrade: 'Q235B', thicknessLevel: 'D1', nominalDiameter: 50, nominalDiameterUnit: 'mm', outerDiameter: 63.5, wallThickness: 4.0 },
+    { materialGrade: 'Q235B', thicknessLevel: 'D2', nominalDiameter: 65, nominalDiameterUnit: 'mm', outerDiameter: 85, wallThickness: 4.5 }
+  ]
+}
+
 let rowIdSeed = 1
 const createRowId = () => rowIdSeed++
 
@@ -390,6 +430,7 @@ const definitionTableData = ref([
     standard: 'GB/T 8163',
     materialGrade: '20#',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 50,
     nominalDiameterUnit: 'mm',
     outerDiameter: 60.3,
@@ -406,6 +447,7 @@ const definitionTableData = ref([
     standard: 'GB/T 8163',
     materialGrade: '20#',
     thicknessLevel: 'D2',
+    thicknessLevelDescription: '加厚壁厚',
     nominalDiameter: 80,
     nominalDiameterUnit: 'mm',
     outerDiameter: 88.9,
@@ -422,6 +464,7 @@ const definitionTableData = ref([
     standard: 'GB/T 5312',
     materialGrade: '20#',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 100,
     nominalDiameterUnit: 'mm',
     outerDiameter: 114.3,
@@ -438,6 +481,7 @@ const definitionTableData = ref([
     standard: 'GB/T 14976',
     materialGrade: '304',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 25,
     nominalDiameterUnit: 'mm',
     outerDiameter: 33.4,
@@ -454,6 +498,7 @@ const definitionTableData = ref([
     standard: 'GB/T 14976',
     materialGrade: '316L',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 40,
     nominalDiameterUnit: 'mm',
     outerDiameter: 48.3,
@@ -470,6 +515,7 @@ const definitionTableData = ref([
     standard: 'GB/T 21833.2',
     materialGrade: '2205',
     thicknessLevel: 'D2',
+    thicknessLevelDescription: '加厚壁厚',
     nominalDiameter: 100,
     nominalDiameterUnit: 'mm',
     outerDiameter: 114.3,
@@ -487,6 +533,7 @@ const definitionTableData = ref([
     standard: 'GB/T 8163',
     materialGrade: '20#',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 65,
     nominalDiameterUnit: 'mm',
     outerDiameter: 76.1,
@@ -503,6 +550,7 @@ const definitionTableData = ref([
     standard: 'GB/T 5312',
     materialGrade: '20#',
     thicknessLevel: 'D3',
+    thicknessLevelDescription: '重型壁厚',
     nominalDiameter: 150,
     nominalDiameterUnit: 'mm',
     outerDiameter: 168.3,
@@ -519,6 +567,7 @@ const definitionTableData = ref([
     standard: 'GB/T 14976',
     materialGrade: '321',
     thicknessLevel: 'D2',
+    thicknessLevelDescription: '加厚壁厚',
     nominalDiameter: 80,
     nominalDiameterUnit: 'mm',
     outerDiameter: 88.9,
@@ -535,6 +584,7 @@ const definitionTableData = ref([
     standard: 'GB/T 21833.2',
     materialGrade: 'S31803',
     thicknessLevel: 'D2',
+    thicknessLevelDescription: '加厚壁厚',
     nominalDiameter: 200,
     nominalDiameterUnit: 'mm',
     outerDiameter: 219.1,
@@ -552,6 +602,7 @@ const definitionTableData = ref([
     standard: 'GB/T 3091',
     materialGrade: 'Q235B',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 50,
     nominalDiameterUnit: 'mm',
     outerDiameter: 60.3,
@@ -568,6 +619,7 @@ const definitionTableData = ref([
     standard: 'GB/T 3091',
     materialGrade: 'Q235B',
     thicknessLevel: 'D2',
+    thicknessLevelDescription: '加厚壁厚',
     nominalDiameter: 100,
     nominalDiameterUnit: 'mm',
     outerDiameter: 114.3,
@@ -584,6 +636,7 @@ const definitionTableData = ref([
     standard: 'GB/T 8163',
     materialGrade: '20#',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 25,
     nominalDiameterUnit: 'mm',
     outerDiameter: 33.4,
@@ -600,6 +653,7 @@ const definitionTableData = ref([
     standard: 'GB/T 8163',
     materialGrade: 'Q345B',
     thicknessLevel: 'D3',
+    thicknessLevelDescription: '重型壁厚',
     nominalDiameter: 200,
     nominalDiameterUnit: 'mm',
     outerDiameter: 219.1,
@@ -617,6 +671,7 @@ const definitionTableData = ref([
     standard: 'GB/T 12459',
     materialGrade: '20#',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 50,
     nominalDiameterUnit: 'mm',
     outerDiameter: 60.3,
@@ -633,6 +688,7 @@ const definitionTableData = ref([
     standard: 'GB/T 12459',
     materialGrade: '20#',
     thicknessLevel: 'D2',
+    thicknessLevelDescription: '加厚壁厚',
     nominalDiameter: 150,
     nominalDiameterUnit: 'mm',
     outerDiameter: 168.3,
@@ -649,6 +705,7 @@ const definitionTableData = ref([
     standard: 'GB/T 12459',
     materialGrade: 'Q345B',
     thicknessLevel: 'D2',
+    thicknessLevelDescription: '加厚壁厚',
     nominalDiameter: 100,
     nominalDiameterUnit: 'mm',
     outerDiameter: 114.3,
@@ -665,6 +722,7 @@ const definitionTableData = ref([
     standard: 'GB/T 12459',
     materialGrade: '20#',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 80,
     nominalDiameterUnit: 'mm',
     outerDiameter: 88.9,
@@ -682,6 +740,7 @@ const definitionTableData = ref([
     standard: 'HG/T 20592',
     materialGrade: '20#',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 50,
     nominalDiameterUnit: 'mm',
     outerDiameter: 60.3,
@@ -698,6 +757,7 @@ const definitionTableData = ref([
     standard: 'HG/T 20592',
     materialGrade: 'Q345B',
     thicknessLevel: 'D2',
+    thicknessLevelDescription: '加厚壁厚',
     nominalDiameter: 150,
     nominalDiameterUnit: 'mm',
     outerDiameter: 168.3,
@@ -714,6 +774,7 @@ const definitionTableData = ref([
     standard: 'HG/T 20592',
     materialGrade: '20#',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 80,
     nominalDiameterUnit: 'mm',
     outerDiameter: 88.9,
@@ -730,6 +791,7 @@ const definitionTableData = ref([
     standard: 'GB/T 9112',
     materialGrade: 'Q345B',
     thicknessLevel: 'D2',
+    thicknessLevelDescription: '加厚壁厚',
     nominalDiameter: 200,
     nominalDiameterUnit: 'mm',
     outerDiameter: 219.1,
@@ -747,6 +809,7 @@ const definitionTableData = ref([
     standard: 'GB/T 12224',
     materialGrade: '20#',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 50,
     nominalDiameterUnit: 'mm',
     outerDiameter: 60.3,
@@ -763,6 +826,7 @@ const definitionTableData = ref([
     standard: 'GB/T 12237',
     materialGrade: '316L',
     thicknessLevel: 'D1',
+    thicknessLevelDescription: '普通壁厚',
     nominalDiameter: 80,
     nominalDiameterUnit: 'mm',
     outerDiameter: 88.9,
@@ -779,6 +843,7 @@ const definitionTableData = ref([
     standard: 'JB/T 7748',
     materialGrade: '304',
     thicknessLevel: 'D2',
+    thicknessLevelDescription: '加厚壁厚',
     nominalDiameter: 150,
     nominalDiameterUnit: 'mm',
     outerDiameter: 168.3,
@@ -847,33 +912,11 @@ const configTreeData = computed(() => {
     return node
   }
 
-  const getMaterialNode = (standardNode, materialGrade) => {
-    const key = toKeyPart(materialGrade)
-    let node = standardNode.children.find(n => n.id === `${standardNode.id}-mat-${key}`)
-    if (!node) {
-      node = {
-        id: `${standardNode.id}-mat-${key}`,
-        label: materialGrade,
-        meta: {
-          level: 4,
-          sequenceName: standardNode.meta.sequenceName,
-          sequenceVersion: standardNode.meta.sequenceVersion,
-          name: standardNode.meta.name,
-          standard: standardNode.meta.standard,
-          materialGrade
-        }
-      }
-      standardNode.children.push(node)
-    }
-    return node
-  }
-
   for (const row of definitionTableData.value) {
-    if (!row.sequenceName || !row.sequenceVersion || !row.name || !row.standard || !row.materialGrade) continue
+    if (!row.sequenceName || !row.sequenceVersion || !row.name || !row.standard) continue
     const seqNode = getSeqNode(row.sequenceName, row.sequenceVersion)
     const nameNode = getNameNode(seqNode, row.name)
-    const standardNode = getStandardNode(nameNode, row.standard)
-    getMaterialNode(standardNode, row.materialGrade)
+    getStandardNode(nameNode, row.standard)
   }
 
   return Array.from(seqMap.values())
@@ -905,13 +948,12 @@ const handleConfigNodeClick = (data, node) => {
   selectedFormRowIds.value = []
 }
 
-const isFormNodeSelected = computed(() => selectedLevel.value === 3 || selectedLevel.value === 4)
+const isFormNodeSelected = computed(() => selectedLevel.value === 3)
 
 const formTitle = computed(() => {
   if (!selectedMeta.value) return ''
   const meta = selectedMeta.value
   const parts = [`${meta.sequenceName} V${meta.sequenceVersion}`, meta.name, meta.standard]
-  if (selectedLevel.value === 4) parts.push(meta.materialGrade)
   return parts.filter(Boolean).join(' / ')
 })
 
@@ -1039,13 +1081,57 @@ const dashboardTableData = computed(() => {
   })).sort((a, b) => String(a.componentName ?? '').localeCompare(String(b.componentName ?? ''), 'zh-CN', { numeric: true }))
 })
 
+const dashboardDetailDialogVisible = ref(false)
+const dashboardDetailSummary = ref(null)
+
+const dashboardDetailRows = computed(() => {
+  if (!dashboardDetailSummary.value) return []
+  const summary = dashboardDetailSummary.value
+  const seq = selectedDashboardSequence.value
+  if (!seq?.sequenceName || !seq?.sequenceVersion) return []
+
+  const rows = definitionTableData.value.filter(
+    r =>
+      r.sequenceName === seq.sequenceName &&
+      r.sequenceVersion === seq.sequenceVersion &&
+      r.name === summary.componentName
+  )
+
+  const compareText = (left, right) =>
+    String(left ?? '').localeCompare(String(right ?? ''), 'zh-CN', { numeric: true, sensitivity: 'base' })
+  const toNum = (v) => {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : 0
+  }
+
+  return rows.slice().sort((a, b) => {
+    const material = compareText(a.materialGrade, b.materialGrade)
+    if (material !== 0) return material
+    const thickness = compareText(a.thicknessLevel, b.thicknessLevel)
+    if (thickness !== 0) return thickness
+    return toNum(a.nominalDiameter) - toNum(b.nominalDiameter)
+  })
+})
+
+const handleDashboardRowClick = (row) => {
+  if (!row || !row.componentName) return
+  dashboardDetailSummary.value = {
+    componentName: row.componentName,
+    sequenceName: selectedDashboardSequence.value?.sequenceName || '',
+    sequenceVersion: selectedDashboardSequence.value?.sequenceVersion || '',
+    nominalDiameter: row.nominalDiameter,
+    materialGrade: row.materialGrade,
+    standardNumber: row.standardNumber
+  }
+  dashboardDetailDialogVisible.value = true
+}
+
 const addNodeDialogVisible = ref(false)
 const addNodeForm = ref({
   sequenceName: '',
   name: '',
   componentType: '',
   standard: '',
-  materialGrade: '',
   sequenceVersion: 1
 })
 
@@ -1088,21 +1174,6 @@ const getSiblingLabels = (level, meta) => {
       )
     ).filter(Boolean)
   }
-  if (level === 4) {
-    return Array.from(
-      new Set(
-        definitionTableData.value
-          .filter(
-            r =>
-              r.sequenceName === meta.sequenceName &&
-              r.sequenceVersion === meta.sequenceVersion &&
-              r.name === meta.name &&
-              r.standard === meta.standard
-          )
-          .map(r => r.materialGrade)
-      )
-    ).filter(Boolean)
-  }
   return []
 }
 
@@ -1127,7 +1198,6 @@ const openAddNodeDialog = () => {
   if (meta && level >= 1) base.sequenceVersion = meta.sequenceVersion || 1
   if (meta && level >= 2) base.name = meta.name || ''
   if (meta && level >= 3) base.standard = meta.standard || ''
-  if (meta && level >= 4) base.materialGrade = ''
 
   const found = definitionTableData.value.find(r => {
     if (base.sequenceName && r.sequenceName !== base.sequenceName) return false
@@ -1148,9 +1218,8 @@ const confirmAddNode = () => {
   const name = normalizeRequiredString(form.name)
   const type = normalizeRequiredString(form.componentType)
   const standard = normalizeRequiredString(form.standard)
-  const material = normalizeRequiredString(form.materialGrade)
 
-  if (!seq || !Number.isFinite(sequenceVersion) || sequenceVersion < 1 || !name || !type || !standard || !material) {
+  if (!seq || !Number.isFinite(sequenceVersion) || sequenceVersion < 1 || !name || !type || !standard) {
     ElMessage.warning('请填写必填项')
     return
   }
@@ -1160,11 +1229,10 @@ const confirmAddNode = () => {
       r.sequenceName === seq &&
       r.sequenceVersion === sequenceVersion &&
       r.name === name &&
-      r.standard === standard &&
-      r.materialGrade === material
+      r.standard === standard
   )
   if (exists) {
-    ElMessage.warning('该材料牌号节点已存在')
+    ElMessage.warning('该标准号节点已存在')
     return
   }
 
@@ -1175,8 +1243,8 @@ const confirmAddNode = () => {
     name,
     componentType: type,
     standard,
-    materialGrade: material,
     thicknessLevel: 'D1',
+    thicknessLevelDescription: getThicknessLevelDescription('D1'),
     nominalDiameter: 0,
     nominalDiameterUnit: 'mm',
     outerDiameter: 0,
@@ -1197,7 +1265,6 @@ const openRenameDialog = () => {
   if (selectedLevel.value === 1) renameForm.value.newLabel = selectedMeta.value.sequenceName
   if (selectedLevel.value === 2) renameForm.value.newLabel = selectedMeta.value.name
   if (selectedLevel.value === 3) renameForm.value.newLabel = selectedMeta.value.standard
-  if (selectedLevel.value === 4) renameForm.value.newLabel = selectedMeta.value.materialGrade
   renameDialogVisible.value = true
 }
 
@@ -1245,18 +1312,6 @@ const confirmRename = () => {
         row.standard = newLabel
       }
     }
-  } else if (level === 4) {
-    for (const row of definitionTableData.value) {
-      if (
-        row.sequenceName === meta.sequenceName &&
-        row.sequenceVersion === meta.sequenceVersion &&
-        row.name === meta.name &&
-        row.standard === meta.standard &&
-        row.materialGrade === meta.materialGrade
-      ) {
-        row.materialGrade = newLabel
-      }
-    }
   }
 
   renameDialogVisible.value = false
@@ -1284,7 +1339,6 @@ const handleDeleteNode = async () => {
     if (row.sequenceVersion !== meta.sequenceVersion) return true
     if (level >= 2 && row.name !== meta.name) return true
     if (level >= 3 && row.standard !== meta.standard) return true
-    if (level >= 4 && row.materialGrade !== meta.materialGrade) return true
     return false
   })
 
@@ -1336,7 +1390,8 @@ const handleUpgradeNode = async () => {
     ...r,
     id: createRowId(),
     sequenceVersion: nextVersion,
-    version: nextVersion
+    version: nextVersion,
+    thicknessLevelDescription: getThicknessLevelDescription(r.thicknessLevel)
   }))
   definitionTableData.value.push(...copies)
 
@@ -1351,13 +1406,17 @@ const createNewRowLocalId = () => `new-${Date.now()}-${newRowLocalIdSeed++}`
 const newRowRows = ref([])
 const newRowSelection = ref([])
 
+// 下拉选项数据
+const materialGradeSelectOptions = ref([])
+const thicknessLevelSelectOptions = ref([])
+const nominalDiameterSelectOptions = ref([])
+const specMappingData = ref({}) // 用于快速查找外径和壁厚
+
 const createEmptyNewRow = (meta) => {
-  const scopeLevel = selectedLevel.value
   const existedMaterial = formViewRows.value[0]?.materialGrade
-  const materialGrade = scopeLevel === 4 ? meta.materialGrade : existedMaterial || ''
   return {
     __localId: createNewRowLocalId(),
-    materialGrade,
+    materialGrade: existedMaterial || '',
     thicknessLevel: '',
     nominalDiameter: 0,
     nominalDiameterUnit: 'mm',
@@ -1367,12 +1426,81 @@ const createEmptyNewRow = (meta) => {
   }
 }
 
-const openAddRowDialog = () => {
+const openAddDialog = () => {
+  if (!selectedMeta.value) return
+  addRowDialogVisible.value = true
+}
+
+const loadBaseData = async (openDialog = true) => {
   if (!selectedMeta.value) return
   const meta = selectedMeta.value
-  newRowRows.value = [createEmptyNewRow(meta)]
-  newRowSelection.value = []
-  addRowDialogVisible.value = true
+  const standard = meta.standard
+
+  const baseData = baseLibraryDataMock[standard] || []
+
+  if (baseData.length === 0) {
+    ElMessage.warning(`没有找到标准号 ${standard} 的基础库数据`)
+    return
+  }
+
+  const sortedData = baseData.slice().sort((a, b) => {
+    const materialCompare = String(a.materialGrade ?? '').localeCompare(String(b.materialGrade ?? ''), 'zh-CN')
+    if (materialCompare !== 0) return materialCompare
+
+    const thicknessCompare = String(a.thicknessLevel ?? '').localeCompare(String(b.thicknessLevel ?? ''), 'zh-CN')
+    if (thicknessCompare !== 0) return thicknessCompare
+
+    return Number(a.nominalDiameter ?? 0) - Number(b.nominalDiameter ?? 0)
+  })
+
+  const materialSet = new Set(sortedData.map(item => item.materialGrade))
+  const thicknessSet = new Set(sortedData.map(item => item.thicknessLevel))
+  const diameterSet = new Set(sortedData.map(item => item.nominalDiameter))
+
+  materialGradeSelectOptions.value = Array.from(materialSet).map(val => ({ label: val, value: val }))
+  thicknessLevelSelectOptions.value = Array.from(thicknessSet).map(val => ({ label: val, value: val }))
+  nominalDiameterSelectOptions.value = Array.from(diameterSet)
+    .sort((a, b) => Number(a) - Number(b))
+    .map(val => ({ label: String(val), value: val }))
+
+  specMappingData.value = {}
+  sortedData.forEach(item => {
+    const key = `${item.materialGrade}|${item.thicknessLevel}|${item.nominalDiameter}`
+    specMappingData.value[key] = {
+      outerDiameter: item.outerDiameter,
+      wallThickness: item.wallThickness
+    }
+  })
+
+  newRowRows.value = sortedData.map(item => ({
+    __localId: createNewRowLocalId(),
+    materialGrade: item.materialGrade,
+    thicknessLevel: item.thicknessLevel,
+    nominalDiameter: item.nominalDiameter,
+    nominalDiameterUnit: item.nominalDiameterUnit,
+    outerDiameter: item.outerDiameter,
+    wallThickness: item.wallThickness,
+    enabled: true
+  }))
+
+  newRowSelection.value = newRowRows.value.slice()
+
+  try {
+    const thicknessCodes = Array.from(thicknessSet)
+    const descriptions = await fetchThicknessLevelDescriptions(thicknessCodes)
+    thicknessLevelDescriptionMap.value = descriptions
+  } catch (error) {
+    console.error('获取壁厚等级描述失败:', error)
+    ElMessage.warning('获取壁厚等级描述失败，将显示编码')
+  }
+
+  if (openDialog) {
+    addRowDialogVisible.value = true
+  }
+}
+
+const openLoadBaseDataDialog = () => {
+  loadBaseData(true)
 }
 
 const handleNewRowSelectionChange = (rows) => {
@@ -1388,6 +1516,21 @@ const appendNewRow = (copyLast) => {
     return
   }
   newRowRows.value.push(createEmptyNewRow(meta))
+}
+
+const updateOuterDiameterAndWallThickness = (row) => {
+  // 根据选择的材料牌号、壁厚等级、通径，自动填充外径和壁厚
+  if (!row.materialGrade || !row.thicknessLevel || !row.nominalDiameter) {
+    return
+  }
+
+  const key = `${row.materialGrade}|${row.thicknessLevel}|${row.nominalDiameter}`
+  const spec = specMappingData.value[key]
+
+  if (spec) {
+    row.outerDiameter = spec.outerDiameter
+    row.wallThickness = spec.wallThickness
+  }
 }
 
 const removeNewRowAt = (index) => {
@@ -1419,6 +1562,7 @@ const confirmAddRows = () => {
       id: createRowId(),
       materialGrade: normalizeRequiredString(input.materialGrade),
       thicknessLevel: normalizeRequiredString(input.thicknessLevel),
+      thicknessLevelDescription: getThicknessLevelDescription(input.thicknessLevel),
       nominalDiameter: Number(input.nominalDiameter),
       nominalDiameterUnit: normalizeRequiredString(input.nominalDiameterUnit),
       outerDiameter: Number(input.outerDiameter),
@@ -1427,11 +1571,6 @@ const confirmAddRows = () => {
       enabled: !!input.enabled
     }
 
-    if (selectedLevel.value === 4) row.materialGrade = meta.materialGrade
-    if (selectedLevel.value === 3 && !row.materialGrade) {
-      ElMessage.warning(`第 ${i + 1} 行：材料牌号必填`)
-      return
-    }
     if (!row.thicknessLevel || !row.nominalDiameterUnit) {
       ElMessage.warning(`第 ${i + 1} 行：请填写必填项`)
       return
@@ -1445,13 +1584,12 @@ const confirmAddRows = () => {
       return
     }
 
-    const fixedMaterial = selectedLevel.value === 4 ? meta.materialGrade : row.materialGrade
     const key = [
       meta.sequenceName,
       meta.sequenceVersion,
       meta.name,
       meta.standard,
-      fixedMaterial,
+      row.materialGrade,
       row.thicknessLevel,
       row.nominalDiameter,
       row.nominalDiameterUnit,
@@ -1472,7 +1610,7 @@ const confirmAddRows = () => {
         r.sequenceVersion === meta.sequenceVersion &&
         r.name === meta.name &&
         r.standard === meta.standard &&
-        r.materialGrade === fixedMaterial &&
+        r.materialGrade === row.materialGrade &&
         normalizeRequiredString(r.thicknessLevel) === row.thicknessLevel &&
         Number(r.nominalDiameter) === row.nominalDiameter &&
         normalizeRequiredString(r.nominalDiameterUnit) === row.nominalDiameterUnit &&
@@ -1493,13 +1631,140 @@ const confirmAddRows = () => {
       name: meta.name,
       componentType,
       standard: meta.standard,
-      materialGrade: fixedMaterial
+      materialGrade: row.materialGrade
     })
   }
 
   definitionTableData.value.push(...pendingRows)
   addRowDialogVisible.value = false
   ElMessage.success(`新增并保存成功（${pendingRows.length}行）`)
+}
+
+const confirmLoadAndSaveRows = async () => {
+  if (!selectedMeta.value) return
+
+  const meta = selectedMeta.value
+  const base = formViewRows.value[0] || getRowsInScope(meta, selectedLevel.value)[0]
+  const componentType = base?.componentType || addNodeForm.value.componentType || componentTypeOptions[0]
+
+  if (newRowSelection.value.length === 0) {
+    ElMessage.warning('请选择要导入的数据')
+    return
+  }
+
+  const pendingRows = []
+  const localKeys = new Set()
+  const duplicateRows = [] // 记录重复的行
+
+  for (let i = 0; i < newRowSelection.value.length; i++) {
+    const input = newRowSelection.value[i]
+    const row = {
+      id: createRowId(),
+      materialGrade: normalizeRequiredString(input.materialGrade),
+      thicknessLevel: normalizeRequiredString(input.thicknessLevel),
+      thicknessLevelDescription: getThicknessLevelDescription(input.thicknessLevel),
+      nominalDiameter: Number(input.nominalDiameter),
+      nominalDiameterUnit: normalizeRequiredString(input.nominalDiameterUnit),
+      outerDiameter: Number(input.outerDiameter),
+      wallThickness: Number(input.wallThickness),
+      version: Number(meta.sequenceVersion),
+      enabled: !!input.enabled
+    }
+
+    const key = [
+      meta.sequenceName,
+      meta.sequenceVersion,
+      meta.name,
+      meta.standard,
+      row.materialGrade,
+      row.thicknessLevel,
+      row.nominalDiameter,
+      row.nominalDiameterUnit,
+      row.outerDiameter,
+      row.wallThickness,
+      row.version
+    ].join('|')
+
+    if (localKeys.has(key)) {
+      ElMessage.warning(`第 ${i + 1} 行：与本次导入的其他行重复`)
+      return
+    }
+    localKeys.add(key)
+
+    const existingIndex = definitionTableData.value.findIndex(r => {
+      return (
+        r.sequenceName === meta.sequenceName &&
+        r.sequenceVersion === meta.sequenceVersion &&
+        r.name === meta.name &&
+        r.standard === meta.standard &&
+        r.materialGrade === row.materialGrade &&
+        normalizeRequiredString(r.thicknessLevel) === row.thicknessLevel &&
+        Number(r.nominalDiameter) === row.nominalDiameter &&
+        normalizeRequiredString(r.nominalDiameterUnit) === row.nominalDiameterUnit &&
+        Number(r.outerDiameter) === row.outerDiameter &&
+        Number(r.wallThickness) === row.wallThickness &&
+        Number(r.version) === row.version
+      )
+    })
+
+    if (existingIndex >= 0) {
+      duplicateRows.push({ index: i, row, existingId: definitionTableData.value[existingIndex].id })
+      continue
+    }
+
+    pendingRows.push({
+      ...row,
+      sequenceName: meta.sequenceName,
+      sequenceVersion: meta.sequenceVersion,
+      name: meta.name,
+      componentType,
+      standard: meta.standard,
+      materialGrade: row.materialGrade
+    })
+  }
+
+  // 如果有重复的行，弹出选择框让用户选择覆盖或跳过
+  if (duplicateRows.length > 0) {
+    const duplicateInfo = duplicateRows.map((item, idx) => {
+      return `第 ${item.index + 1} 行：${item.row.materialGrade} / ${item.row.thicknessLevel} / ${item.row.nominalDiameter}`
+    }).join('\n')
+
+    try {
+      await ElMessageBox.confirm(`检测到 ${duplicateRows.length} 行重复数据：\n\n${duplicateInfo}\n\n是否覆盖现有数据？`, '发现重复数据', {
+        confirmButtonText: '覆盖',
+        cancelButtonText: '跳过',
+        type: 'warning'
+      })
+      // 用户选择"覆盖"
+      duplicateRows.forEach(item => {
+        const existingIndex = definitionTableData.value.findIndex(r => r.id === item.existingId)
+        if (existingIndex >= 0) {
+          definitionTableData.value[existingIndex] = {
+            ...definitionTableData.value[existingIndex],
+            materialGrade: item.row.materialGrade,
+            thicknessLevel: item.row.thicknessLevel,
+            thicknessLevelDescription: getThicknessLevelDescription(item.row.thicknessLevel),
+            nominalDiameter: item.row.nominalDiameter,
+            nominalDiameterUnit: item.row.nominalDiameterUnit,
+            outerDiameter: item.row.outerDiameter,
+            wallThickness: item.row.wallThickness,
+            version: item.row.version,
+            enabled: item.row.enabled
+          }
+        }
+      })
+    } catch {
+      // 用户选择"跳过"，不处理重复行
+    }
+  }
+
+  if (pendingRows.length > 0) {
+    definitionTableData.value.push(...pendingRows)
+  }
+
+  const totalCount = pendingRows.length + duplicateRows.length
+  addRowDialogVisible.value = false
+  ElMessage.success(`导入并保存成功（新增 ${pendingRows.length} 行，覆盖 ${duplicateRows.length} 行）`)
 }
 
 const handleDeleteRows = async () => {
