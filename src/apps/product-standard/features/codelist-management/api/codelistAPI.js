@@ -108,11 +108,12 @@ export function saveCodelistItem(data) {
 
 /**
  * 获取建议的下一个 Codelist 编码。
- * 当前对接后端真实接口：/CodeListManagement/next-code
+ * 当前对接后端真实接口：/CodeListManagement/next-code/{codeListTableName}
+ * @param {string} codeListTableName 当前代码列表表名
  */
-export function getNextCodelistNumber() {
+export function getNextCodelistNumber(codeListTableName) {
   return request({
-    url: '/CodeListManagement/next-code',
+    url: `/CodeListManagement/next-code/${encodeURIComponent(codeListTableName)}`,
     method: 'get'
   }).then((res) => {
     if (typeof res === 'number') return { nextCodeNum: res }

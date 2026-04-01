@@ -667,6 +667,7 @@ const handleExportCodelist = async () => {
 }
 
 const openCodelistAddDialog = async () => {
+  const codeListTableName = String(selectedNode.value?.label || '').trim()
   codelistAddForm.value = {
     parent: computeCodelistParent(),
     longDesc: '',
@@ -675,8 +676,13 @@ const openCodelistAddDialog = async () => {
   }
   codelistAddDialogVisible.value = true
 
+  if (!codeListTableName) {
+    codelistAddPlaceholder.value = '未获取到代码列表名称'
+    return
+  }
+
   try {
-    const res = await getNextCodelistNumber()
+    const res = await getNextCodelistNumber(codeListTableName)
     if (res?.nextCodeNum !== undefined && res?.nextCodeNum !== null) {
       codelistAddForm.value.codeNum = String(res.nextCodeNum)
       codelistAddPlaceholder.value = ''
@@ -695,19 +701,19 @@ const handleSaveCodelistAdd = async () => {
   const parsedCodeNum = Number(codeNum)
 
   if (!shortDesc) {
-    ElMessage.warning('Please enter short description')
+    ElMessage.warning('请输入短描述')
     return
   }
   if (!longDesc) {
-    ElMessage.warning('Please enter long description')
+    ElMessage.warning('请输入长描述')
     return
   }
   if (!codeNum) {
-    ElMessage.warning('Please enter or confirm the codelist value')
+    ElMessage.warning('请输入或确认 Codelist值')
     return
   }
   if (Number.isNaN(parsedCodeNum)) {
-    ElMessage.warning('Codelist value must be a number')
+    ElMessage.warning('Codelist值必须为数字')
     return
   }
 
@@ -723,7 +729,7 @@ const handleSaveCodelistAdd = async () => {
   try {
     await saveCodelistItem(payload)
     codelistAddDialogVisible.value = false
-    ElMessage.success('Saved successfully')
+    ElMessage.success('保存成功')
 
     if (currentLevel.value === 1) {
       await loadCodelistLevelData(1)
@@ -739,7 +745,7 @@ const handleSaveCodelistAdd = async () => {
 
 const handleToggleStatus = async () => {
   if (!codelistSelection.value.length) {
-    ElMessage.warning('Please select at least one row')
+    ElMessage.warning('请至少选择一行')
     return
   }
 
@@ -747,10 +753,10 @@ const handleToggleStatus = async () => {
   try {
     if (enableMode) {
       await enableRows(codelistSelection.value)
-      ElMessage.success('Enabled successfully')
+      ElMessage.success('启用成功')
     } else {
       await disableRows(codelistSelection.value)
-      ElMessage.success('Disabled successfully')
+      ElMessage.success('禁用成功')
     }
 
     codelistSelection.value = []
