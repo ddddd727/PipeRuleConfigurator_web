@@ -597,7 +597,8 @@ const handleSaveSpecification = async () => {
     return
   }
   const pmcCode = String(currentNode.value.label || '').trim()
-  if (pmcCode.length !== 7) {
+  const normalizedPmcCode = pmcCode.replace(/[^A-Za-z0-9]/g, '')
+  if (normalizedPmcCode.length !== 7) {
     ElMessage.warning('请选择有效的PMC编码（7位）')
     return
   }
