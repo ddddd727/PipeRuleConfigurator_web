@@ -1,6 +1,7 @@
 import RouterPassthrough from '@/layouts/components/RouterPassthrough.vue'
 
 const Stub = () => import('@/shared/components/StubPage.vue')
+const StandardCatalogDefinition = () => import('@/apps/product-standard/features/standard-catalog-definition/pages/StandardCatalogDefinition.vue')
 
 export default {
   path: 'catalog-definition',
@@ -15,7 +16,7 @@ export default {
       meta: { title: '定义产品元件标准', icon: 'Setting' },
       redirect: '/product-standard/catalog-definition/standard/piping',
       children: [
-        { path: 'piping',     name: 'CatalogStdPiping',    component: Stub, meta: { title: '管系',         icon: 'Guide' } },
+        { path: 'piping',     name: 'CatalogStdPiping',    component: StandardCatalogDefinition, meta: { title: '管系',         icon: 'Guide' } },
         { path: 'hvac',       name: 'CatalogStdHvac',      component: Stub, meta: { title: '冷空通',       icon: 'Wind' } },
         { path: 'electrical', name: 'CatalogStdElectrical', component: Stub, meta: { title: '电气',         icon: 'Lightning' } },
         { path: 'outfitting', name: 'CatalogStdOutfitting', component: Stub, meta: { title: '舾装',         icon: 'Ship' } },
