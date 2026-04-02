@@ -759,8 +759,8 @@ const canDelete = computed(() => tableMeta.value.permissions?.allowDelete !== fa
     <!-- 新增列对话框 -->
     <el-dialog v-model="addColVisible" title="添加自定义列" width="400px" append-to-body>
       <el-form label-position="top">
-        <el-form-item label="列名称 (中文标题)">
-          <el-input v-model="addColForm.title" placeholder="例如：紧急程度" />
+        <el-form-item label="列名称">
+          <el-input v-model="addColForm.title" placeholder="例如：牌号" />
         </el-form-item>
         <el-form-item label="数据类型">
           <el-select v-model="addColForm.uiType" style="width: 100%;">
