@@ -170,7 +170,16 @@ const closeAll = () => {
 
 .tags-tabs { height: 100%; border: none !important; }
 :deep(.el-tabs__header) { margin: 0; border: none !important; height: 100%; }
-:deep(.el-tabs__nav-wrap) { height: 100%; margin: 0; padding: 0; }
+/* 勿写 padding:0，否则会覆盖 EP 在 .is-scrollable 下的左右留白，标签会滚到箭头下面被挡 */
+:deep(.el-tabs__nav-wrap) {
+  height: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+:deep(.el-tabs__nav-wrap.is-scrollable) {
+  padding: 0 26px;
+  box-sizing: border-box;
+}
 :deep(.el-tabs__nav-scroll) { height: 100%; }
 :deep(.el-tabs__nav) {
   border: none !important;
@@ -236,24 +245,17 @@ const closeAll = () => {
   text-overflow: ellipsis;
 }
 
-/* 溢出时 Element Plus 的左右滚动按钮：垂直居中，避免与底层标签叠字 */
+/* 箭头落在留白区内，仅做垂直居中，不再铺底遮挡标签 */
 :deep(.el-tabs__nav-prev),
 :deep(.el-tabs__nav-next) {
   line-height: 1 !important;
   top: 0;
   bottom: 0;
   height: 100%;
+  width: 26px;
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  z-index: 6;
-  background-color: #fff;
-}
-:deep(.el-tabs__nav-prev) {
-  box-shadow: 8px 0 12px -4px #fff;
-}
-:deep(.el-tabs__nav-next) {
-  box-shadow: -8px 0 12px -4px #fff;
 }
 .is-pinned-label::before { content: ''; display: inline-block; width: 6px; height: 6px; background-color: #E6A23C; border-radius: 50%; margin-right: 8px; }
 :deep(.el-tabs__item.is-active) .is-pinned-label::before { background-color: #fff; }
