@@ -508,16 +508,18 @@ const handleConfirmSave = async () => {
     return // checkDuplicateRule 内部已经弹窗提示
   }
 
+  // 执行保存
+  await executeSave(pendingSaveType.value, ruleName, selectedData)
+  
+  // 保存后清空当前规则选择
   if (pendingSaveType.value === 'b1b2b3d') {
-    selectedRuleB1B2B3D.value = ruleName
-    await executeSave('b1b2b3d', ruleName, selectedData)
+    selectedRuleB1B2B3D.value = ''
   } else if (pendingSaveType.value === 'c1c2') {
-    selectedRuleC1C2.value = ruleName
-    await executeSave('c1c2', ruleName, selectedData)
+    selectedRuleC1C2.value = ''
   } else if (pendingSaveType.value === 'limit') {
-    selectedRuleLimit.value = ruleName
-    await executeSave('limit', ruleName, selectedData)
+    selectedRuleLimit.value = ''
   }
+  
   saveConfirmVisible.value = false
 }
 
@@ -1101,8 +1103,6 @@ const handleResultRowClick = async (row, column) => {
   }
 
   if (column && column.type === 'selection') return
-  if (!resultTableRef.value) return
-  resultTableRef.value.toggleRowSelection(row)
 }
 
 // Result Data Selection
@@ -1306,8 +1306,6 @@ const handleResultC1C2RowClick = async (row, column) => {
   }
 
   if (column && column.type === 'selection') return
-  if (!resultC1C2TableRef.value) return
-  resultC1C2TableRef.value.toggleRowSelection(row)
 }
 
 // Result C1C2 Data Selection
@@ -1598,8 +1596,6 @@ const handleResultLimitRowClick = async (row, column) => {
   }
 
   if (column && column.type === 'selection') return
-  if (!resultLimitTableRef.value) return
-  resultLimitTableRef.value.toggleRowSelection(row)
 }
 
 // Result Limit Data Selection
