@@ -81,11 +81,6 @@ const { initSnapshot, isModified } = useDirtyData()
 const componentTypeList = ref([]) // 存储组件类型数据
 const mappedColumns = ref([]) // 存储原始列配置，用于判断哪些列是JsonData中的列
 
-// 分页相关状态
-const currentPage = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-
 const {
   tableConfig, loading, isEdit, searchKeyword, selectedRows,
   dataSnapshot, optionsMap, loadingOptions,
@@ -295,10 +290,6 @@ const fetchData = async () => {
         list: formattedRows
       }
 
-      // 重置分页状态
-      currentPage.value = 1
-      total.value = formattedRows.length
-
       tableKey.value++
       
       dataSnapshot.value = JSON.parse(JSON.stringify(tableConfig.value))
@@ -405,14 +396,7 @@ const toggleEdit = async () => {
 // 取消编辑操作，恢复数据并重新获取后端最新数据
 const handleCancel = async () => {
   if (dataSnapshot.value) {
-    // 保存当前页码，以便恢复后保持原位
-    const currentPageNum = currentPage.value
-    
-    // 重新调用后端查询列表接口获取最新数据
     await fetchData()
-    
-    // 恢复到之前的页码
-    currentPage.value = currentPageNum
   }
   isEdit.value = false
   selectedRows.value = [] 
@@ -808,16 +792,6 @@ const handleSave = async () => {
   }
 }
 
-// 分页事件处理函数
-const handleSizeChange = (size) => {
-  pageSize.value = size
-  currentPage.value = 1 // 重置到第一页
-}
-
-const handleCurrentChange = (current) => {
-  currentPage.value = current
-}
-
 // 获取下拉框显示的label值
 const getSelectLabel = (col, value, row) => {
   if (value === undefined || value === null || value === '') {
@@ -918,26 +892,14 @@ const submitAddColumn = () => {
   // 重新生成表格key，强制重新渲染
   tableKey.value++
 }
-// 计算属性：处理表格数据的搜索过滤和分页显示
+// 计算属性：处理表格数据的搜索过滤（全量展示）
 const displayData = computed(() => {
-  const rawData = tableConfig.value.list || [] 
+  const rawData = tableConfig.value.list || []
   const keyword = searchKeyword.value.trim().toLowerCase()
-  let filteredData = rawData
-  
-  // 搜索过滤
-  if (keyword) {
-    filteredData = rawData.filter(row => 
-      Object.values(row).some(val => String(val).toLowerCase().includes(keyword))
-    )
-  }
-  
-  // 更新总条数
-  total.value = filteredData.length
-  
-  // 分页处理
-  const startIndex = (currentPage.value - 1) * pageSize.value
-  const endIndex = startIndex + pageSize.value
-  return filteredData.slice(startIndex, endIndex)
+  if (!keyword) return rawData
+  return rawData.filter(row =>
+    Object.values(row).some(val => String(val).toLowerCase().includes(keyword))
+  )
 })
 
 // ─────────────────────────────────────────────
@@ -1109,19 +1071,6 @@ const filterHandler = (value, row, column) => {
         </el-table-column>
       </template>
     </el-table>
-    
-    <!-- 分页组件 -->
-    <div class="pagination-container" style="margin-top: 16px; display: flex; justify-content: flex-end; align-items: center;">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="total"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
     
     <el-dialog v-model="addColVisible" title="添加自定义列" width="400px" append-to-body>
       <el-form label-position="top">
