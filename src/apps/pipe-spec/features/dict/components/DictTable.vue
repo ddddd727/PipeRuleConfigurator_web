@@ -22,7 +22,7 @@ const {
   dataSnapshot, optionsMap, loadingOptions,
   addColVisible, addColForm, addingCol,
   mapUiType, toCamelCase, findKey, getNextAvailableId,
-  getVisibleOptions, fetchSharedOptions, resetToSnapshot
+  getVisibleOptions, getAddRowBlockedByFilteredSelectMessage, fetchSharedOptions, resetToSnapshot
 } = useDictCommon()
 toCamelCase
 // ...existing code...
@@ -301,6 +301,8 @@ const handleSelectionChange = (val) => { selectedRows.value = val }
 // ─────────────────────────────────────────────
 const handleAddRow = () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
+  const blockedMsg = getAddRowBlockedByFilteredSelectMessage()
+  if (blockedMsg) return ElMessage.warning(blockedMsg)
   const newRow = { _isNew: true }
 
   const nextId = getNextAvailableId(tableConfig.value.list, tableConfig.value.columns)

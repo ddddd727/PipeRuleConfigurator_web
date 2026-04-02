@@ -158,6 +158,26 @@ const findKey = (obj, targetKey) => {
     return allOptions.filter(opt => !usedValues.has(opt.value))
   }
 
+  /**
+   * 带「已选过滤」的下拉列：若基础库仍有选项但全部被当前表格占用，则无法再新增可选行。
+   * 返回提示文案；未拦截时返回 null。
+   */
+  const getAddRowBlockedByFilteredSelectMessage = () => {
+    const cols = tableConfig.value.columns || []
+    for (const col of cols) {
+      if (col.isReadOnly) continue
+      if (col.type !== 'select' && col.type !== 'multiselect') continue
+      if (!shouldFilterOptions(col)) continue
+      const allOptions = optionsMap.value[col.prop] || []
+      if (allOptions.length === 0) continue
+      const visible = getVisibleOptions(col, null)
+      if (visible.length === 0) {
+        return '基础库的内容都在这里了'
+      }
+    }
+    return null
+  }
+
   // 核心优化：按 URL 合并请求 (兼容了 params 和不同的返回格式)
   const fetchSharedOptions = async (url, columns, extraParams = {}) => {
     try {
@@ -246,7 +266,8 @@ const findKey = (obj, targetKey) => {
     addColVisible, addColForm, addingCol,
     // 函数
     mapUiType, toCamelCase, findKey, getNextAvailableId,
-    shouldFilterOptions, getVisibleOptions, fetchSharedOptions,
+    shouldFilterOptions, getVisibleOptions, getAddRowBlockedByFilteredSelectMessage,
+    fetchSharedOptions,
     resetToSnapshot
   }
 }

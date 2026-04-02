@@ -86,7 +86,7 @@ const {
   dataSnapshot, optionsMap, loadingOptions,
   addColVisible, addColForm, addingCol,
   mapUiType, toCamelCase, findKey, getNextAvailableId,
-  getVisibleOptions, fetchSharedOptions
+  getVisibleOptions, getAddRowBlockedByFilteredSelectMessage, fetchSharedOptions
 } = useDictCommon()
 
 
@@ -408,6 +408,8 @@ const handleSelectionChange = (val) => { selectedRows.value = val }
 // 添加新行，自动分配ID并填充默认值
 const handleAddRow = async () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
+  const blockedMsg = getAddRowBlockedByFilteredSelectMessage()
+  if (blockedMsg) return ElMessage.warning(blockedMsg)
 
   // 1. 核心标记：打上 _isNew 标记，告诉保存接口这是新数据
   const newRow = { _isNew: true }
