@@ -580,24 +580,7 @@ const handleSave = async () => {
   }
 
   // ==========================
-  // 2. CL 字段唯一性校验 (保留)
-  // ==========================
-  const clColumn = columns.find(col => /_?cl$/i.test(col.prop))
-  if (clColumn) {
-    const clValues = currentList.map(row => row[clColumn.prop])
-    // 过滤掉无效值，只校验填写了的内容
-    const validValues = clValues.filter(v => v !== null && v !== undefined && v !== '')
-    
-    const uniqueValues = new Set(validValues)
-    if (uniqueValues.size !== validValues.length) {
-      const duplicates = validValues.filter((item, index) => validValues.indexOf(item) !== index)
-      ElMessage.error(`保存失败：检测到重复的 CL 值 (${Array.from(new Set(duplicates)).join(', ')})，请确保数据唯一。`)
-      return
-    }
-  }
-
-  // ==========================
-  // 3. 提交数据
+  // 2. 提交数据
   // ==========================
   loading.value = true
   try {

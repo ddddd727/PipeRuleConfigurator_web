@@ -176,10 +176,12 @@ const closeAll = () => {
   border: none !important;
   height: 100%;
   display: flex;
+  flex-wrap: nowrap;
   align-items: flex-end;
 }
 
 :deep(.el-tabs__item) {
+  flex-shrink: 0;
   height: 100% !important;
   display: flex;
   align-items: center;
@@ -225,7 +227,34 @@ const closeAll = () => {
   color: #fff;
 }
 
-.tab-label-content { display: inline-flex; align-items: center; }
+.tab-label-content {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 溢出时 Element Plus 的左右滚动按钮：垂直居中，避免与底层标签叠字 */
+:deep(.el-tabs__nav-prev),
+:deep(.el-tabs__nav-next) {
+  line-height: 1 !important;
+  top: 0;
+  bottom: 0;
+  height: 100%;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  z-index: 6;
+  background-color: #fff;
+}
+:deep(.el-tabs__nav-prev) {
+  box-shadow: 8px 0 12px -4px #fff;
+}
+:deep(.el-tabs__nav-next) {
+  box-shadow: -8px 0 12px -4px #fff;
+}
 .is-pinned-label::before { content: ''; display: inline-block; width: 6px; height: 6px; background-color: #E6A23C; border-radius: 50%; margin-right: 8px; }
 :deep(.el-tabs__item.is-active) .is-pinned-label::before { background-color: #fff; }
 
