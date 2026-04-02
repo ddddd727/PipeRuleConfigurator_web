@@ -5,7 +5,7 @@
       <el-aside width="280px" class="tree-aside">
         <div class="tree-title">
           <el-icon><Menu /></el-icon>
-          <span>简选序列</span>
+          <span>简选系列</span>
         </div>
         <div class="tree-content">
           <div class="tree-header">
@@ -188,7 +188,7 @@
       width="520px"
     >
       <el-form :model="addNodeForm" label-width="110px">
-        <el-form-item label="简选序列" required>
+        <el-form-item label="简选系列" required>
           <el-input v-model="addNodeForm.sequenceName" />
         </el-form-item>
         <el-form-item label="物资名称" required>
@@ -200,10 +200,12 @@
           </el-select>
         </el-form-item>
         <el-form-item label="标准号" required>
-          <el-input v-model="addNodeForm.standard" />
+          <el-select v-model="addNodeForm.standard" filterable size="default" style="width: 100%;">
+            <el-option v-for="opt in addNodeStandardOptions" :key="opt" :label="opt" :value="opt" />
+          </el-select>
         </el-form-item>
-        <el-form-item label="序列版本号" required>
-          <el-input-number v-model="addNodeForm.sequenceVersion" :min="1" controls-position="right" style="width: 100%;" />
+        <el-form-item label="版本号" required>
+          <el-input v-model="addNodeForm.sequenceVersion" style="width: 100%;" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -228,7 +230,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="addRowDialogVisible" title="加载基础库数据" width="980px">
+    <el-dialog v-model="addRowDialogVisible" title="新增数据" width="980px">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <div style="font-weight: 600;">
           {{ formTitle }}
