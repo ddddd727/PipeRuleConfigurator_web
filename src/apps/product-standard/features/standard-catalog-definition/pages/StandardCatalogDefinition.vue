@@ -3,7 +3,7 @@
     <div class="module-layout">
       <section class="module-card">
         <div class="module-header">
-          <h2 class="module-title">标准-部件类型配置模块</h2>
+          <h2 class="module-title">部件类型-标准配置模块</h2>
           <div class="module-toolbar">
             <div class="toolbar-filter">
               <span class="toolbar-label">专业</span>
@@ -26,26 +26,34 @@
         <div class="list-grid list-grid-left">
           <article class="list-card">
             <div class="list-card-title">部件类型</div>
-            <div class="table-shell">
+            <div class="table-shell" v-loading="componentTypeLoading" element-loading-text="加载中...">
               <el-table
                 :data="componentTypeData"
                 border
                 size="small"
                 height="100%"
                 highlight-current-row
+                empty-text="暂无数据"
                 @row-click="handleComponentTypeRowClick"
               >
-                <el-table-column width="56" align="center">
+                <el-table-column width="56" align="center" header-align="center">
                   <template #default="{ row }">
                     <el-radio v-model="selectedComponentTypeId" :label="row.id" @click.stop>
                       <span></span>
                     </el-radio>
                   </template>
                 </el-table-column>
-                <el-table-column prop="name" label="部件类型" min-width="150" align="center" />
-                <el-table-column label="启用" width="86" align="center">
+                <el-table-column prop="name" label="部件类型" min-width="180" header-align="center" align="center" />
+                <el-table-column label="启用" width="86" header-align="center" align="center">
                   <template #default="{ row }">
-                    <el-switch v-model="row.enabled" size="small" class="compact-switch" />
+                    <el-switch
+                      :model-value="row.enabled"
+                      size="small"
+                      class="compact-switch"
+                      :loading="isStatusUpdating(row.id)"
+                      @click.stop
+                      @change="(value) => handleComponentTypeStatusChange(row, value)"
+                    />
                   </template>
                 </el-table-column>
               </el-table>
@@ -61,19 +69,20 @@
                 size="small"
                 height="100%"
                 highlight-current-row
+                empty-text="待后续接入"
                 @row-click="handleProductStandardRowClick"
               >
-                <el-table-column width="56" align="center">
+                <el-table-column width="56" align="center" header-align="center">
                   <template #default="{ row }">
                     <el-radio v-model="selectedProductStandardId" :label="row.id" @click.stop>
                       <span></span>
                     </el-radio>
                   </template>
                 </el-table-column>
-                <el-table-column prop="code" label="标准" min-width="140" align="center" />
-                <el-table-column label="启用" width="86" align="center">
+                <el-table-column prop="code" label="标准" min-width="160" header-align="center" align="center" />
+                <el-table-column label="启用" width="86" header-align="center" align="center">
                   <template #default="{ row }">
-                    <el-switch v-model="row.enabled" size="small" class="compact-switch" />
+                    <el-switch :model-value="row.enabled" size="small" class="compact-switch" disabled />
                   </template>
                 </el-table-column>
               </el-table>
@@ -106,23 +115,24 @@
         <div class="list-grid list-grid-right">
           <article class="list-card">
             <div class="list-card-title">部件类型目录</div>
-            <div class="table-shell">
+            <div class="table-shell" v-loading="componentTypeLoading" element-loading-text="加载中...">
               <el-table
                 :data="componentTypeCatalogData"
                 border
                 size="small"
                 height="100%"
                 highlight-current-row
+                empty-text="暂无启用数据"
                 @row-click="handleComponentTypeCatalogRowClick"
               >
-                <el-table-column width="56" align="center">
+                <el-table-column width="56" align="center" header-align="center">
                   <template #default="{ row }">
                     <el-radio v-model="selectedComponentTypeCatalogId" :label="row.id" @click.stop>
                       <span></span>
                     </el-radio>
                   </template>
                 </el-table-column>
-                <el-table-column prop="name" label="部件类型" min-width="150" align="center" />
+                <el-table-column prop="name" label="部件类型" min-width="180" header-align="center" align="center" />
               </el-table>
             </div>
           </article>
@@ -136,16 +146,17 @@
                 size="small"
                 height="100%"
                 highlight-current-row
+                empty-text="待后续接入"
                 @row-click="handleCustomCatalogRowClick"
               >
-                <el-table-column width="56" align="center">
+                <el-table-column width="56" align="center" header-align="center">
                   <template #default="{ row }">
                     <el-radio v-model="selectedCustomCatalogId" :label="row.id" @click.stop>
                       <span></span>
                     </el-radio>
                   </template>
                 </el-table-column>
-                <el-table-column prop="name" label="用户自定义类" min-width="160" align="center" />
+                <el-table-column prop="name" label="用户自定义类" min-width="180" header-align="center" align="center" />
               </el-table>
             </div>
           </article>
@@ -159,19 +170,20 @@
                 size="small"
                 height="100%"
                 highlight-current-row
+                empty-text="待后续接入"
                 @row-click="handleProductStandardCatalogRowClick"
               >
-                <el-table-column width="56" align="center">
+                <el-table-column width="56" align="center" header-align="center">
                   <template #default="{ row }">
                     <el-radio v-model="selectedStandardCatalogId" :label="row.id" @click.stop>
                       <span></span>
                     </el-radio>
                   </template>
                 </el-table-column>
-                <el-table-column prop="code" label="标准" min-width="140" align="center" />
-                <el-table-column label="启用" width="86" align="center">
+                <el-table-column prop="code" label="标准" min-width="160" header-align="center" align="center" />
+                <el-table-column label="启用" width="86" header-align="center" align="center">
                   <template #default="{ row }">
-                    <el-switch v-model="row.enabled" size="small" class="compact-switch" />
+                    <el-switch :model-value="row.enabled" size="small" class="compact-switch" disabled />
                   </template>
                 </el-table-column>
               </el-table>
@@ -184,15 +196,22 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, RefreshLeft } from '@element-plus/icons-vue'
-import { createStandardCatalogMockData } from '@/apps/product-standard/features/standard-catalog-definition/mock/standardCatalogMock'
+import {
+  getStandardCatalogComponentTypes,
+  getStandardCatalogDisciplines,
+  updateStandardCatalogComponentTypeStatus
+} from '@/apps/product-standard/features/standard-catalog-definition/api/standardCatalogDefinitionAPI'
 
-const mockData = reactive(createStandardCatalogMockData())
+const DEFAULT_DISCIPLINE = '管系'
 
-const professionalOptions = mockData.professionals
-const selectedProfessional = ref(professionalOptions[0]?.value ?? '')
+const professionalOptions = ref([])
+const selectedProfessional = ref(DEFAULT_DISCIPLINE)
+const componentTypeRows = ref([])
+const componentTypeLoading = ref(false)
+const statusUpdatingIds = ref([])
 
 const selectedComponentTypeId = ref('')
 const selectedProductStandardId = ref('')
@@ -200,34 +219,12 @@ const selectedComponentTypeCatalogId = ref('')
 const selectedCustomCatalogId = ref('')
 const selectedStandardCatalogId = ref('')
 
-const currentProfessionalData = computed(() => {
-  return mockData.professionalCatalogMap[selectedProfessional.value] ?? {
-    leftComponentTypes: [],
-    rightComponentTypeCatalogs: []
-  }
-})
+const productStandardData = ref([])
+const customCatalogData = ref([])
+const productStandardCatalogData = ref([])
 
-const componentTypeData = computed(() => currentProfessionalData.value.leftComponentTypes)
-
-const selectedComponentType = computed(() => {
-  return componentTypeData.value.find((item) => item.id === selectedComponentTypeId.value) ?? null
-})
-
-const productStandardData = computed(() => selectedComponentType.value?.productStandards ?? [])
-
-const componentTypeCatalogData = computed(() => currentProfessionalData.value.rightComponentTypeCatalogs)
-
-const selectedComponentTypeCatalog = computed(() => {
-  return componentTypeCatalogData.value.find((item) => item.id === selectedComponentTypeCatalogId.value) ?? null
-})
-
-const customCatalogData = computed(() => selectedComponentTypeCatalog.value?.customCatalogs ?? [])
-
-const selectedCustomCatalog = computed(() => {
-  return customCatalogData.value.find((item) => item.id === selectedCustomCatalogId.value) ?? null
-})
-
-const productStandardCatalogData = computed(() => selectedCustomCatalog.value?.standardCatalogs ?? [])
+const componentTypeData = computed(() => componentTypeRows.value)
+const componentTypeCatalogData = computed(() => componentTypeRows.value.filter((item) => item.enabled))
 
 const syncSelectionWithRows = (rowsGetter, selectedIdRef) => {
   watch(
@@ -238,8 +235,7 @@ const syncSelectionWithRows = (rowsGetter, selectedIdRef) => {
         return
       }
 
-      const hasSelectedRow = rows.some((item) => item.id === selectedIdRef.value)
-      if (!hasSelectedRow) {
+      if (!rows.some((item) => item.id === selectedIdRef.value)) {
         selectedIdRef.value = ''
       }
     },
@@ -252,6 +248,76 @@ syncSelectionWithRows(() => productStandardData.value, selectedProductStandardId
 syncSelectionWithRows(() => componentTypeCatalogData.value, selectedComponentTypeCatalogId)
 syncSelectionWithRows(() => customCatalogData.value, selectedCustomCatalogId)
 syncSelectionWithRows(() => productStandardCatalogData.value, selectedStandardCatalogId)
+
+const isStatusUpdating = (id) => statusUpdatingIds.value.includes(id)
+
+const normalizeComponentTypes = (rows = []) =>
+  rows.map((item) => ({
+    id: item.id,
+    discipline: item.discipline || '',
+    name: item.componentType || '',
+    enabled: Boolean(item.enabled)
+  }))
+
+const resetChildSelections = () => {
+  selectedComponentTypeId.value = ''
+  selectedProductStandardId.value = ''
+  selectedComponentTypeCatalogId.value = ''
+  selectedCustomCatalogId.value = ''
+  selectedStandardCatalogId.value = ''
+}
+
+const loadProfessionalOptions = async () => {
+  const rows = await getStandardCatalogDisciplines()
+  professionalOptions.value = rows.map((item) => ({
+    label: item.label,
+    value: item.value
+  }))
+
+  if (!professionalOptions.value.length) {
+    selectedProfessional.value = ''
+    return
+  }
+
+  const hasDefaultDiscipline = professionalOptions.value.some((item) => item.value === DEFAULT_DISCIPLINE)
+  const hasCurrentDiscipline = professionalOptions.value.some((item) => item.value === selectedProfessional.value)
+
+  if (hasDefaultDiscipline) {
+    selectedProfessional.value = DEFAULT_DISCIPLINE
+    return
+  }
+
+  if (!hasCurrentDiscipline) {
+    selectedProfessional.value = professionalOptions.value[0].value
+  }
+}
+
+const loadComponentTypes = async () => {
+  componentTypeLoading.value = true
+  try {
+    const rows = await getStandardCatalogComponentTypes({
+      discipline: selectedProfessional.value || undefined
+    })
+    componentTypeRows.value = normalizeComponentTypes(rows)
+  } finally {
+    componentTypeLoading.value = false
+  }
+}
+
+const handleComponentTypeStatusChange = async (row, enabled) => {
+  const originalValue = row.enabled
+  row.enabled = enabled
+  statusUpdatingIds.value = [...statusUpdatingIds.value, row.id]
+
+  try {
+    await updateStandardCatalogComponentTypeStatus(row.id, enabled)
+    ElMessage.success(enabled ? '启用成功' : '禁用成功')
+  } catch {
+    row.enabled = originalValue
+  } finally {
+    statusUpdatingIds.value = statusUpdatingIds.value.filter((item) => item !== row.id)
+  }
+}
 
 const handleComponentTypeRowClick = (row) => {
   selectedComponentTypeId.value = row.id
@@ -274,16 +340,33 @@ const handleProductStandardCatalogRowClick = (row) => {
 }
 
 const handleAddComponentType = () => {
-  ElMessage.success('新增部件类型')
+  ElMessage.info('新增部件类型功能待后续开发')
 }
 
 const handleBindStandard = () => {
-  ElMessage.success('标准-部件类型绑定')
+  ElMessage.info('标准-部件类型绑定功能待后续开发')
 }
 
 const handleAddStandardCatalog = () => {
-  ElMessage.success('新增标准目录')
+  ElMessage.info('新增标准目录功能待后续开发')
 }
+
+watch(
+  selectedProfessional,
+  async (value, oldValue) => {
+    if (value === oldValue) {
+      return
+    }
+
+    resetChildSelections()
+    await loadComponentTypes()
+  }
+)
+
+onMounted(async () => {
+  await loadProfessionalOptions()
+  await loadComponentTypes()
+})
 </script>
 
 <style scoped>
@@ -347,7 +430,7 @@ const handleAddStandardCatalog = () => {
 }
 
 .toolbar-select {
-  width: 120px;
+  width: 160px;
 }
 
 .toolbar-actions {
@@ -396,7 +479,6 @@ const handleAddStandardCatalog = () => {
 .table-shell {
   flex: 1;
   min-height: 0;
-  padding: 0;
 }
 
 .table-shell :deep(.el-table) {
@@ -406,14 +488,23 @@ const handleAddStandardCatalog = () => {
 }
 
 .table-shell :deep(.el-table th.el-table__cell) {
+  padding: 8px 12px;
   color: #314252;
   font-weight: 700;
+  text-align: center;
 }
 
-.table-shell :deep(.el-table td.el-table__cell),
-.table-shell :deep(.el-table th.el-table__cell) {
+.table-shell :deep(.el-table td.el-table__cell) {
   padding: 8px 0;
   text-align: center;
+}
+
+.table-shell :deep(.el-radio) {
+  margin-right: 0;
+}
+
+.table-shell :deep(.el-radio__label) {
+  display: none;
 }
 
 .table-shell :deep(.el-table__body tr > td.el-table__cell) {
@@ -424,14 +515,6 @@ const handleAddStandardCatalog = () => {
 .table-shell :deep(.el-table__body tr:hover > td.el-table__cell),
 .table-shell :deep(.el-table__body tr.hover-row > td.el-table__cell) {
   background: #eef5ff !important;
-}
-
-.table-shell :deep(.el-radio) {
-  margin-right: 0;
-}
-
-.table-shell :deep(.el-radio__label) {
-  display: none;
 }
 
 .table-shell :deep(.el-table__row) {
@@ -455,10 +538,6 @@ const handleAddStandardCatalog = () => {
 @media (max-width: 1680px) {
   .module-layout {
     grid-template-columns: 1fr;
-  }
-
-  .list-grid-right {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
