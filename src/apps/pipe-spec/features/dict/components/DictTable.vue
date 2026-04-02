@@ -491,7 +491,6 @@ const openAddColumnDialog = () => {
 
 const submitAddColumn = async () => {
   if (!addColForm.title) return ElMessage.warning('请输入列名称')
-  if (addColForm.uiType === 'Select' && !addColForm.options) return ElMessage.warning('下拉框必须填写选项')
 
   addingCol.value = true
   try {
@@ -765,13 +764,9 @@ const canDelete = computed(() => tableMeta.value.permissions?.allowDelete !== fa
         </el-form-item>
         <el-form-item label="数据类型">
           <el-select v-model="addColForm.uiType" style="width: 100%;">
-            <el-option label="文本框 (Input)"  value="Input" />
-            <el-option label="下拉框 (Select)" value="Select" />
-            <el-option label="开关 (Switch)"   value="Switch" />
+            <el-option label="文本框 (Input)" value="Input" />
+            <el-option label="开关 (Switch)" value="Switch" />
           </el-select>
-        </el-form-item>
-        <el-form-item v-if="addColForm.uiType === 'Select'" label="选项列表 (用逗号分隔)">
-          <el-input v-model="addColForm.options" placeholder="例如：高,中,低" />
         </el-form-item>
         <el-form-item>
           <el-checkbox v-model="addColForm.isRequired">是否必填</el-checkbox>
