@@ -5,7 +5,7 @@ const Stub = () => import('@/shared/components/StubPage.vue')
 export default {
   path: '/engineering',
   component: AppLayout,
-  meta: { title: '工程基础管理', icon: 'Monitor' },
+  meta: { title: 'S3D工程基础管理', icon: 'Monitor' },
   redirect: '/engineering/s3d-env-config',
   children: [
     {
