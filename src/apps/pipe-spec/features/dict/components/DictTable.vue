@@ -359,6 +359,9 @@ const handleBatchDelete = () => {
 // ─────────────────────────────────────────────
 const validateRow = async (row, rowIndex) => {
   const columns = tableConfig.value.columns
+  const pkCol = (columns || []).find(c => c.isPrimaryKey)
+  const pkVal = pkCol?.prop ? row?.[pkCol.prop] : (row?.id ?? row?.Id ?? row?.ID)
+  const idText = (pkVal === undefined || pkVal === null || pkVal === '') ? '—' : pkVal
 
   for (const col of columns) {
     if (col.isPrimaryKey || col.isReadOnly) continue
@@ -368,8 +371,7 @@ const validateRow = async (row, rowIndex) => {
 
     // IsRequired
     if (col.required && isEmpty) {
-      ElMessage.warning(`第 ${rowIndex + 1} 行 [${col.label}] 不能为空`)
-      return false
+      return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）不能为空`)
     }
 
     if (isEmpty) continue
@@ -381,15 +383,15 @@ const validateRow = async (row, rowIndex) => {
     if (v) {
       const msg = v.customMessage
       if (v.minLength && strVal.length < v.minLength)
-        return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${msg ?? `最少 ${v.minLength} 个字符`}`)
+        return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${msg ?? `最少 ${v.minLength} 个字符`}`)
       if (v.maxLength && strVal.length > v.maxLength)
-        return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${msg ?? `最多 ${v.maxLength} 个字符`}`)
+        return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${msg ?? `最多 ${v.maxLength} 个字符`}`)
       if (v.min != null && Number(val) < v.min)
-        return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${msg ?? `不能小于 ${v.min}`}`)
+        return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${msg ?? `不能小于 ${v.min}`}`)
       if (v.max != null && Number(val) > v.max)
-        return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${msg ?? `不能大于 ${v.max}`}`)
+        return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${msg ?? `不能大于 ${v.max}`}`)
       if (v.pattern && !new RegExp(v.pattern).test(strVal))
-        return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${msg ?? '格式不正确'}`)
+        return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${msg ?? '格式不正确'}`)
     }
 
     // ✅ CustomRules（onSubmit 触发）
@@ -401,7 +403,7 @@ const validateRow = async (row, rowIndex) => {
           // eslint-disable-next-line no-new-func
           const fn = new Function('value', 'row', `return (${rule.expression})`)
           const passed = fn(val, row)
-          if (!passed) return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${rule.message}`)
+          if (!passed) return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${rule.message}`)
         } catch (e) {
           console.warn('Expression 执行失败:', e)
         }
@@ -415,7 +417,7 @@ const validateRow = async (row, rowIndex) => {
             row: { ...row }
           })
           const result = res.data?.data || res.data
-          if (!result.valid) return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${result.message || rule.message}`)
+          if (!result.valid) return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${result.message || rule.message}`)
         } catch (e) {
           console.error('远程校验失败:', e)
         }
