@@ -26,6 +26,30 @@ export function getStandardCatalogComponentTypes(params = {}) {
 }
 
 /**
+ * 获取指定部件类型下的产品元件标准列表。
+ * @param {number} componentTypeId 部件类型主键
+ */
+export function getStandardCatalogIndustryStandards(componentTypeId) {
+  return request({
+    url: `/StandardCatalogDefinition/component-types/${componentTypeId}/industry-standards`,
+    method: 'get'
+  }).then((res) => (Array.isArray(res) ? res : []))
+}
+
+/**
+ * 更新指定产品元件标准的启用状态。
+ * @param {number} id 关联记录主键
+ * @param {boolean} enabled 目标启用状态
+ */
+export function updateStandardCatalogIndustryStandardStatus(id, enabled) {
+  return request({
+    url: `/StandardCatalogDefinition/industry-standards/${id}/status`,
+    method: 'put',
+    data: { enabled }
+  })
+}
+
+/**
  * 更新指定部件类型的启用状态。
  * @param {number} id 主键标识
  * @param {boolean} enabled 目标启用状态
