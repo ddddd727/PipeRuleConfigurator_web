@@ -1,270 +1,270 @@
 # StandardCatalogDefinition 模块契约
 
-## 1. 文档说明
+## 1. 范围
 
-- 文档位置：`src/apps/product-standard/features/standard-catalog-definition/docs/API_CONTRACT.md`
-- 适用范围：前端 `standard-catalog-definition` 页面与后端 `StandardCatalogDefinition` 模块联调
-- 维护原则：页面行为、接口结构、数据源或字段含义发生变化时，必须同步更新本文件
+- 前端页面：`src/apps/product-standard/features/standard-catalog-definition/pages/StandardCatalogDefinition.vue`
+- 前端 API：`src/apps/product-standard/features/standard-catalog-definition/api/standardCatalogDefinitionAPI.js`
+- 后端模块：`后端/sws-pmc-system-backend/Modules/StandardCatalogDefinition`
 
-## 2. 模块范围
-
-当前模块包含两个并列区域：
-
-1. 标准-部件类型配置模块
-2. 产品元件标准目录管理模块
-
-当前已落地的能力包含“部件类型”与“产品元件标准”两层联动，包含：
+当前已接入能力：
 
 - 专业下拉加载
-- 左侧部件类型列表加载
-- 左侧启用/禁用状态切换并回写数据库
-- 左侧产品元件标准列表按部件类型联动加载
-- 右侧部件类型目录按启用状态过滤展示
+- 部件类型列表查询
+- 部件类型新增
+- 部件类型启用/禁用
+- 产品元件标准列表查询
+- 产品元件标准启用/禁用
+- 部件类型-标准绑定弹窗查询与保存
 
-以下内容暂未接入真实后端数据：
+暂未接入真实数据的区域：
 
 - 自定义类目录
 - 产品元件标准目录
-- 新增按钮相关新增/绑定功能
+- 新增标准目录
 
-## 3. 数据源约定
+## 2. 数据源与字段映射
 
-### 3.1 主数据表
+### 2.1 部件类型
 
-- 数据表：`S3D_Dict_ComponentType`
-- 数据表：`S3D_Dict_GeometricIndustryStandard`
-- 数据表：`S3D_Common_CodeListValue`
+数据表：`S3D_Dict_ComponentType`
 
-### 3.2 字段映射
+- `Discipline` 对应前端“专业”
+- `ComponentTypeDescription` 对应前端“部件类型”
+- `ComponentTypeName` 对应前端“部件类型描述”
+- `ConnectType` 对应前端“连接类型”
+- `Status` 对应前端“启用”
 
-| 数据库字段 | 前端/接口含义 | 说明 |
-| --- | --- | --- |
-| `ID` | `id` | 主键 |
-| `Discipline` | 专业 | 用于两个模块顶部下拉框 |
-| `ComponentTypeDescription` | 部件类型 | 展示在“部件类型”与“部件类型目录”列 |
-| `Status` | `enabled` | `1=true`，`0=false` |
+新增部件类型时：
 
-`S3D_Dict_GeometricIndustryStandard` 字段映射：
+- `Status` 默认保存为 `1`
+- 当专业为“管系”时，前端显示“连接类型”字段
+- 当专业不是“管系”时，前端隐藏“连接类型”，后端允许 `ConnectType` 为空
+- 新增前需要校验 `ComponentTypeDescription` 是否已存在，已存在时提示“该部件类型已存在，请重新输入”，并禁止重复保存
 
-| 数据库字段 | 前端/接口含义 | 说明 |
-| --- | --- | --- |
-| `ID` | `id` | 关联记录主键 |
-| `ComponentTypeID` | 部件类型主键 | 对应 `S3D_Dict_ComponentType.ID` |
-| `GeometricIndustryStandard_CL` | 标准码值 | 作为翻译关联字段 |
-| `Status` | `enabled` | `1=true`，`0=false`，用于控制前端开关状态 |
+### 2.2 产品元件标准
 
-`S3D_Common_CodeListValue` 字段映射：
+关系表：`S3D_Dict_GeometricIndustryStandard`
 
-| 数据库字段 | 前端/接口含义 | 说明 |
-| --- | --- | --- |
-| `CodeListTableID` | 码表标识 | 通过 `S3D_Common_CodeListTable.CodeListTableName = "GeometricIndustryStandard"` 动态解析 |
-| `CodeListNumber` | 标准码值 | 对应 `GeometricIndustryStandard_CL` |
-| `ShortStringValue` | 标准显示值 | 展示在“产品元件标准”列表 |
-| `Status` | 码值启用状态 | 为 `0` 不显示 |
+- `ComponentTypeID` 对应部件类型主键
+- `GeometricIndustryStandard_CL` 对应标准码值
+- `Status` 对应前端“启用”开关
 
-### 3.3 下拉框约定
+### 2.3 标准翻译码表
 
-- 专业下拉数据源：`S3D_Dict_ComponentType.Discipline` 去重结果
-- 左右两个专业下拉框使用同一个前端状态
+数据表：
+
+- `S3D_Common_CodeListTable`
+- `S3D_Common_CodeListValue`
+
+规则：
+
+1. 不能把 `CodeListTableID = 4` 写死
+2. 必须先通过 `S3D_Common_CodeListTable.CodeListTableName = "GeometricIndustryStandard"` 查到实际 `ID`
+3. 再用该 `ID` 去 `S3D_Common_CodeListValue` 查询标准值
+
+字段映射：
+
+- `CodeListNumber` 对应 `GeometricIndustryStandard_CL`
+- `ShortStringValue` 对应标准显示名
+- 仅 `S3D_Common_CodeListValue.Status = 1` 的标准可显示、可绑定
+
+## 3. 页面行为
+
+### 3.1 专业下拉
+
+- 数据源：`S3D_Dict_ComponentType.Discipline` 去重结果
+- 左右两个模块共用同一个前端状态
 - 默认值：`管系`
-- 若返回数据中不存在 `管系`，则回退为首个可选项
+- 如果返回数据中不存在 `管系`，回退到第一个可选项
 
-## 4. 页面行为契约
+### 3.2 左侧部件类型列表
 
-### 4.1 左侧“部件类型”表格
+- 接口：`GET /api/StandardCatalogDefinition/component-types`
+- 支持按 `discipline` 过滤
+- `enabled = false` 的行不能被选中
+- 状态开关变更后回写 `S3D_Dict_ComponentType.Status`
 
-- 数据来源：后端接口 `/StandardCatalogDefinition/component-types`
-- 传参：`discipline`
-- 展示字段：
-  - “部件类型”列显示 `ComponentTypeDescription`
-  - “启用”列显示 `Status`
-- 开关切换规则：
-  - `status = 1` 时开关为开
-  - `status = 0` 时开关为关
-  - 用户切换开关后，调用状态更新接口回写数据库
+### 3.3 左侧产品元件标准列表
 
-### 4.2 右侧“部件类型目录”表格
+- 接口：`GET /api/StandardCatalogDefinition/component-types/{componentTypeId}/industry-standards`
+- 由左侧部件类型选中行驱动加载
+- 该列表不使用单选
+- `S3D_Common_CodeListValue.Status = 0` 的标准不显示
+- `S3D_Dict_GeometricIndustryStandard.Status = 0` 的标准仍显示，但开关为关闭
+- 开关变更后回写 `S3D_Dict_GeometricIndustryStandard.Status`
 
-- 与左侧“部件类型”列表同源
-- 仅展示 `status = 1` 的数据
-- 左侧状态切换成功后，右侧列表需同步刷新展示结果
+### 3.4 右侧部件类型目录
 
-### 4.3 左侧“产品元件标准”表格
+- 与左侧部件类型列表同源
+- 仅展示 `Status = 1` 的记录
+- 左侧启用/禁用切换后，右侧同步刷新
 
-- 触发条件：左侧“部件类型”表格选中某一行后加载
-- 查询链路：
-  1. 获取当前选中部件类型对应的 `ID`
-  2. 到 `S3D_Dict_GeometricIndustryStandard` 中按 `ComponentTypeID = 当前ID` 筛选
-  3. 不过滤 `S3D_Dict_GeometricIndustryStandard.Status`，而是将其映射为表格中的启用开关状态
-  4. 取出 `GeometricIndustryStandard_CL`
-  5. 先到 `S3D_Common_CodeListTable` 中查找 `CodeListTableName = "GeometricIndustryStandard"` 对应的 `ID`
-  6. 再到 `S3D_Common_CodeListValue` 中查找 `CodeListTableID = 上一步ID` 且 `CodeListNumber = GeometricIndustryStandard_CL`
-  7. 仅保留 `S3D_Common_CodeListValue.Status = 1` 的记录
-  8. 使用 `ShortStringValue` 作为列表展示名称
-- 展示字段：
-  - “标准”列显示 `ShortStringValue`
-  - “启用”列控制 `S3D_Dict_GeometricIndustryStandard.Status`
+### 3.5 新增部件类型弹窗
 
-### 4.4 选中交互
+- 入口按钮：左侧工具栏“新增部件类型”
+- 专业只读，读取当前页面专业
+- “连接类型”仅在专业为“管系”时显示
+- 保存成功后刷新左侧部件类型列表
 
-- 五个表格首列均保留单选按钮
-- 点击表格行时，单选按钮与当前行高亮同步变化
-- 默认不自动选中任何行
+### 3.6 部件类型-标准绑定弹窗
 
-## 5. 后端接口契约
+- 入口按钮：左侧工具栏“标准-部件类型绑定”
+- 必须先选中一个部件类型
+- 弹窗顶部和右侧区域都展示当前选中的部件类型，只读
 
-后端控制器：`/api/StandardCatalogDefinition`
+弹窗内有两个列表：
 
-### 5.1 获取专业下拉
+- 标准库：来自 `S3D_Common_CodeListValue`
+- 标准配置：来自当前部件类型已绑定的标准，也就是左侧“产品元件标准”列表中的标准名集合
+
+标准库规则：
+
+1. 通过 `CodeListTableName = "GeometricIndustryStandard"` 动态获取码表 ID
+2. 读取 `S3D_Common_CodeListValue.ShortStringValue`
+3. 仅取 `Status = 1` 的记录
+4. 需要去重
+5. 需要去掉右侧“标准配置”中已经存在的内容
+
+左右移动规则：
+
+- 支持复选
+- `>` 把左侧勾选项移到右侧
+- `<` 把右侧勾选项移回左侧
+
+保存规则：
+
+- 右侧“标准配置”作为最终目标结果
+- 已存在绑定不重复新增
+- 新增绑定时：
+  - 通过 `Discipline + ComponentTypeDescription` 在 `S3D_Dict_ComponentType` 中定位 `ID`
+  - 通过标准名在 `S3D_Common_CodeListValue.ShortStringValue` 中匹配对应 `CodeListNumber`
+  - 保存到 `S3D_Dict_GeometricIndustryStandard`
+  - `ComponentTypeID = 部件类型ID`
+  - `GeometricIndustryStandard_CL = CodeListNumber`
+  - `Status = 1`
+- 保存时会同步删除当前可管理标准范围内、但已被移出右侧列表的旧绑定
+
+## 4. 后端接口契约
+
+控制器前缀：`/api/StandardCatalogDefinition`
+
+### 4.1 获取专业下拉
 
 - 方法：`GET`
 - 路径：`/api/StandardCatalogDefinition/disciplines`
-- 说明：返回 `Discipline` 去重结果
 
-响应示例：
-
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": [
-    {
-      "label": "管系",
-      "value": "管系"
-    }
-  ]
-}
-```
-
-### 5.2 获取部件类型列表
+### 4.2 获取部件类型列表
 
 - 方法：`GET`
 - 路径：`/api/StandardCatalogDefinition/component-types`
 
 查询参数：
 
-| 参数名 | 类型 | 必填 | 说明 |
+| 参数 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `discipline` | string | 否 | 专业筛选 |
-| `enabledOnly` | bool | 否 | 是否仅返回启用项，默认 `false` |
+| `enabledOnly` | bool | 否 | 是否仅返回启用数据 |
 
-响应 `data` 项结构：
+### 4.3 新增部件类型
+
+- 方法：`POST`
+- 路径：`/api/StandardCatalogDefinition/component-types`
+
+请求体：
 
 ```json
 {
-  "id": 1,
   "discipline": "管系",
-  "componentType": "管材",
-  "enabled": true
+  "componentTypeDescription": "管材",
+  "componentTypeName": "Pipe",
+  "connectType": "焊接"
+}
+
+### 4.3.1 校验部件类型是否已存在
+
+- 方法：`GET`
+- 路径：`/api/StandardCatalogDefinition/component-types/existence`
+
+查询参数：
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `discipline` | string | 否 | 当前专业，用于同专业下重复校验 |
+| `componentTypeDescription` | string | 是 | 待校验的部件类型 |
+
+响应示例：
+
+```json
+{
+  "exists": true
 }
 ```
+```
 
-### 5.3 更新部件类型启用状态
+### 4.4 更新部件类型启用状态
 
 - 方法：`PUT`
 - 路径：`/api/StandardCatalogDefinition/component-types/{id}/status`
 
-请求体：
-
-```json
-{
-  "enabled": true
-}
-```
-
-成功响应示例：
-
-```json
-{
-  "code": 200,
-  "message": "Status updated successfully."
-}
-```
-
-失败约定：
-
-- 当 `id` 不存在时，返回 `404`
-
-### 5.4 获取指定部件类型下的产品元件标准列表
+### 4.5 获取产品元件标准列表
 
 - 方法：`GET`
 - 路径：`/api/StandardCatalogDefinition/component-types/{componentTypeId}/industry-standards`
 
-响应 `data` 项结构：
-
-```json
-{
-  "id": 101,
-  "geometricIndustryStandardCl": 12,
-  "standardName": "ASME B16.9",
-  "enabled": true
-}
-```
-
-### 5.5 更新产品元件标准启用状态
+### 4.6 更新产品元件标准启用状态
 
 - 方法：`PUT`
 - 路径：`/api/StandardCatalogDefinition/industry-standards/{id}/status`
+
+### 4.7 获取绑定弹窗数据
+
+- 方法：`GET`
+- 路径：`/api/StandardCatalogDefinition/component-types/{componentTypeId}/binding-dialog`
+
+响应示例：
+
+```json
+{
+  "componentType": "管材",
+  "standardLibrary": ["GB/T 8163-2018", "SH/T 3410-2012"],
+  "selectedStandards": ["GB/T 8163-2018"]
+}
+```
+
+### 4.8 保存绑定结果
+
+- 方法：`PUT`
+- 路径：`/api/StandardCatalogDefinition/component-type-standard-bindings`
 
 请求体：
 
 ```json
 {
-  "enabled": false
+  "discipline": "管系",
+  "componentTypeDescription": "管材",
+  "standardNames": ["GB/T 8163-2018", "SH/T 3410-2012"]
 }
 ```
 
-成功响应示例：
+## 5. 前端 API 方法
 
-```json
-{
-  "code": 200,
-  "message": "Status updated successfully."
-}
-```
+文件：`src/apps/product-standard/features/standard-catalog-definition/api/standardCatalogDefinitionAPI.js`
 
-## 6. 前端调用契约
+- `getStandardCatalogDisciplines()`
+- `getStandardCatalogComponentTypes(params)`
+- `checkStandardCatalogComponentTypeDescriptionExists(params)`
+- `createStandardCatalogComponentType(data)`
+- `getStandardCatalogBindingDialog(componentTypeId)`
+- `saveStandardCatalogBindings(data)`
+- `getStandardCatalogIndustryStandards(componentTypeId)`
+- `updateStandardCatalogComponentTypeStatus(id, enabled)`
+- `updateStandardCatalogIndustryStandardStatus(id, enabled)`
 
-前端 API 文件：`src/apps/product-standard/features/standard-catalog-definition/api/standardCatalogDefinitionAPI.js`
+## 6. 后续更新要求
 
-当前已定义方法：
+以下内容变更时，需要同步更新本文档：
 
-| 方法名 | 说明 |
-| --- | --- |
-| `getStandardCatalogDisciplines()` | 获取专业下拉 |
-| `getStandardCatalogComponentTypes(params)` | 获取部件类型列表 |
-| `getStandardCatalogIndustryStandards(componentTypeId)` | 获取选中部件类型下的产品元件标准列表 |
-| `updateStandardCatalogIndustryStandardStatus(id, enabled)` | 更新产品元件标准启用状态 |
-| `updateStandardCatalogComponentTypeStatus(id, enabled)` | 更新启用状态 |
-
-## 7. 当前已实现文件
-
-### 7.1 前端
-
-- `pages/StandardCatalogDefinition.vue`
-- `api/standardCatalogDefinitionAPI.js`
-
-### 7.2 后端
-
-- `Modules/StandardCatalogDefinition/Controllers/StandardCatalogDefinitionController.cs`
-- `Modules/StandardCatalogDefinition/Services/Implementations/StandardCatalogDefinitionService.cs`
-- `Modules/StandardCatalogDefinition/Services/Interfaces/IStandardCatalogDefinitionService.cs`
-- `Modules/StandardCatalogDefinition/Dtos/StandardCatalogDisciplineResponse.cs`
-- `Modules/StandardCatalogDefinition/Dtos/StandardCatalogComponentTypeResponse.cs`
-- `Modules/StandardCatalogDefinition/Dtos/StandardCatalogIndustryStandardResponse.cs`
-- `Modules/StandardCatalogDefinition/Dtos/UpdateStandardCatalogIndustryStandardStatusRequest.cs`
-- `Modules/StandardCatalogDefinition/Dtos/UpdateStandardCatalogComponentTypeStatusRequest.cs`
-- `Modules/StandardCatalogDefinition/Entities/S3dDictGeometricIndustryStandard.cs`
-- `Modules/StandardCatalogDefinition/DataConfigurations/S3dDictGeometricIndustryStandardConfiguration.cs`
-- `Shared/Entities/S3dDictPipingComponentType.cs`
-- `Shared/DataConfigurations/S3dDictPipingComponentTypeConfiguration.cs`
-
-## 8. 后续更新要求
-
-后续若接入以下内容，必须同步更新本契约：
-
-1. 产品元件标准的新增、编辑、启用控制等后续能力
-2. 自定义类目录的真实数据源、接口与层级关系
-3. 产品元件标准目录的真实数据源、接口与层级关系
-4. 新增、编辑、删除、绑定类接口
-5. 表格字段、默认值、筛选规则、联动规则的任何变化
+1. 字段映射调整
+2. 绑定逻辑变化
+3. 弹窗字段变化
+4. 新增/编辑/删除接口
+5. 目录区真实数据接入
