@@ -243,8 +243,131 @@
     </el-dialog>
 
     <el-dialog
+      v-model="customCatalogDialogVisible"
+      width="420px"
+      destroy-on-close
+      :close-on-click-modal="false"
+      class="custom-catalog-dialog"
+    >
+      <template #header>
+        <div class="custom-catalog-dialog__header">
+          <div class="custom-catalog-dialog__title">新增自定义类目录</div>
+          <div class="custom-catalog-dialog__component-type">部件类型：{{ customCatalogDialogComponentTypeName || '-' }}</div>
+        </div>
+      </template>
+
+      <div class="custom-catalog-dialog__body">
+        <div class="custom-catalog-dialog__list">
+          <div v-for="(item, index) in customCatalogFormRows" :key="item.key" class="custom-catalog-dialog__row">
+            <el-input
+              v-model="item.name"
+              :placeholder="`请输入自定义类目录 ${index + 1}`"
+              clearable
+              maxlength="255"
+            />
+            <el-button
+              type="danger"
+              plain
+              :icon="Delete"
+              :disabled="customCatalogFormRows.length === 1"
+              @click="removeCustomCatalogFormRow(item.key)"
+            />
+          </div>
+        </div>
+
+        <div class="custom-catalog-dialog__add-row">
+          <el-button type="primary" plain :icon="Plus" @click="addCustomCatalogFormRow">新增一行</el-button>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="custom-catalog-dialog__footer">
+          <el-button type="primary" :loading="customCatalogDialogSubmitting" @click="submitCustomCatalogDialog">保存</el-button>
+          <el-button @click="customCatalogDialogVisible = false">取消</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="standardCatalogDialogVisible"
+      width="680px"
+      destroy-on-close
+      :close-on-click-modal="false"
+      class="bind-standard-dialog standard-directory-dialog"
+    >
+      <template #header>
+        <div class="bind-standard-dialog__header">
+          <div class="bind-standard-dialog__title">新增标准目录</div>
+          <div class="bind-standard-dialog__component-type">用户自定义类：{{ standardCatalogComponentSubTypeName || '-' }}</div>
+        </div>
+      </template>
+
+      <div v-loading="standardCatalogDialogLoading" class="bind-standard-dialog__body">
+        <div class="bind-standard-dialog__panel-layout">
+          <section class="bind-standard-dialog__panel">
+            <div class="bind-standard-dialog__panel-head">
+              <div class="bind-standard-dialog__panel-title">已配置标准</div>
+              <el-input
+                v-model="standardCatalogConfiguredKeyword"
+                placeholder="搜索已配置标准"
+                clearable
+                class="bind-standard-dialog__search"
+              >
+                <template #append>
+                  <el-button :icon="Search" />
+                </template>
+              </el-input>
+            </div>
+            <el-scrollbar class="bind-standard-dialog__scroll">
+              <el-checkbox-group v-model="standardCatalogConfiguredChecked" class="bind-standard-dialog__checkbox-group">
+                <el-checkbox v-for="item in filteredStandardCatalogConfigured" :key="item" :label="item">
+                  {{ item }}
+                </el-checkbox>
+              </el-checkbox-group>
+            </el-scrollbar>
+          </section>
+
+          <div class="bind-standard-dialog__move-actions">
+            <el-button type="primary" plain :disabled="!standardCatalogConfiguredChecked.length" @click="moveConfiguredStandardsToDirectory">&gt;</el-button>
+            <el-button type="primary" plain :disabled="!standardCatalogSelectedChecked.length" @click="moveDirectoryStandardsToConfigured">&lt;</el-button>
+          </div>
+
+          <section class="bind-standard-dialog__panel">
+            <div class="bind-standard-dialog__panel-head">
+              <div class="bind-standard-dialog__panel-title">标准目录</div>
+              <el-input
+                v-model="standardCatalogSelectedKeyword"
+                placeholder="搜索标准目录"
+                clearable
+                class="bind-standard-dialog__search"
+              >
+                <template #append>
+                  <el-button :icon="Search" />
+                </template>
+              </el-input>
+            </div>
+            <el-scrollbar class="bind-standard-dialog__scroll">
+              <el-checkbox-group v-model="standardCatalogSelectedChecked" class="bind-standard-dialog__checkbox-group">
+                <el-checkbox v-for="item in filteredStandardCatalogSelected" :key="item" :label="item">
+                  {{ item }}
+                </el-checkbox>
+              </el-checkbox-group>
+            </el-scrollbar>
+          </section>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="bind-standard-dialog__footer">
+          <el-button type="primary" :loading="standardCatalogDialogSubmitting" @click="submitStandardCatalogDialog">保存</el-button>
+          <el-button @click="standardCatalogDialogVisible = false">取消</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="bindStandardDialogVisible"
-      width="760px"
+      width="680px"
       destroy-on-close
       :close-on-click-modal="false"
       class="bind-standard-dialog"
@@ -252,15 +375,11 @@
       <template #header>
         <div class="bind-standard-dialog__header">
           <div class="bind-standard-dialog__title">部件类型-标准绑定</div>
+          <div class="bind-standard-dialog__component-type">部件类型：{{ bindStandardComponentTypeName || '-' }}</div>
         </div>
       </template>
 
       <div v-loading="bindStandardDialogLoading" class="bind-standard-dialog__body">
-        <div class="bind-standard-dialog__readonly-row">
-          <span class="bind-standard-dialog__readonly-label">部件类型</span>
-          <el-input :model-value="bindStandardComponentTypeName" readonly class="bind-standard-dialog__readonly-input" />
-        </div>
-
         <div class="bind-standard-dialog__panel-layout">
           <section class="bind-standard-dialog__panel">
             <div class="bind-standard-dialog__panel-head">
@@ -328,17 +447,20 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, RefreshLeft, Search } from '@element-plus/icons-vue'
+import { Delete, Plus, RefreshLeft, Search } from '@element-plus/icons-vue'
 import {
   checkStandardCatalogComponentTypeDescriptionExists,
+  createStandardCatalogCustomCatalogs,
   createStandardCatalogComponentType,
   getStandardCatalogBindingDialog,
   getStandardCatalogCustomCatalogs,
+  getStandardCatalogDirectoryDialog,
   getStandardCatalogIndustryStandards,
   getStandardCatalogComponentTypes,
   getStandardCatalogDisciplines,
   getStandardCatalogProductStandardCatalogs,
   saveStandardCatalogBindings,
+  saveStandardCatalogDirectory,
   updateStandardCatalogIndustryStandardStatus,
   updateStandardCatalogProductStandardCatalogStatus,
   updateStandardCatalogComponentTypeStatus
@@ -358,6 +480,11 @@ const productStandardStatusUpdatingIds = ref([])
 const productStandardCatalogStatusUpdatingIds = ref([])
 const componentTypeDialogVisible = ref(false)
 const componentTypeDialogSubmitting = ref(false)
+const customCatalogDialogVisible = ref(false)
+const customCatalogDialogSubmitting = ref(false)
+const standardCatalogDialogVisible = ref(false)
+const standardCatalogDialogLoading = ref(false)
+const standardCatalogDialogSubmitting = ref(false)
 const bindStandardDialogVisible = ref(false)
 const bindStandardDialogLoading = ref(false)
 const bindStandardDialogSubmitting = ref(false)
@@ -381,12 +508,22 @@ const bindStandardLibraryChecked = ref([])
 const bindStandardSelectedChecked = ref([])
 const bindStandardLibraryKeyword = ref('')
 const bindStandardSelectedKeyword = ref('')
+const standardCatalogComponentSubTypeName = ref('')
+const standardCatalogAllConfigured = ref([])
+const standardCatalogSelected = ref([])
+const standardCatalogConfiguredChecked = ref([])
+const standardCatalogSelectedChecked = ref([])
+const standardCatalogConfiguredKeyword = ref('')
+const standardCatalogSelectedKeyword = ref('')
+const customCatalogDialogComponentTypeName = ref('')
 const componentTypeForm = reactive({
   discipline: DEFAULT_DISCIPLINE,
   componentTypeDescription: '',
   componentTypeName: '',
   connectType: ''
 })
+const customCatalogFormRows = ref([])
+let customCatalogRowSeed = 0
 const showConnectTypeField = computed(() => componentTypeForm.discipline === DEFAULT_DISCIPLINE)
 const componentTypeFormRules = computed(() => {
   const rules = {
@@ -404,6 +541,7 @@ const componentTypeFormRules = computed(() => {
 const componentTypeData = computed(() => componentTypeRows.value)
 const componentTypeCatalogData = computed(() => componentTypeRows.value.filter((item) => item.enabled))
 const selectedComponentTypeRow = computed(() => componentTypeRows.value.find((item) => item.id === selectedComponentTypeId.value) || null)
+const selectedComponentTypeCatalogRow = computed(() => componentTypeRows.value.find((item) => item.id === selectedComponentTypeCatalogId.value) || null)
 const selectedCustomCatalogRow = computed(() => customCatalogData.value.find((item) => item.id === selectedCustomCatalogId.value) || null)
 const availableStandardLibrary = computed(() =>
   bindStandardLibrary.value.filter((item) => !bindStandardSelected.value.includes(item))
@@ -423,6 +561,25 @@ const filteredSelectedStandards = computed(() => {
   }
 
   return bindStandardSelected.value.filter((item) => item.toLowerCase().includes(keyword))
+})
+const availableStandardCatalogConfigured = computed(() =>
+  standardCatalogAllConfigured.value.filter((item) => !standardCatalogSelected.value.includes(item))
+)
+const filteredStandardCatalogConfigured = computed(() => {
+  const keyword = standardCatalogConfiguredKeyword.value.trim().toLowerCase()
+  if (!keyword) {
+    return availableStandardCatalogConfigured.value
+  }
+
+  return availableStandardCatalogConfigured.value.filter((item) => item.toLowerCase().includes(keyword))
+})
+const filteredStandardCatalogSelected = computed(() => {
+  const keyword = standardCatalogSelectedKeyword.value.trim().toLowerCase()
+  if (!keyword) {
+    return standardCatalogSelected.value
+  }
+
+  return standardCatalogSelected.value.filter((item) => item.toLowerCase().includes(keyword))
 })
 
 const syncSelectionWithRows = (rowsGetter, selectedIdRef) => {
@@ -480,6 +637,13 @@ const normalizeProductStandardCatalogs = (rows = []) =>
     code: item.standardName || '',
     enabled: Boolean(item.enabled)
   }))
+
+const createCustomCatalogFormRow = (name = '') => ({
+  key: `custom-catalog-${customCatalogRowSeed++}`,
+  name
+})
+
+const sortStandardNames = (rows = []) => [...rows].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN'))
 
 const sortStandardsByLibraryOrder = (rows = []) => {
   const orderMap = new Map(bindStandardLibrary.value.map((item, index) => [item, index]))
@@ -720,7 +884,31 @@ const handleAddStandardCatalog = () => {
     return
   }
 
-  ElMessage.info('新增标准目录功能待后续开发')
+  standardCatalogDialogLoading.value = true
+  standardCatalogComponentSubTypeName.value = selectedCustomCatalogRow.value.name
+  standardCatalogConfiguredChecked.value = []
+  standardCatalogSelectedChecked.value = []
+  standardCatalogConfiguredKeyword.value = ''
+  standardCatalogSelectedKeyword.value = ''
+
+  getStandardCatalogDirectoryDialog(selectedComponentTypeCatalogId.value, selectedCustomCatalogRow.value.name)
+    .then((result) => {
+      standardCatalogComponentSubTypeName.value = result.componentSubType || selectedCustomCatalogRow.value?.name || ''
+      const configuredStandards = Array.isArray(result.configuredStandards) ? result.configuredStandards : []
+      const standardCatalogs = Array.isArray(result.standardCatalogs) ? result.standardCatalogs : []
+
+      standardCatalogAllConfigured.value = sortStandardNames([
+        ...new Set([...configuredStandards, ...standardCatalogs])
+      ])
+      standardCatalogSelected.value = sortStandardNames(standardCatalogs)
+      standardCatalogDialogVisible.value = true
+    })
+    .catch(() => {
+      standardCatalogDialogVisible.value = false
+    })
+    .finally(() => {
+      standardCatalogDialogLoading.value = false
+    })
 }
 
 const handleAddCustomCatalog = () => {
@@ -729,7 +917,9 @@ const handleAddCustomCatalog = () => {
     return
   }
 
-  ElMessage.info('新增自定义类目录功能待后续开发')
+  customCatalogDialogComponentTypeName.value = selectedComponentTypeCatalogRow.value?.name || ''
+  customCatalogFormRows.value = [createCustomCatalogFormRow()]
+  customCatalogDialogVisible.value = true
 }
 
 const handleConfigureCommodityType = () => {
@@ -739,6 +929,53 @@ const handleConfigureCommodityType = () => {
   }
 
   ElMessage.info('配置CommodityType功能待后续开发')
+}
+
+const addCustomCatalogFormRow = () => {
+  customCatalogFormRows.value = [...customCatalogFormRows.value, createCustomCatalogFormRow()]
+}
+
+const removeCustomCatalogFormRow = (key) => {
+  if (customCatalogFormRows.value.length === 1) {
+    return
+  }
+
+  customCatalogFormRows.value = customCatalogFormRows.value.filter((item) => item.key !== key)
+}
+
+const submitCustomCatalogDialog = async () => {
+  if (!selectedComponentTypeCatalogId.value) {
+    ElMessage.warning('当前部件类型目录不存在')
+    return
+  }
+
+  const normalizedNames = customCatalogFormRows.value
+    .map((item) => item.name.trim())
+    .filter(Boolean)
+
+  if (!normalizedNames.length) {
+    ElMessage.warning('请至少填写一条自定义类目录')
+    return
+  }
+
+  const duplicateNames = normalizedNames.filter((item, index) => normalizedNames.findIndex((current) => current === item) !== index)
+  if (duplicateNames.length) {
+    ElMessage.warning('输入内容存在重复，请检查')
+    return
+  }
+
+  customCatalogDialogSubmitting.value = true
+  try {
+    await createStandardCatalogCustomCatalogs(selectedComponentTypeCatalogId.value, {
+      componentSubTypes: normalizedNames
+    })
+
+    customCatalogDialogVisible.value = false
+    await loadCustomCatalogs()
+    ElMessage.success('新增成功')
+  } finally {
+    customCatalogDialogSubmitting.value = false
+  }
 }
 
 const moveStandardsToConfig = () => {
@@ -759,6 +996,26 @@ const moveStandardsToLibrary = () => {
 
   bindStandardSelected.value = bindStandardSelected.value.filter((item) => !bindStandardSelectedChecked.value.includes(item))
   bindStandardSelectedChecked.value = []
+}
+
+const moveConfiguredStandardsToDirectory = () => {
+  if (!standardCatalogConfiguredChecked.value.length) {
+    return
+  }
+
+  standardCatalogSelected.value = sortStandardNames([
+    ...new Set([...standardCatalogSelected.value, ...standardCatalogConfiguredChecked.value])
+  ])
+  standardCatalogConfiguredChecked.value = []
+}
+
+const moveDirectoryStandardsToConfigured = () => {
+  if (!standardCatalogSelectedChecked.value.length) {
+    return
+  }
+
+  standardCatalogSelected.value = standardCatalogSelected.value.filter((item) => !standardCatalogSelectedChecked.value.includes(item))
+  standardCatalogSelectedChecked.value = []
 }
 
 const submitComponentTypeForm = async () => {
@@ -816,6 +1073,27 @@ const submitBindStandardDialog = async () => {
     ElMessage.success('绑定保存成功')
   } finally {
     bindStandardDialogSubmitting.value = false
+  }
+}
+
+const submitStandardCatalogDialog = async () => {
+  if (!selectedComponentTypeCatalogId.value || !selectedCustomCatalogRow.value?.name) {
+    ElMessage.warning('当前用户自定义类不存在')
+    return
+  }
+
+  standardCatalogDialogSubmitting.value = true
+  try {
+    await saveStandardCatalogDirectory(selectedComponentTypeCatalogId.value, {
+      componentSubType: selectedCustomCatalogRow.value.name,
+      standardNames: standardCatalogSelected.value
+    })
+
+    standardCatalogDialogVisible.value = false
+    await loadProductStandardCatalogs()
+    ElMessage.success('标准目录保存成功')
+  } finally {
+    standardCatalogDialogSubmitting.value = false
   }
 }
 
@@ -1091,24 +1369,87 @@ onMounted(async () => {
   padding-right: 6px;
 }
 
-.bind-standard-dialog :deep(.el-dialog__header) {
+.custom-catalog-dialog :deep(.el-dialog__header) {
   margin-right: 0;
   padding: 18px 22px 10px;
 }
 
+.custom-catalog-dialog :deep(.el-dialog__body) {
+  padding: 8px 22px 12px;
+}
+
+.custom-catalog-dialog :deep(.el-dialog__footer) {
+  padding: 10px 22px 20px;
+}
+
+.custom-catalog-dialog__header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.custom-catalog-dialog__title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #17212d;
+  line-height: 1.1;
+}
+
+.custom-catalog-dialog__component-type {
+  font-size: 13px;
+  font-weight: 600;
+  color: #5a6b7d;
+  align-self: flex-end;
+}
+
+.custom-catalog-dialog__body {
+  min-height: 220px;
+}
+
+.custom-catalog-dialog__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.custom-catalog-dialog__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 10px;
+  align-items: center;
+}
+
+.custom-catalog-dialog__add-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.custom-catalog-dialog__footer {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.bind-standard-dialog :deep(.el-dialog__header) {
+  margin-right: 0;
+  padding: 18px 16px 10px;
+}
+
 .bind-standard-dialog :deep(.el-dialog__body) {
-  padding: 6px 22px 10px;
+  padding: 6px 14px 10px;
 }
 
 .bind-standard-dialog :deep(.el-dialog__footer) {
-  padding: 10px 22px 20px;
+  padding: 10px 16px 20px;
 }
 
 .bind-standard-dialog__header {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .bind-standard-dialog__title {
@@ -1118,43 +1459,21 @@ onMounted(async () => {
   line-height: 1.1;
 }
 
-.bind-standard-dialog__selected-type {
+.bind-standard-dialog__component-type {
   font-size: 15px;
-  font-weight: 600;
-  color: #4f6275;
+  font-weight: 700;
+  color: #435568;
+  align-self: flex-end;
 }
 
 .bind-standard-dialog__body {
-  min-height: 420px;
-}
-
-.bind-standard-dialog__readonly-row {
-  display: grid;
-  grid-template-columns: 84px minmax(0, 220px);
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-.bind-standard-dialog__readonly-label {
-  font-size: 14px;
-  font-weight: 700;
-  color: #314252;
-}
-
-.bind-standard-dialog__readonly-input {
-  max-width: 220px;
-}
-
-.bind-standard-dialog__readonly-input :deep(.el-input__wrapper) {
-  background: #f5f7fa;
-  box-shadow: 0 0 0 1px #d7dee8 inset;
+  min-height: 460px;
 }
 
 .bind-standard-dialog__panel-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1fr);
+  gap: 12px;
   align-items: stretch;
 }
 
@@ -1184,11 +1503,11 @@ onMounted(async () => {
 }
 
 .bind-standard-dialog__search {
-  width: 190px;
+  width: 160px;
 }
 
 .bind-standard-dialog__scroll {
-  height: 300px;
+  height: 390px;
   padding: 10px 12px;
   border: 1px solid #d7dee8;
   border-radius: 8px;

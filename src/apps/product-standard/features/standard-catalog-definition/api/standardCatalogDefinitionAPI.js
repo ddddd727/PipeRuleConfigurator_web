@@ -60,12 +60,36 @@ export function getStandardCatalogCustomCatalogs(componentTypeId) {
   }).then((res) => (Array.isArray(res) ? res : []))
 }
 
+export function createStandardCatalogCustomCatalogs(componentTypeId, data) {
+  return request({
+    url: `/StandardCatalogDefinition/component-types/${componentTypeId}/custom-catalogs`,
+    method: 'post',
+    data
+  })
+}
+
 export function getStandardCatalogProductStandardCatalogs(componentTypeId, componentSubType) {
   return request({
     url: `/StandardCatalogDefinition/component-types/${componentTypeId}/product-standard-catalogs`,
     method: 'get',
     params: { componentSubType }
   }).then((res) => (Array.isArray(res) ? res : []))
+}
+
+export function getStandardCatalogDirectoryDialog(componentTypeId, componentSubType) {
+  return request({
+    url: `/StandardCatalogDefinition/component-types/${componentTypeId}/standard-catalog-directory-dialog`,
+    method: 'get',
+    params: { componentSubType }
+  })
+}
+
+export function saveStandardCatalogDirectory(componentTypeId, data) {
+  return request({
+    url: `/StandardCatalogDefinition/component-types/${componentTypeId}/standard-catalog-directories`,
+    method: 'put',
+    data
+  })
 }
 
 export function updateStandardCatalogProductStandardCatalogStatus(componentTypeId, data) {

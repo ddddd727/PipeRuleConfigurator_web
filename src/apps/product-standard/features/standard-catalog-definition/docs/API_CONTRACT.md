@@ -258,3 +258,34 @@
 - `新增标准目录` 需要先选择 `部件类型目录` 与 `自定义类目录`
 - `配置CommodityType` 需要先选择 `部件类型目录`、`自定义类目录` 与 `产品元件标准目录`
 - 这 3 个按钮当前为前端占位入口，后续弹窗与保存接口实现后继续更新本文档
+## 8. 2026-04-07 新增自定义类目录
+
+- 前端新增“新增自定义类目录”弹窗，入口位于右侧模块工具栏
+- 仅在已选中“部件类型目录”时允许打开
+- 弹窗支持批量录入多条 `ComponentSubType`
+- 保存后调用 `POST /component-types/{componentTypeId}/custom-catalogs`
+- 后端写入表 `S3D_Rule_ComponentTypeHierarchyRule`
+- 本次写入字段：
+  - `ComponentTypeID`
+  - `Status = 1`
+  - `ComponentSubType`
+  - `GeometricIndustryStandard_CL = NULL`
+  - `CommodityType = NULL`
+- 后端会按 `ComponentTypeID + ComponentSubType` 去重，已存在的数据不会重复插入
+## 9. 2026-04-07 新增标准目录
+
+- 前端新增“新增标准目录”弹窗，交互形式与“部件类型-标准绑定”一致
+- 标题右下角展示当前“用户自定义类”
+- 左侧“已配置标准”数据源与左侧“产品元件标准”列表同源
+- 左侧列表会自动去掉当前“标准目录”中已经存在的内容
+- 右侧“标准目录”数据源与右下角“产品元件标准目录”列表同源
+- 保存接口：
+  - `GET /component-types/{componentTypeId}/standard-catalog-directory-dialog`
+  - `PUT /component-types/{componentTypeId}/standard-catalog-directories`
+- 保存时按 `ComponentTypeID + ComponentSubType` 同步 `S3D_Rule_ComponentTypeHierarchyRule`
+- 新增写入字段：
+  - `ComponentTypeID`
+  - `Status = 1`
+  - `ComponentSubType`
+  - `GeometricIndustryStandard_CL`
+  - `CommodityType = NULL`
