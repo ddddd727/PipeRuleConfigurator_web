@@ -107,7 +107,9 @@
               </el-select>
             </div>
             <div class="toolbar-actions">
+              <el-button type="primary" :icon="Plus" @click="handleAddCustomCatalog">新增自定义类目录</el-button>
               <el-button type="primary" :icon="Plus" @click="handleAddStandardCatalog">新增标准目录</el-button>
+              <el-button type="primary" :icon="RefreshLeft" @click="handleConfigureCommodityType">配置CommodityType</el-button>
             </div>
           </div>
         </div>
@@ -139,14 +141,14 @@
 
           <article class="list-card">
             <div class="list-card-title">自定义类目录</div>
-            <div class="table-shell">
+            <div class="table-shell" v-loading="customCatalogLoading" element-loading-text="加载中...">
               <el-table
                 :data="customCatalogData"
                 border
                 size="small"
                 height="100%"
                 highlight-current-row
-                empty-text="待后续接入"
+                :empty-text="selectedComponentTypeCatalogId ? '暂无数据' : '请选择部件类型目录'"
                 @row-click="handleCustomCatalogRowClick"
               >
                 <el-table-column width="48" align="center" header-align="center">
@@ -163,14 +165,14 @@
 
           <article class="list-card">
             <div class="list-card-title">产品元件标准目录</div>
-            <div class="table-shell">
+            <div class="table-shell" v-loading="productStandardCatalogLoading" element-loading-text="加载中...">
               <el-table
                 :data="productStandardCatalogData"
                 border
                 size="small"
                 height="100%"
                 highlight-current-row
-                empty-text="待后续接入"
+                :empty-text="selectedCustomCatalogId ? '暂无数据' : '请选择自定义类目录'"
                 @row-click="handleProductStandardCatalogRowClick"
               >
                 <el-table-column width="48" align="center" header-align="center">
@@ -183,7 +185,14 @@
                 <el-table-column prop="code" label="标准" min-width="120" show-overflow-tooltip header-align="center" align="center" />
                 <el-table-column label="启用" width="72" header-align="center" align="center">
                   <template #default="{ row }">
-                    <el-switch :model-value="row.enabled" size="small" class="compact-switch" disabled />
+                    <el-switch
+                      :model-value="row.enabled"
+                      size="small"
+                      class="compact-switch"
+                      :loading="isProductStandardCatalogStatusUpdating(row.id)"
+                      @click.stop
+                      @change="(value) => handleProductStandardCatalogStatusChange(row, value)"
+                    />
                   </template>
                 </el-table-column>
               </el-table>
@@ -324,11 +333,14 @@ import {
   checkStandardCatalogComponentTypeDescriptionExists,
   createStandardCatalogComponentType,
   getStandardCatalogBindingDialog,
+  getStandardCatalogCustomCatalogs,
   getStandardCatalogIndustryStandards,
   getStandardCatalogComponentTypes,
   getStandardCatalogDisciplines,
+  getStandardCatalogProductStandardCatalogs,
   saveStandardCatalogBindings,
   updateStandardCatalogIndustryStandardStatus,
+  updateStandardCatalogProductStandardCatalogStatus,
   updateStandardCatalogComponentTypeStatus
 } from '@/apps/product-standard/features/standard-catalog-definition/api/standardCatalogDefinitionAPI'
 
@@ -339,8 +351,11 @@ const selectedProfessional = ref(DEFAULT_DISCIPLINE)
 const componentTypeRows = ref([])
 const componentTypeLoading = ref(false)
 const productStandardLoading = ref(false)
+const customCatalogLoading = ref(false)
+const productStandardCatalogLoading = ref(false)
 const statusUpdatingIds = ref([])
 const productStandardStatusUpdatingIds = ref([])
+const productStandardCatalogStatusUpdatingIds = ref([])
 const componentTypeDialogVisible = ref(false)
 const componentTypeDialogSubmitting = ref(false)
 const bindStandardDialogVisible = ref(false)
@@ -389,6 +404,7 @@ const componentTypeFormRules = computed(() => {
 const componentTypeData = computed(() => componentTypeRows.value)
 const componentTypeCatalogData = computed(() => componentTypeRows.value.filter((item) => item.enabled))
 const selectedComponentTypeRow = computed(() => componentTypeRows.value.find((item) => item.id === selectedComponentTypeId.value) || null)
+const selectedCustomCatalogRow = computed(() => customCatalogData.value.find((item) => item.id === selectedCustomCatalogId.value) || null)
 const availableStandardLibrary = computed(() =>
   bindStandardLibrary.value.filter((item) => !bindStandardSelected.value.includes(item))
 )
@@ -433,6 +449,7 @@ syncSelectionWithRows(() => productStandardCatalogData.value, selectedStandardCa
 
 const isStatusUpdating = (id) => statusUpdatingIds.value.includes(id)
 const isProductStandardStatusUpdating = (id) => productStandardStatusUpdatingIds.value.includes(id)
+const isProductStandardCatalogStatusUpdating = (id) => productStandardCatalogStatusUpdatingIds.value.includes(id)
 
 const normalizeComponentTypes = (rows = []) =>
   rows.map((item) => ({
@@ -443,6 +460,20 @@ const normalizeComponentTypes = (rows = []) =>
   }))
 
 const normalizeIndustryStandards = (rows = []) =>
+  rows.map((item) => ({
+    id: item.id,
+    geometricIndustryStandardCl: item.geometricIndustryStandardCl,
+    code: item.standardName || '',
+    enabled: Boolean(item.enabled)
+  }))
+
+const normalizeCustomCatalogs = (rows = []) =>
+  rows.map((item) => ({
+    id: item.id,
+    name: item.componentSubType || ''
+  }))
+
+const normalizeProductStandardCatalogs = (rows = []) =>
   rows.map((item) => ({
     id: item.id,
     geometricIndustryStandardCl: item.geometricIndustryStandardCl,
@@ -523,6 +554,40 @@ const loadIndustryStandards = async () => {
   }
 }
 
+const loadCustomCatalogs = async () => {
+  if (!selectedComponentTypeCatalogId.value) {
+    customCatalogData.value = []
+    productStandardCatalogData.value = []
+    return
+  }
+
+  customCatalogLoading.value = true
+  try {
+    const rows = await getStandardCatalogCustomCatalogs(selectedComponentTypeCatalogId.value)
+    customCatalogData.value = normalizeCustomCatalogs(rows)
+  } finally {
+    customCatalogLoading.value = false
+  }
+}
+
+const loadProductStandardCatalogs = async () => {
+  if (!selectedComponentTypeCatalogId.value || !selectedCustomCatalogRow.value?.name) {
+    productStandardCatalogData.value = []
+    return
+  }
+
+  productStandardCatalogLoading.value = true
+  try {
+    const rows = await getStandardCatalogProductStandardCatalogs(
+      selectedComponentTypeCatalogId.value,
+      selectedCustomCatalogRow.value.name
+    )
+    productStandardCatalogData.value = normalizeProductStandardCatalogs(rows)
+  } finally {
+    productStandardCatalogLoading.value = false
+  }
+}
+
 const handleComponentTypeStatusChange = async (row, enabled) => {
   const originalValue = row.enabled
   row.enabled = enabled
@@ -556,6 +621,32 @@ const handleProductStandardStatusChange = async (row, enabled) => {
     row.enabled = originalValue
   } finally {
     productStandardStatusUpdatingIds.value = productStandardStatusUpdatingIds.value.filter((item) => item !== row.id)
+  }
+}
+
+const handleProductStandardCatalogStatusChange = async (row, enabled) => {
+  if (!selectedComponentTypeCatalogId.value || !selectedCustomCatalogRow.value?.name) {
+    ElMessage.warning('请先选择自定义类目录')
+    return
+  }
+
+  const originalValue = row.enabled
+  row.enabled = enabled
+  productStandardCatalogStatusUpdatingIds.value = [...productStandardCatalogStatusUpdatingIds.value, row.id]
+
+  try {
+    await updateStandardCatalogProductStandardCatalogStatus(selectedComponentTypeCatalogId.value, {
+      componentSubType: selectedCustomCatalogRow.value.name,
+      geometricIndustryStandardCl: row.geometricIndustryStandardCl,
+      enabled
+    })
+    ElMessage.success(enabled ? '启用成功' : '禁用成功')
+    await loadCustomCatalogs()
+    await loadProductStandardCatalogs()
+  } catch {
+    row.enabled = originalValue
+  } finally {
+    productStandardCatalogStatusUpdatingIds.value = productStandardCatalogStatusUpdatingIds.value.filter((item) => item !== row.id)
   }
 }
 
@@ -624,7 +715,30 @@ const handleBindStandard = async () => {
 }
 
 const handleAddStandardCatalog = () => {
+  if (!selectedComponentTypeCatalogId.value || !selectedCustomCatalogRow.value?.name) {
+    ElMessage.warning('请先选择部件类型目录和自定义类目录')
+    return
+  }
+
   ElMessage.info('新增标准目录功能待后续开发')
+}
+
+const handleAddCustomCatalog = () => {
+  if (!selectedComponentTypeCatalogId.value) {
+    ElMessage.warning('请先选择部件类型目录')
+    return
+  }
+
+  ElMessage.info('新增自定义类目录功能待后续开发')
+}
+
+const handleConfigureCommodityType = () => {
+  if (!selectedComponentTypeCatalogId.value || !selectedCustomCatalogRow.value?.name || !selectedStandardCatalogId.value) {
+    ElMessage.warning('请先选择部件类型目录、自定义类目录和产品元件标准目录')
+    return
+  }
+
+  ElMessage.info('配置CommodityType功能待后续开发')
 }
 
 const moveStandardsToConfig = () => {
@@ -730,6 +844,24 @@ watch(
   selectedComponentTypeId,
   async () => {
     await loadIndustryStandards()
+  }
+)
+
+watch(
+  selectedComponentTypeCatalogId,
+  async () => {
+    selectedCustomCatalogId.value = ''
+    selectedStandardCatalogId.value = ''
+    productStandardCatalogData.value = []
+    await loadCustomCatalogs()
+  }
+)
+
+watch(
+  selectedCustomCatalogId,
+  async () => {
+    selectedStandardCatalogId.value = ''
+    await loadProductStandardCatalogs()
   }
 )
 

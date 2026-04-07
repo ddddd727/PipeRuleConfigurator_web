@@ -53,6 +53,29 @@ export function getStandardCatalogIndustryStandards(componentTypeId) {
   }).then((res) => (Array.isArray(res) ? res : []))
 }
 
+export function getStandardCatalogCustomCatalogs(componentTypeId) {
+  return request({
+    url: `/StandardCatalogDefinition/component-types/${componentTypeId}/custom-catalogs`,
+    method: 'get'
+  }).then((res) => (Array.isArray(res) ? res : []))
+}
+
+export function getStandardCatalogProductStandardCatalogs(componentTypeId, componentSubType) {
+  return request({
+    url: `/StandardCatalogDefinition/component-types/${componentTypeId}/product-standard-catalogs`,
+    method: 'get',
+    params: { componentSubType }
+  }).then((res) => (Array.isArray(res) ? res : []))
+}
+
+export function updateStandardCatalogProductStandardCatalogStatus(componentTypeId, data) {
+  return request({
+    url: `/StandardCatalogDefinition/component-types/${componentTypeId}/product-standard-catalogs/status`,
+    method: 'put',
+    data
+  })
+}
+
 export function updateStandardCatalogIndustryStandardStatus(id, enabled) {
   return request({
     url: `/StandardCatalogDefinition/industry-standards/${id}/status`,
