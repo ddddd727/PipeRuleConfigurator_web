@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/AppLayout.vue'
 import catalogDefinitionRouter from './modules/catalog-definition'
 import dataStructureRouter from './modules/data-structure'
-import dataManagementRouter from './modules/data-management'
+import codelistManagementRouter from './modules/codelist-management'
 import standardSelectionRouter from './modules/standard-selection'
 
 export default {
@@ -12,7 +12,7 @@ export default {
   children: [
     catalogDefinitionRouter,
     dataStructureRouter,
-    dataManagementRouter,
+    codelistManagementRouter,
     standardSelectionRouter
   ]
 }
