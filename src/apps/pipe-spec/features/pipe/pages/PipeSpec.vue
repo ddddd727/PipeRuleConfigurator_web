@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted, computed, watch, reactive, onUnmounted } from 'vue'
+import { ref, onMounted, computed, watch, reactive, onUnmounted, onActivated, nextTick } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, ArrowRight, Setting, Plus, Ship } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, RefreshRight, Setting, Plus, Ship } from '@element-plus/icons-vue'
 import PipeSpecConfigForm from '@/apps/pipe-spec/features/pipe/components/PipeSpecConfigForm.vue'    // 导入 PipeSpecConfigForm 组件，用于配置按钮的弹窗实现
 import PipeSpecPreviewForm from '@/apps/pipe-spec/features/pipe/components/PipeSpecPreviewForm.vue'  // 导入规格书预览窗口组件
 import PipeSpecNpdTable from '@/apps/pipe-spec/features/pipe/components/pipe-spec/PipeSpecNpdTable.vue'
@@ -24,7 +24,8 @@ const {
   selectedShipNumber,
   shipClasses,
   shipNumbers,
-  fetchShipInfos
+  fetchShipInfos,
+  refreshPmcRules
 } = usePmcTree()
 
 const {
@@ -89,15 +90,15 @@ const handleSubmitReview = async () => {
     if (res.data.code === 200) {
       ElMessage.success('审核提交成功')
       // 更新节点状态
-      nodeData.status = res.data.data.status || 'approved'
+      nodeData.status = res.data?.data?.status || 'approved'
       // 关闭菜单
       closeContextMenu()
     } else {
-      ElMessage.error(res.data.msg || '审核提交失败')
+      ElMessage.error(res.data.message || '审核提交失败')
     }
   } catch (error) {
     console.error('提交审核错误:', error)
-    ElMessage.error('网络错误，提交审核失败')
+    ElMessage.error(error?.response?.data?.message || '网络错误，提交审核失败')
   }
 }
 
@@ -108,6 +109,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('click', closeContextMenu)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
 const preferredRule = ref(null)
@@ -167,6 +169,7 @@ const handleVersionChange = async (versionId) => {
       pipingMaterialClass: baseInfo.pmcCode || currentNode.value.label,
       pipe: baseInfo.pipeStandard || '',
       material: baseInfo.materialGrade || '',
+      materialCategory: baseInfo.materialCategory || '',
       pressureClass: baseInfo.pressureRating || '',
       wallThickness: baseInfo.wallThickness || ''
     }
@@ -302,6 +305,9 @@ const filterNode = (value, data) => {
 // 侧边栏折叠状态
 const sidebarCollapsed = ref(false)
 
+const refreshingTree = ref(false)
+const lastAutoRefreshAt = ref(0)
+
 // 使用computed缓存船型和船号名称，避免模板中重复计算
 const currentShipClassName = computed(() => {
   if (!selectedShipClass.value || !shipClasses.value.length) return '-'
@@ -316,6 +322,57 @@ const currentShipNumberName = computed(() => {
 // 切换侧边栏折叠状态
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
+const treeContainsPmcCode = (nodes, pmcCode) => {
+  if (!Array.isArray(nodes) || !pmcCode) return false
+  for (const n of nodes) {
+    if (n?.label === pmcCode && !n?.children) return true
+    if (Array.isArray(n?.children) && treeContainsPmcCode(n.children, pmcCode)) return true
+  }
+  return false
+}
+
+const refreshPmcTree = async ({ force = false } = {}) => {
+  const now = Date.now()
+  if (!force && now - lastAutoRefreshAt.value < 2500) return
+  if (refreshingTree.value) return
+  if (!selectedShipNumber.value) return
+
+  refreshingTree.value = true
+  if (!force) lastAutoRefreshAt.value = now
+
+  const selectedPmcCode = currentNode.value?.label && String(currentNode.value.label).length === 7 ? String(currentNode.value.label) : ''
+
+  try {
+    await refreshPmcRules()
+    await nextTick()
+
+    if (filterText.value) {
+      treeRef.value?.filter(filterText.value)
+    }
+
+    if (selectedPmcCode) {
+      if (treeContainsPmcCode(treeData.value, selectedPmcCode)) {
+        treeRef.value?.setCurrentKey?.(selectedPmcCode)
+        await fetchPmcCodeDetails(selectedPmcCode)
+      } else {
+        handleNodeClick({ label: 'Piping Specification', children: [] })
+        treeRef.value?.setCurrentKey?.(null)
+      }
+    }
+  } finally {
+    refreshingTree.value = false
+  }
+}
+
+const handleManualRefresh = async () => {
+  await refreshPmcTree({ force: true })
+}
+
+const handleVisibilityChange = async () => {
+  if (document.visibilityState !== 'visible') return
+  await refreshPmcTree()
 }
 
 // 配置按钮列表
@@ -336,6 +393,12 @@ onMounted(async () => {
     fetchShipInfos(),
     fetchPreferredRules()
   ])
+
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onActivated(async () => {
+  await refreshPmcTree()
 })
 
 const showDialog = ref(false)
@@ -492,6 +555,10 @@ const handleConfigClick = (buttonId) => {
     ElMessage.warning('请先在左侧PMC编码列表中选择对应的PMC编码')
     return
   }
+  if (!formData.value.materialCategory) {
+    ElMessage.warning('当前PMC未解析出主材料，无法获取标准与材料牌号')
+    return
+  }
   
   currentButtonId.value = buttonId
   
@@ -529,6 +596,12 @@ const handleSaveSpecification = async () => {
     ElMessage.warning('请选择有效的PMC编码')
     return
   }
+  const pmcCode = String(currentNode.value.label || '').trim()
+  const normalizedPmcCode = pmcCode.replace(/[^A-Za-z0-9]/g, '')
+  if (normalizedPmcCode.length !== 7) {
+    ElMessage.warning('请选择有效的PMC编码（7位）')
+    return
+  }
 
   // 检查是否有已配置的部件类型
   const configuredButtons = configButtons.value.filter(btn => btn.type && btn.configResult)
@@ -539,35 +612,69 @@ const handleSaveSpecification = async () => {
   }
   
   try {
+    const shipType = shipClasses.value.find(item => item.id === selectedShipClass.value)?.name || ''
+    const shipNumber = shipNumbers.value.find(item => item.id === selectedShipNumber.value)?.name || ''
+    if (!shipType) {
+      ElMessage.warning('船型为空，请重新选择船型')
+      return
+    }
+    if (!shipNumber) {
+      ElMessage.warning('船号为空，请重新选择船号')
+      return
+    }
+
     // 从存储中获取所有配置的完整数据
     const allStoredConfigs = pipeSpecConfigStore.getAllConfigs()
     
     // 准备保存数据，包含完整的配置信息
     // 按照 SavePipeSpecRequest 接口契约构造数据
-    const saveData = {
-      shipType: selectedShipClass.value ? shipClasses.value.find(item => item.id === selectedShipClass.value)?.name : '',
-      shipNumber: selectedShipNumber.value ? shipNumbers.value.find(item => item.id === selectedShipNumber.value)?.name : '',
-      pmcCode: currentNode.value.label || '',
-      configurations: configuredButtons.map(btn => {
+    const invalidConfigs = []
+    const configurationsPayload = configuredButtons.map(btn => {
         // 优先使用按钮中存储的完整配置数据
         const fullConfigData = btn.configData || 
                                allStoredConfigs.find(config => config.componentTypeId === btn.typeId) || 
                                allStoredConfigs.find(config => config.partType === btn.type)
         
         // 映射 fullConfigData 到 contract 的 ComponentFullConfiguration 结构
-        // standardFileConfigs: Array<{ standardFile, material }>
-        const standardFileConfigs = fullConfigData && fullConfigData.configurations ? fullConfigData.configurations.map(cfg => ({
-          standardFile: cfg.standardFileName, // 使用 standardFileName 对应 contract 中的 standardFile
-          material: cfg.materialName          // 使用 materialName 对应 contract 中的 material
-        })) : []
+        const standardFileConfigs = Array.isArray(fullConfigData?.configurations)
+          ? fullConfigData.configurations
+              .map(cfg => {
+                const standardFile = cfg?.standardFileName ?? cfg?.standardName ?? cfg?.standardFile ?? cfg?.standardFileId
+                const material = cfg?.materialName ?? cfg?.material ?? cfg?.materialId
+                if (!standardFile || !material) return null
+                return { standardFile, material }
+              })
+              .filter(Boolean)
+          : []
 
-        return {
-          componentTypeId: btn.typeId, // 新增：传递 componentTypeId
-          componentType: btn.type, // 对应 contract 中的 componentType
-          configResult: btn.configResult,
-          standards: standardFileConfigs // 对应 contract 中的 standards
+        const componentTypeId = btn.typeId ?? fullConfigData?.componentTypeId
+        const componentType = btn.type || fullConfigData?.partType
+
+        if ((!componentTypeId && !componentType) || standardFileConfigs.length === 0) {
+          invalidConfigs.push(componentType || String(componentTypeId || btn.id))
         }
+
+        const item = {
+          configResult: btn.configResult,
+          standards: standardFileConfigs
+        }
+
+        if (typeof componentTypeId === 'number') item.componentTypeId = componentTypeId
+        if (componentType) item.componentType = componentType
+
+        return item
       })
+
+    if (invalidConfigs.length > 0) {
+      ElMessage.error(`以下部件类型配置不完整（缺少部件类型标识或标准/材料）：${invalidConfigs.join('、')}`)
+      return
+    }
+
+    const saveData = {
+      shipType,
+      shipNumber,
+      pmcCode,
+      configurations: configurationsPayload
     }
     
     // 调用保存接口 (Interface 4.7)
@@ -580,11 +687,26 @@ const handleSaveSpecification = async () => {
         await fetchVersions(currentNode.value.label, currentShipClassName.value, currentShipNumberName.value)
       }
     } else {
-      ElMessage.error(res.data.msg || '规格书保存失败')
+      ElMessage.error(res.data.message || '规格书保存失败')
     }
   } catch (error) {
     console.error('保存规格书错误:', error)
-    ElMessage.error('网络错误，规格书保存失败')
+    const serverData = error?.response?.data
+    const serverMessage = serverData?.message
+    const serverErrorsFromArray = Array.isArray(serverData?.data)
+      ? serverData.data
+          .map(e => e?.message || e?.field)
+          .filter(Boolean)
+          .join('；')
+      : ''
+    const serverErrorsFromObject = serverData?.errors && typeof serverData.errors === 'object'
+      ? Object.entries(serverData.errors)
+          .flatMap(([field, messages]) => (Array.isArray(messages) ? messages.map(m => `${field}: ${m}`) : []))
+          .filter(Boolean)
+          .join('；')
+      : ''
+    const serverErrors = serverErrorsFromArray || serverErrorsFromObject
+    ElMessage.error(serverErrors ? `${serverMessage || '请求失败'}：${serverErrors}` : (serverMessage || '网络错误，规格书保存失败'))
   }
 }
 
@@ -653,6 +775,17 @@ const clearAllStoredConfigs = () => {
               :value="numberItem.id" 
             />
           </el-select>
+          <el-button
+            v-show="!sidebarCollapsed"
+            class="collapse-btn"
+            @click="handleManualRefresh"
+            circle
+            size="small"
+            style="margin-left: 8px;"
+            :loading="treeLoading || refreshingTree"
+          >
+            <el-icon><RefreshRight /></el-icon>
+          </el-button>
         </div>
         <div class="sidebar-header-title">
           <span v-show="!sidebarCollapsed">PMC编码列表</span>
@@ -689,6 +822,7 @@ const clearAllStoredConfigs = () => {
           <el-tree
             ref="treeRef"
             :data="treeData"
+            node-key="label"
             :highlight-current="true"
             :filter-node-method="filterNode"
             @node-click="handleNodeClick"
@@ -852,6 +986,7 @@ const clearAllStoredConfigs = () => {
       :pathRanges="filteredNpdRanges"
       :buttonLabel="currentButtonLabel"
       :initial-config="currentConfigData"
+      :material-category="formData.materialCategory"
       @confirm="handleConfirm"
     />
     <PipeSpecPreviewForm

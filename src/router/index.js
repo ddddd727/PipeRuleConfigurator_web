@@ -5,6 +5,7 @@ import productStandardRoute from '@/apps/product-standard/router'
 import designRuleRoute from '@/apps/design-rule/router'
 import engineeringRoute from '@/apps/engineering/router'
 import componentCiRoute from '@/apps/component-ci/router'
+import codeManagementRoute from '@/apps/code-management/router'
 
 export const constantRoutes = [
   {
@@ -19,6 +20,7 @@ export const constantRoutes = [
   designRuleRoute,
   engineeringRoute,
   componentCiRoute,
+  codeManagementRoute,
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 

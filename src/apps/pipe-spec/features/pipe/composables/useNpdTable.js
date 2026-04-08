@@ -164,7 +164,7 @@ export const useNpdTable = () => {
       }
     } catch (error) {
       console.error('获取管材规格数据错误:', error)
-      ElMessage.error('网络错误，获取管材规格数据失败')
+      ElMessage.error(error?.response?.data?.message || '网络错误，获取管材规格数据失败')
       clearDimensionData()
     } finally {
       dimensionLoading.value = false

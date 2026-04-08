@@ -38,6 +38,8 @@ const showAppRail = computed(() => railState.value !== RAIL_STATE.IDLE)
 let railTimer = null
 
 const tagsStore = useTagsViewStore()
+const leftNavGroupRef = ref(null)
+const RAIL_TRIGGER_LEFT_DISTANCE = 50
 
 const clearRailTimer = () => {
   if (railTimer) {
@@ -172,7 +174,7 @@ const gotoPortal = () => {
 <template>
   <div class="app-wrapper">
     <el-container class="layout-container">
-      <div class="left-nav-group" @mouseenter="scheduleRailOpen" @mouseleave="scheduleRailClose">
+      <div class="left-nav-group" ref="leftNavGroupRef" @mouseenter="scheduleRailOpen" @mouseleave="scheduleRailClose">
         <app-rail
           :visible="showAppRail"
           :collapsed="isCollapse"
@@ -508,7 +510,6 @@ const gotoPortal = () => {
   flex: 1;
   overflow-y: auto;
   box-shadow: 0 1px 4px rgba(0, 21, 41, 0.04);
-  margin-bottom: 10px;
 }
 
 .ai-sidebar-wrap {
@@ -519,7 +520,6 @@ const gotoPortal = () => {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
-  margin-bottom: 10px;
 }
 
 .slide-width-enter-active,

@@ -22,7 +22,8 @@ export default {
         { path: 'mat-grade-rule',      name: 'MatGradeRule',       component: DictTable,       meta: { title: '牌号规则',     icon: 'SetUp'        }, props: { dictId: 'mat-grade-rule' } },
         { path: 'flange-standard',     name: 'FlangeStandard',     component: DictTable,       meta: { title: '法兰等级标准', icon: 'Notebook'     }, props: { dictId: 'flange-standard' } },
         { path: 'pressure-rating',     name: 'PressureRating',     component: DictTable,       meta: { title: '法兰压力等级', icon: 'Odometer'     }, props: { dictId: 'pressure-rating' } },
-        { path: 'schedule-thickness',  name: 'ScheduleThickness',  component: DictTable,       meta: { title: '壁厚等级',     icon: 'CopyDocument' }, props: { dictId: 'schedule-thickness' } }
+        { path: 'schedule-thickness',  name: 'ScheduleThickness',  component: DictTable,       meta: { title: '壁厚等级',     icon: 'CopyDocument' }, props: { dictId: 'schedule-thickness' } },
+        { path: 'schedule-description',name: 'ScheduleDescription',component: DictTable,       meta: { title: '壁厚等级描述', icon: 'Tickets'      }, props: { dictId: 'schedule-description' } }
       ]
     },
 

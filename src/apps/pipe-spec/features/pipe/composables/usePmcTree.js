@@ -42,7 +42,7 @@ export const usePmcTree = () => {
       }
     } catch (error) {
       console.error('获取船型船号信息错误:', error)
-      ElMessage.error('网络错误，获取船型船号信息失败')
+      ElMessage.error(error?.response?.data?.message || '网络错误，获取船型船号信息失败')
     } finally {
       shipInfosLoading.value = false
     }
@@ -62,7 +62,7 @@ export const usePmcTree = () => {
       }
     } catch (error) {
       console.error('获取PMC规则数据错误:', error)
-      ElMessage.error('网络错误，获取PMC规则数据失败')
+      ElMessage.error(error?.response?.data?.message || '网络错误，获取PMC规则数据失败')
     } finally {
       if (requestId === pmcRulesRequestId) {
         treeLoading.value = false
@@ -141,6 +141,19 @@ export const usePmcTree = () => {
     }
   })
 
+  const refreshPmcRules = async () => {
+    if (!selectedShipNumber.value) {
+      treeData.value = []
+      return
+    }
+    const shipNumber = shipNumbers.value.find(item => item.id === selectedShipNumber.value)?.name
+    if (!shipNumber) {
+      treeData.value = []
+      return
+    }
+    await fetchPmcRules(shipNumber)
+  }
+
   return {
     treeData,
     treeLoading,
@@ -150,6 +163,7 @@ export const usePmcTree = () => {
     selectedShipNumber,
     shipClasses,
     shipNumbers,
-    fetchShipInfos
+    fetchShipInfos,
+    refreshPmcRules
   }
 }
