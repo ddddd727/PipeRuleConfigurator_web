@@ -177,7 +177,7 @@
               >
                 <el-table-column width="48" align="center" header-align="center">
                   <template #default="{ row }">
-                    <el-radio v-model="selectedStandardCatalogId" :label="row.id" @click.stop>
+                    <el-radio v-model="selectedStandardCatalogId" :label="row.id" :disabled="!row.enabled" @click.stop>
                       <span></span>
                     </el-radio>
                   </template>
@@ -284,6 +284,64 @@
         <div class="custom-catalog-dialog__footer">
           <el-button type="primary" :loading="customCatalogDialogSubmitting" @click="submitCustomCatalogDialog">保存</el-button>
           <el-button @click="customCatalogDialogVisible = false">取消</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="commodityTypeDialogVisible"
+      width="420px"
+      destroy-on-close
+      :close-on-click-modal="false"
+      class="custom-catalog-dialog commodity-type-dialog"
+    >
+      <template #header>
+        <div class="custom-catalog-dialog__header">
+          <div class="custom-catalog-dialog__title">配置CommodityType</div>
+          <div class="custom-catalog-dialog__component-type">标准：{{ commodityTypeDialogStandardName || '-' }}</div>
+        </div>
+      </template>
+
+        <div v-loading="commodityTypeDialogLoading" class="custom-catalog-dialog__body">
+          <div class="custom-catalog-dialog__list">
+            <div v-for="(item, index) in commodityTypeFormRows" :key="item.key" class="custom-catalog-dialog__row">
+              <el-input v-if="item.existing" :model-value="item.name" readonly class="commodity-type-dialog__readonly" />
+              <el-select
+                v-else
+                v-model="item.name"
+                placeholder="请选择CommodityType"
+                filterable
+                clearable
+                class="commodity-type-dialog__select"
+              >
+                <el-option
+                  v-for="option in commodityTypeOptions"
+                  :key="option"
+                  :label="option"
+                  :value="option"
+                />
+              </el-select>
+              <el-button
+                type="danger"
+                plain
+                :icon="Delete"
+                :disabled="commodityTypeFormRows.length === 1"
+              @click="removeCommodityTypeFormRow(item.key)"
+            />
+          </div>
+        </div>
+
+        <div class="custom-catalog-dialog__add-row">
+          <el-button type="primary" plain :icon="Plus" @click="addCommodityTypeFormRow">
+            新增一行
+          </el-button>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="custom-catalog-dialog__footer">
+          <el-button type="primary" :loading="commodityTypeDialogSubmitting" @click="submitCommodityTypeDialog">保存</el-button>
+          <el-button @click="commodityTypeDialogVisible = false">取消</el-button>
         </div>
       </template>
     </el-dialog>
@@ -453,6 +511,7 @@ import {
   createStandardCatalogCustomCatalogs,
   createStandardCatalogComponentType,
   getStandardCatalogBindingDialog,
+  getStandardCatalogCommodityTypeDialog,
   getStandardCatalogCustomCatalogs,
   getStandardCatalogDirectoryDialog,
   getStandardCatalogIndustryStandards,
@@ -460,6 +519,7 @@ import {
   getStandardCatalogDisciplines,
   getStandardCatalogProductStandardCatalogs,
   saveStandardCatalogBindings,
+  saveStandardCatalogCommodityTypes,
   saveStandardCatalogDirectory,
   updateStandardCatalogIndustryStandardStatus,
   updateStandardCatalogProductStandardCatalogStatus,
@@ -482,6 +542,9 @@ const componentTypeDialogVisible = ref(false)
 const componentTypeDialogSubmitting = ref(false)
 const customCatalogDialogVisible = ref(false)
 const customCatalogDialogSubmitting = ref(false)
+const commodityTypeDialogVisible = ref(false)
+const commodityTypeDialogLoading = ref(false)
+const commodityTypeDialogSubmitting = ref(false)
 const standardCatalogDialogVisible = ref(false)
 const standardCatalogDialogLoading = ref(false)
 const standardCatalogDialogSubmitting = ref(false)
@@ -516,6 +579,8 @@ const standardCatalogSelectedChecked = ref([])
 const standardCatalogConfiguredKeyword = ref('')
 const standardCatalogSelectedKeyword = ref('')
 const customCatalogDialogComponentTypeName = ref('')
+const commodityTypeDialogStandardName = ref('')
+const commodityTypeOptions = ref([])
 const componentTypeForm = reactive({
   discipline: DEFAULT_DISCIPLINE,
   componentTypeDescription: '',
@@ -523,7 +588,9 @@ const componentTypeForm = reactive({
   connectType: ''
 })
 const customCatalogFormRows = ref([])
+const commodityTypeFormRows = ref([])
 let customCatalogRowSeed = 0
+let commodityTypeRowSeed = 0
 const showConnectTypeField = computed(() => componentTypeForm.discipline === DEFAULT_DISCIPLINE)
 const componentTypeFormRules = computed(() => {
   const rules = {
@@ -543,6 +610,7 @@ const componentTypeCatalogData = computed(() => componentTypeRows.value.filter((
 const selectedComponentTypeRow = computed(() => componentTypeRows.value.find((item) => item.id === selectedComponentTypeId.value) || null)
 const selectedComponentTypeCatalogRow = computed(() => componentTypeRows.value.find((item) => item.id === selectedComponentTypeCatalogId.value) || null)
 const selectedCustomCatalogRow = computed(() => customCatalogData.value.find((item) => item.id === selectedCustomCatalogId.value) || null)
+const selectedStandardCatalogRow = computed(() => productStandardCatalogData.value.find((item) => item.id === selectedStandardCatalogId.value) || null)
 const availableStandardLibrary = computed(() =>
   bindStandardLibrary.value.filter((item) => !bindStandardSelected.value.includes(item))
 )
@@ -604,6 +672,17 @@ syncSelectionWithRows(() => componentTypeCatalogData.value, selectedComponentTyp
 syncSelectionWithRows(() => customCatalogData.value, selectedCustomCatalogId)
 syncSelectionWithRows(() => productStandardCatalogData.value, selectedStandardCatalogId)
 
+watch(
+  productStandardCatalogData,
+  (rows) => {
+    const currentRow = rows.find((item) => item.id === selectedStandardCatalogId.value)
+    if (currentRow && !currentRow.enabled) {
+      selectedStandardCatalogId.value = ''
+    }
+  },
+  { immediate: true }
+)
+
 const isStatusUpdating = (id) => statusUpdatingIds.value.includes(id)
 const isProductStandardStatusUpdating = (id) => productStandardStatusUpdatingIds.value.includes(id)
 const isProductStandardCatalogStatusUpdating = (id) => productStandardCatalogStatusUpdatingIds.value.includes(id)
@@ -641,6 +720,12 @@ const normalizeProductStandardCatalogs = (rows = []) =>
 const createCustomCatalogFormRow = (name = '') => ({
   key: `custom-catalog-${customCatalogRowSeed++}`,
   name
+})
+
+const createCommodityTypeFormRow = (name = '') => ({
+  key: `commodity-type-${commodityTypeRowSeed++}`,
+  name,
+  existing: Boolean(name)
 })
 
 const sortStandardNames = (rows = []) => [...rows].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN'))
@@ -804,6 +889,9 @@ const handleProductStandardCatalogStatusChange = async (row, enabled) => {
       geometricIndustryStandardCl: row.geometricIndustryStandardCl,
       enabled
     })
+    if (!enabled && selectedStandardCatalogId.value === row.id) {
+      selectedStandardCatalogId.value = ''
+    }
     ElMessage.success(enabled ? '启用成功' : '禁用成功')
     await loadCustomCatalogs()
     await loadProductStandardCatalogs()
@@ -832,6 +920,10 @@ const handleCustomCatalogRowClick = (row) => {
 }
 
 const handleProductStandardCatalogRowClick = (row) => {
+  if (!row.enabled) {
+    return
+  }
+
   selectedStandardCatalogId.value = row.id
 }
 
@@ -928,7 +1020,28 @@ const handleConfigureCommodityType = () => {
     return
   }
 
-  ElMessage.info('配置CommodityType功能待后续开发')
+  commodityTypeDialogLoading.value = true
+  commodityTypeDialogStandardName.value = selectedStandardCatalogRow.value?.code || ''
+
+  getStandardCatalogCommodityTypeDialog(selectedComponentTypeCatalogId.value, {
+    componentSubType: selectedCustomCatalogRow.value.name,
+    geometricIndustryStandardCl: selectedStandardCatalogRow.value?.geometricIndustryStandardCl
+  })
+    .then((result) => {
+      commodityTypeDialogStandardName.value = result.standardName || selectedStandardCatalogRow.value?.code || ''
+      commodityTypeOptions.value = Array.isArray(result.commodityTypeOptions) ? result.commodityTypeOptions : []
+      const existingCommodityTypes = Array.isArray(result.commodityTypes) ? result.commodityTypes : []
+      commodityTypeFormRows.value = existingCommodityTypes.length
+        ? existingCommodityTypes.map((item) => createCommodityTypeFormRow(item))
+        : [createCommodityTypeFormRow()]
+      commodityTypeDialogVisible.value = true
+    })
+    .catch(() => {
+      commodityTypeDialogVisible.value = false
+    })
+    .finally(() => {
+      commodityTypeDialogLoading.value = false
+    })
 }
 
 const addCustomCatalogFormRow = () => {
@@ -941,6 +1054,18 @@ const removeCustomCatalogFormRow = (key) => {
   }
 
   customCatalogFormRows.value = customCatalogFormRows.value.filter((item) => item.key !== key)
+}
+
+const addCommodityTypeFormRow = () => {
+  commodityTypeFormRows.value = [...commodityTypeFormRows.value, createCommodityTypeFormRow()]
+}
+
+const removeCommodityTypeFormRow = (key) => {
+  if (commodityTypeFormRows.value.length === 1) {
+    return
+  }
+
+  commodityTypeFormRows.value = commodityTypeFormRows.value.filter((item) => item.key !== key)
 }
 
 const submitCustomCatalogDialog = async () => {
@@ -1094,6 +1219,40 @@ const submitStandardCatalogDialog = async () => {
     ElMessage.success('标准目录保存成功')
   } finally {
     standardCatalogDialogSubmitting.value = false
+  }
+}
+
+const submitCommodityTypeDialog = async () => {
+  if (!selectedComponentTypeCatalogId.value || !selectedCustomCatalogRow.value?.name || !selectedStandardCatalogRow.value) {
+    ElMessage.warning('当前标准不存在')
+    return
+  }
+
+  const normalizedCommodityTypes = commodityTypeFormRows.value
+    .map((item) => (item.name || '').trim())
+    .filter(Boolean)
+
+  const duplicateCommodityTypes = normalizedCommodityTypes.filter(
+    (item, index) => normalizedCommodityTypes.findIndex((current) => current === item) !== index
+  )
+  if (duplicateCommodityTypes.length) {
+    ElMessage.warning('CommodityType 存在重复，请检查')
+    return
+  }
+
+  commodityTypeDialogSubmitting.value = true
+  try {
+    await saveStandardCatalogCommodityTypes(selectedComponentTypeCatalogId.value, {
+      componentSubType: selectedCustomCatalogRow.value.name,
+      geometricIndustryStandardCl: selectedStandardCatalogRow.value.geometricIndustryStandardCl,
+      commodityTypes: normalizedCommodityTypes
+    })
+
+    commodityTypeDialogVisible.value = false
+    await loadProductStandardCatalogs()
+    ElMessage.success('CommodityType 保存成功')
+  } finally {
+    commodityTypeDialogSubmitting.value = false
   }
 }
 
@@ -1430,6 +1589,18 @@ onMounted(async () => {
   display: flex;
   justify-content: center;
   gap: 14px;
+}
+
+.commodity-type-dialog__select {
+  width: 100%;
+}
+
+.commodity-type-dialog__readonly {
+  width: 100%;
+}
+
+.commodity-type-dialog__readonly :deep(.el-input__wrapper) {
+  background: #f5f7fa;
 }
 
 .bind-standard-dialog :deep(.el-dialog__header) {

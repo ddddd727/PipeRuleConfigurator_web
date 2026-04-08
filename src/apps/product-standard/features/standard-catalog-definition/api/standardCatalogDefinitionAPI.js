@@ -92,6 +92,22 @@ export function saveStandardCatalogDirectory(componentTypeId, data) {
   })
 }
 
+export function getStandardCatalogCommodityTypeDialog(componentTypeId, params) {
+  return request({
+    url: `/StandardCatalogDefinition/component-types/${componentTypeId}/commodity-type-dialog`,
+    method: 'get',
+    params
+  })
+}
+
+export function saveStandardCatalogCommodityTypes(componentTypeId, data) {
+  return request({
+    url: `/StandardCatalogDefinition/component-types/${componentTypeId}/commodity-types`,
+    method: 'put',
+    data
+  })
+}
+
 export function updateStandardCatalogProductStandardCatalogStatus(componentTypeId, data) {
   return request({
     url: `/StandardCatalogDefinition/component-types/${componentTypeId}/product-standard-catalogs/status`,
