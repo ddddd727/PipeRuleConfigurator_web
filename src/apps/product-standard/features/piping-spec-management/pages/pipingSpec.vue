@@ -1,7 +1,7 @@
-<template>
+﻿<template>
   <div class="piping-spec-page">
     <el-container class="main-layout">
-      <el-aside width="280px" class="tree-aside">
+      <el-aside :width="isTreeCollapsed ? '0px' : '280px'" :class="['tree-aside', { collapsed: isTreeCollapsed }]">
         <div class="tree-title">
           <el-icon><Menu /></el-icon>
           <span>{{ currentTitle }}</span>
@@ -48,48 +48,43 @@
           <el-card shadow="never" class="info-card">
             <template #header>
               <div class="card-header">
-                <div>
-                  <span class="title">部件类型基础</span>
-                  <span class="subtitle">筛选条件默认展示当前节点首条基础数据</span>
+                <div class="header-title-group">
+                  <div class="collapse-trigger" @click="toggleTreePanel">
+                    <el-icon :size="16">
+                      <component :is="isTreeCollapsed ? Expand : Fold" />
+                    </el-icon>
+                  </div>
+                  <div class="header-main">
+                    <span class="title">部件类型基础</span>
+                    <span class="subtitle">筛选条件默认展示当前节点首条基础数据</span>
+                  </div>
                 </div>
                 <div class="header-actions">
                   <el-button type="primary" plain :icon="Upload">导入</el-button>
                   <el-button type="primary" plain :icon="Download">导出</el-button>
-                  <el-button type="primary" :icon="Plus" @click="openSaveAsDialog">另存为</el-button>
+                  <el-button type="primary" :icon="Plus" @click="openSaveAsDialog">新增</el-button>
                 </div>
               </div>
             </template>
 
             <div class="info-form-container">
-              <el-form :model="filterForm" label-width="150px" class="info-form">
+              <el-form :model="filterForm" label-width="180px" class="info-form">
                 <el-row :gutter="20">
-                  <el-col :span="8">
-                    <el-form-item label="IndustryCommodityCode">
-                      <el-select v-model="filterForm.IndustryCommodityCode" style="width: 100%">
-                        <el-option v-for="opt in industryCommodityCodeOptions" :key="opt" :label="opt" :value="opt" />
-                      </el-select>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="8" v-if="hasScheduleThicknessFilter">
-                    <el-form-item label="ScheduleThickness">
-                      <el-select v-model="filterForm.scheduleThickness" style="width: 100%">
-                        <el-option v-for="opt in scheduleThicknessOptions" :key="opt" :label="opt" :value="opt" />
-                      </el-select>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="8">
-                    <el-form-item label="MaterialGrade">
-                      <el-select v-model="filterForm.materialGrade" style="width: 100%">
-                        <el-option v-for="opt in materialGradeOptions" :key="opt" :label="opt" :value="opt" />
-                      </el-select>
-                    </el-form-item>
-                  </el-col>
-                </el-row>
-
-                <el-row :gutter="20">
-                  <el-col v-for="field in detailFields" :key="field.key" :span="8">
+                  <el-col v-for="field in baseFormFields" :key="field.key" :span="8">
                     <el-form-item :label="field.label">
-                      <el-input :model-value="currentBaseRow[field.key] ?? ''" readonly />
+                      <el-select
+                        v-if="field.control === 'select'"
+                        v-model="filterForm[field.modelKey]"
+                        class="base-field-control"
+                      >
+                        <el-option
+                          v-for="opt in field.options"
+                          :key="opt"
+                          :label="opt"
+                          :value="opt"
+                        />
+                      </el-select>
+                      <el-input v-else class="base-field-control" :model-value="currentBaseRow[field.key] ?? ''" readonly />
                     </el-form-item>
                   </el-col>
                 </el-row>
@@ -97,63 +92,66 @@
             </div>
           </el-card>
 
-          <div class="tabs-container">
-            <el-tabs v-model="activeTab" class="data-tabs" type="border-card">
-              <el-tab-pane label="公用端面数据" name="common">
-                <div class="table-wrapper" v-loading="commonLoading" element-loading-text="加载中...">
-                  <el-table
-                    ref="commonTableRef"
-                    :data="commonData"
-                    border
-                    height="100%"
-                    :row-class-name="tableRowClassName"
-                    @selection-change="handleCommonSelectionChange"
-                  >
-                    <el-table-column type="selection" width="55" :selectable="checkSelectable" />
-                    <el-table-column
-                      v-for="col in visibleCommonColumns"
-                      :key="col.prop"
-                      :prop="col.prop"
-                      :label="col.label"
-                      :min-width="col.minWidth || 140"
-                      show-overflow-tooltip
-                    />
-                  </el-table>
+          <div class="tables-panel">
+            <section class="data-section">
+              <div class="data-section-header">
+                <div class="data-section-title">公用端面数据</div>
+                <div class="data-section-actions">
+                  <el-button type="primary" :icon="Plus" @click="handleAddRow('common')">新增</el-button>
+                  <el-button type="warning" :icon="Edit">修改</el-button>
                 </div>
-              </el-tab-pane>
-              <el-tab-pane v-if="showAppearanceGroup" label="外形重量重心描述" name="appearance">
-                <div class="table-wrapper" v-loading="appearanceLoading" element-loading-text="加载中...">
-                  <el-table
-                    ref="appearanceTableRef"
-                    :data="appearanceData"
-                    border
-                    height="100%"
-                    :row-class-name="tableRowClassName"
-                    @selection-change="handleAppearanceSelectionChange"
-                  >
-                    <el-table-column type="selection" width="55" :selectable="checkSelectable" />
-                    <el-table-column
-                      v-for="col in visibleAppearanceColumns"
-                      :key="col.prop"
-                      :prop="col.prop"
-                      :label="col.label"
-                      :min-width="col.minWidth || 140"
-                      show-overflow-tooltip
-                    />
-                  </el-table>
+              </div>
+              <div class="table-wrapper" v-loading="commonLoading" element-loading-text="加载中...">
+                <el-table
+                  ref="commonTableRef"
+                  :data="commonData"
+                  border
+                  height="100%"
+                  :row-class-name="tableRowClassName"
+                  @selection-change="handleCommonSelectionChange"
+                >
+                  <el-table-column type="selection" width="55" :selectable="checkSelectable" />
+                  <el-table-column
+                    v-for="col in visibleCommonColumns"
+                    :key="col.prop"
+                    :prop="col.prop"
+                    :label="col.label"
+                    :min-width="col.minWidth || 140"
+                    show-overflow-tooltip
+                  />
+                </el-table>
+              </div>
+            </section>
+            <section v-if="showAppearanceGroup" class="data-section">
+              <div class="data-section-header">
+                <div class="data-section-title">外形重量重心描述</div>
+                <div class="data-section-actions">
+                  <el-button type="primary" :icon="Plus" @click="handleAddRow('appearance')">新增</el-button>
+                  <el-button type="warning" :icon="Edit">修改</el-button>
+                  <el-button type="danger" :icon="CircleClose" @click="handleDisableRows('appearance')">禁用</el-button>
                 </div>
-              </el-tab-pane>
-            </el-tabs>
-
-            <div class="tab-header-actions" v-if="activeTab === 'common'">
-              <el-button type="primary" :icon="Plus" @click="handleAddRow">新增</el-button>
-              <el-button type="warning" :icon="Edit">修改</el-button>
-            </div>
-            <div class="tab-header-actions" v-else-if="activeTab === 'appearance'">
-              <el-button type="primary" :icon="Plus" @click="handleAddRow">新增</el-button>
-              <el-button type="danger" :icon="CircleClose" @click="handleDisableRows">禁用</el-button>
-              <el-button type="warning" :icon="Edit">修改</el-button>
-            </div>
+              </div>
+              <div class="table-wrapper" v-loading="appearanceLoading" element-loading-text="加载中...">
+                <el-table
+                  ref="appearanceTableRef"
+                  :data="appearanceData"
+                  border
+                  height="100%"
+                  :row-class-name="tableRowClassName"
+                  @selection-change="handleAppearanceSelectionChange"
+                >
+                  <el-table-column type="selection" width="55" :selectable="checkSelectable" />
+                  <el-table-column
+                    v-for="col in visibleAppearanceColumns"
+                    :key="col.prop"
+                    :prop="col.prop"
+                    :label="col.label"
+                    :min-width="col.minWidth || 140"
+                    show-overflow-tooltip
+                  />
+                </el-table>
+              </div>
+            </section>
           </div>
         </div>
 
@@ -167,7 +165,7 @@
       <el-form :model="saveAsForm" label-width="150px">
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="制造标准">
+            <el-form-item label="标准">
               <el-select v-model="saveAsForm.manufacturingStd" style="width: 100%">
                 <el-option v-for="opt in baseOptions.manufacturingStdOptions" :key="opt" :label="opt" :value="opt" />
               </el-select>
@@ -218,6 +216,8 @@ import {
   Document,
   Download,
   Edit,
+  Expand,
+  Fold,
   Folder,
   Menu,
   Plus,
@@ -254,7 +254,7 @@ const commonData = ref([])
 const appearanceData = ref([])
 const commonSelection = ref([])
 const appearanceSelection = ref([])
-const activeTab = ref('common')
+const isTreeCollapsed = ref(false)
 
 const filterForm = ref({
   IndustryCommodityCode: '/',
@@ -282,6 +282,10 @@ const defaultProps = {
   label: 'label'
 }
 
+const toggleTreePanel = () => {
+  isTreeCollapsed.value = !isTreeCollapsed.value
+}
+
 const detailFields = computed(() => {
   const hidden = new Set(['status'])
   const row = currentBaseRow.value
@@ -289,6 +293,38 @@ const detailFields = computed(() => {
     .filter((key) => !hidden.has(key) && !['IndustryCommodityCode', 'ScheduleThickness', 'MaterialGrade'].includes(key))
     .slice(0, 9)
     .map((key) => ({ key, label: key }))
+})
+
+const baseFormFields = computed(() => {
+  const fields = [
+    {
+      key: 'IndustryCommodityCode',
+      label: 'IndustryCommodityCode',
+      control: 'select',
+      modelKey: 'IndustryCommodityCode',
+      options: industryCommodityCodeOptions.value
+    }
+  ]
+
+  if (hasScheduleThicknessFilter.value) {
+    fields.push({
+      key: 'ScheduleThickness',
+      label: 'ScheduleThickness',
+      control: 'select',
+      modelKey: 'scheduleThickness',
+      options: scheduleThicknessOptions.value
+    })
+  }
+
+  fields.push({
+    key: 'MaterialGrade',
+    label: 'MaterialGrade',
+    control: 'select',
+    modelKey: 'materialGrade',
+    options: materialGradeOptions.value
+  })
+
+  return [...fields, ...detailFields.value.map((field) => ({ ...field, control: 'input' }))]
 })
 
 const currentBaseRow = computed(() => {
@@ -374,7 +410,7 @@ const loadTreeData = async () => {
     const res = await getPipingSpecTree()
     treeData.value = transformPathsToTree(res || [])
   } catch (error) {
-    console.error('加载管系专业树失败:', error)
+    console.error('加载管系专业目录树失败:', error)
     treeData.value = []
   } finally {
     treeLoading.value = false
@@ -458,7 +494,6 @@ const handleNodeClick = async (data) => {
   if (data.children?.length) return
   selectedNode.value = { label: data.label, fullPath: data.fullPath }
   selectedCategory.value = String(data.raw?.category || '')
-  activeTab.value = 'common'
   await loadBaseData()
   await loadCommonData()
   await loadAppearanceData()
@@ -490,29 +525,28 @@ const handleSaveAs = async () => {
         material: saveAsForm.value.material
       }
     })
-    saveAsDialogVisible.value = false
-    ElMessage.success('Saved successfully')
+    ElMessage.success('保存成功')
     await loadTreeData()
   } catch (error) {
     console.error('另存为失败:', error)
   }
 }
-
-const handleAddRow = () => {
-  ElMessage.info('当前先保留为展示入口，后续可以继续补新增表单')
+const handleAddRow = (section) => {
+  const sectionName = section === 'appearance' ? '外形重量重心描述' : '公用端面数据'
+  ElMessage.info(`${sectionName} 的新增功能先保留为展示入口，后续可继续补充表单`)
 }
 
-const handleDisableRows = async () => {
-  const rows = activeTab.value === 'appearance' ? appearanceSelection.value : commonSelection.value
+const handleDisableRows = async (section = 'appearance') => {
+  const rows = section === 'appearance' ? appearanceSelection.value : commonSelection.value
   if (!rows.length) {
-    ElMessage.warning('Please select at least one row')
+    ElMessage.warning('请至少选择一行数据')
     return
   }
   await disablePipingRows(rows)
   rows.forEach((row) => {
     row.status = 0
   })
-  ElMessage.success('Disabled successfully')
+  ElMessage.success('禁用成功')
 }
 
 const handleCommonSelectionChange = (rows) => {
@@ -565,6 +599,12 @@ watch(
   border-right: 1px solid #ebeef5;
   background: #fff;
   min-height: 0;
+  overflow: hidden;
+  transition: width 0.2s ease, border-color 0.2s ease;
+}
+
+.tree-aside.collapsed {
+  border-right-color: transparent;
 }
 
 .tree-title {
@@ -630,32 +670,121 @@ watch(
   background: #f7f8fa;
   min-height: 0;
   overflow: hidden;
+  padding: 10px;
 }
 
 .detail-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   height: 100%;
+  min-height: 0;
 }
 
-.info-card,
-.tabs-container,
-.table-wrapper {
-  height: 100%;
+.info-card {
+  flex: 0 0 auto;
 }
 
-.card-header {
+.info-card :deep(.el-card__header) {
+  padding: 12px 14px;
+}
+
+.info-card :deep(.el-card__body) {
+  padding: 10px 14px 12px;
+}
+
+.info-form-container {
+  padding-top: 2px;
+}
+
+.base-field-control {
+  width: 90%;
+}
+
+.tables-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.data-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 10px 8px;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.data-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-bottom: 8px;
+}
+
+.data-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.data-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-wrapper {
+  flex: 1;
+  min-height: 0;
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header-title-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.header-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.collapse-trigger {
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: #606266;
+}
+
+.collapse-trigger:hover {
+  background-color: rgba(64, 158, 255, 0.12);
+  color: #409eff;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .title {
@@ -667,12 +796,6 @@ watch(
 .subtitle {
   color: #909399;
   font-size: 13px;
-}
-
-.tab-header-actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 8px;
 }
 
 .empty-state {
