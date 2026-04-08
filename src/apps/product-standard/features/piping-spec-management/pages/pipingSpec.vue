@@ -15,6 +15,10 @@
               clearable
               :prefix-icon="Search"
             />
+            <div class="tree-actions">
+              <el-button text class="tree-action-button">+</el-button>
+              <el-button text class="tree-action-button" :icon="CopyDocument" />
+            </div>
           </div>
 
           <div class="tree-wrapper">
@@ -210,6 +214,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   CircleClose,
+  CopyDocument,
   Document,
   Download,
   Edit,
@@ -581,6 +586,27 @@ watch(
 .tree-header {
   padding: 12px 16px;
   border-bottom: 1px solid #f0f2f5;
+}
+
+.tree-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 2px;
+  margin-bottom: -8px;
+}
+
+.tree-action-button {
+  padding: 0;
+  min-height: auto;
+  min-width: auto;
+  font-size: 18px;
+  line-height: 1;
+  color: #606266;
+}
+
+.tree-action-button:hover {
+  color: #409eff;
 }
 
 .tree-wrapper {
