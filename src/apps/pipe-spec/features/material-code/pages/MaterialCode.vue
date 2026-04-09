@@ -1,0 +1,1454 @@
+<script setup>
+import { ref, watch, onMounted, nextTick, computed } from 'vue'
+import axios from 'axios'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Delete, Check, Search, CopyDocument, CaretTop, CaretBottom } from '@element-plus/icons-vue'
+
+// --- Data & State ---
+
+// UI State
+const showRulePanel = ref(true)
+
+// 1. Ship Selection
+const allShipInfos = ref([]) // 存储所有船型船号信息
+const shipTypes = ref([])
+const selectedShipType = ref('')
+const shipNumbers = ref([]) // 动态加载
+const selectedShipNumber = ref('')
+const sourceShipType = ref('')
+const targetShipType = ref('')
+const sourceShipNumber = ref('')
+const targetShipNumber = ref('')
+const sourceShipNumbers = ref([])
+const targetShipNumbers = ref([])
+
+// Save Dialog State
+const saveDialogVisible = ref(false)
+const targetSaveShipType = ref('')
+const targetSaveShipNumber = ref('')
+const targetSaveShipNumbers = ref([])
+
+// 监听保存弹窗中的船型变化
+watch(targetSaveShipType, (newVal) => {
+  if (!newVal) {
+    targetSaveShipNumbers.value = []
+    targetSaveShipNumber.value = ''
+    return
+  }
+  const filtered = allShipInfos.value.filter(item => item.shipType === newVal)
+  targetSaveShipNumbers.value = filtered.map(item => ({ label: item.shipNumber, value: item.shipNumber }))
+  targetSaveShipNumber.value = ''
+})
+
+// 2. Rules Selection (Mock下拉选项，实际可能也是接口)
+const mainMaterialRules = ref([])
+const selectedMainMaterialRule = ref('')
+
+const flangeRules = ref([])
+const selectedFlangeRule = ref('')
+
+const pipeLimitRules = ref([])
+const selectedPipeLimitRule = ref('')
+
+// 3. Rule Tables Data (从后端加载)
+const mainMaterialData = ref([])
+const flangeData = ref([])
+const pipeLimitData = ref([])
+
+// --- API Methods ---
+
+// 获取规则下拉列表（pipe-limit 由后端提供 RuleName）
+const fetchRuleOptions = async (type) => {
+  try {
+    if (type === 'pipe-limit') {
+      const res = await axios.get(`/api/pmc/rules/pipe-limit`)
+      const names = Array.isArray(res.data?.data) ? res.data.data : []
+      pipeLimitRules.value = names.map(n => ({ label: n, value: n }))
+      return
+    }
+    if (type === 'main-material') {
+      const res = await axios.get(`/api/pmc/rules/main-material`)
+      const names = Array.isArray(res.data?.data) ? res.data.data : []
+      mainMaterialRules.value = names.map(n => ({ label: n, value: n }))
+      return
+    }
+    if (type === 'flange') {
+      const res = await axios.get(`/api/pmc/rules/flange`)
+      const names = Array.isArray(res.data?.data) ? res.data.data : []
+      flangeRules.value = names.map(n => ({ label: n, value: n }))
+      return
+    }
+    const res = await axios.get(`/api/pmc/rules/list?type=${type}`)
+    if (res.data.code === 200) {
+      if (type === 'main-material') {
+        mainMaterialRules.value = res.data.data
+      } else if (type === 'flange') {
+        flangeRules.value = res.data.data
+      }
+    }
+  } catch (error) {
+    console.error(`Fetch rule options for ${type} failed:`, error)
+  }
+}
+
+// 页面加载时初始化
+onMounted(() => {
+  fetchAllShipInfos()
+  fetchRuleOptions('main-material')
+  fetchRuleOptions('flange')
+  fetchRuleOptions('pipe-limit')
+})
+
+// 获取所有船型船号信息
+const fetchAllShipInfos = async () => {
+  try {
+    const res = await axios.get('/api/pmc/pmccode/ShipInfos')
+    if (res.data.code === 200) {
+      allShipInfos.value = res.data.data || []
+      // 提取所有不重复的船型
+      const types = new Set(allShipInfos.value.map(item => item.shipType))
+      shipTypes.value = Array.from(types).map(t => ({ label: t, value: t }))
+    }
+  } catch (error) {
+    console.error('Fetch ship infos failed:', error)
+    ElMessage.error('获取船型船号信息失败')
+  }
+}
+
+// 获取船号 (本地过滤)
+const fetchShipNumbers = (type) => {
+  if (!type) {
+    shipNumbers.value = []
+    selectedShipNumber.value = ''
+    return
+  }
+  const filtered = allShipInfos.value.filter(item => item.shipType === type)
+  shipNumbers.value = filtered.map(item => ({ label: item.shipNumber, value: item.shipNumber }))
+  selectedShipNumber.value = '' // 重置选中
+}
+
+// 获取复制规则弹窗用的船号 (本地过滤)
+const fetchCopyShipNumbers = (type, target) => {
+  if (!type) {
+    if (target === 'source') {
+      sourceShipNumbers.value = []
+      sourceShipNumber.value = ''
+    } else if (target === 'target') {
+      targetShipNumbers.value = []
+      targetShipNumber.value = ''
+    }
+    return
+  }
+  
+  const filtered = allShipInfos.value.filter(item => item.shipType === type)
+  const numbers = filtered.map(item => ({ label: item.shipNumber, value: item.shipNumber }))
+
+  if (target === 'source') {
+    sourceShipNumbers.value = numbers
+    sourceShipNumber.value = ''
+  } else if (target === 'target') {
+    targetShipNumbers.value = numbers
+    targetShipNumber.value = ''
+  }
+}
+
+// 获取主材料规则内容
+const fetchMainMaterialData = async (ruleCode) => {
+  console.log('Fetching Main Material Rule:', ruleCode)
+  if (!ruleCode) {
+    mainMaterialData.value = []
+    return
+  }
+  try {
+    const res = await axios.get(`/api/pmc/rules/main-material/${encodeURIComponent(ruleCode)}`)
+    console.log('Main Material Response:', res.data)
+    const list = res.data?.data || []
+    
+    // Map backend DTO to frontend table fields
+    mainMaterialData.value = list.map((d, index) => ({
+      id: index + 1,
+      code: d.materialsCategoryCode,      // MaterialsCategoryCode -> code
+      std: d.pipingStandardCode,          // PipingStandardCode -> std
+      grade: d.materialsGradeCode,        // MaterialsGradeCode -> grade
+      thickness: d.scheduleThicknessCode  // ScheduleThicknessCode -> thickness
+    }))
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('获取主材料规则失败')
+  }
+}
+
+// 获取法兰规则内容
+const fetchFlangeData = async (ruleCode) => {
+  console.log('Fetching Flange Rule:', ruleCode)
+  if (!ruleCode) {
+    flangeData.value = []
+    return
+  }
+  try {
+    const res = await axios.get(`/api/pmc/rules/flange/${encodeURIComponent(ruleCode)}`)
+    console.log('Flange Response:', res.data)
+    const list = res.data?.data || []
+    
+    // Map backend DTO to frontend table fields
+    flangeData.value = list.map((d, index) => ({
+      id: index + 1,
+      std: d.flangeStandardCode,      // FlangeStandardCode -> std
+      press: d.pressureRatingCode     // PressureRatingCode -> press
+    }))
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('获取法兰规则失败')
+  }
+}
+
+// 获取管材限定规则内容（后端 VW_S3D_Rule_AB2B3C2_WithCodes）
+const fetchPipeLimitData = async (ruleCode) => {
+  console.log('Fetching Pipe Limit Rule (AB2B3C2):', ruleCode)
+  if (!ruleCode) {
+    pipeLimitData.value = []
+    return
+  }
+  try {
+    const res = await axios.get(`/api/pmc/rules/pipe-limit/${encodeURIComponent(ruleCode)}`)
+    const list = res.data?.data || []
+    
+    // Process list: map fields and auto-generate ID (1, 2, 3...)
+    pipeLimitData.value = list.map((d, index) => ({
+      id: index + 1, // Auto-increment ID on frontend
+      pipingClassCode: d.pipingClassCode,
+      pipingStandardCode: d.pipingStandardCode,
+      materialsGradeCode: d.materialsGradeCode,
+      pressureRatingCode: d.pressureRatingCode
+    }))
+  } catch (error) {
+    console.error('Fetch AB2B3C2 failed:', error)
+    ElMessage.error('获取管材限定规则失败')
+  }
+}
+
+// --- Watchers ---
+
+// 监听船型变化 -> 加载船号
+watch(selectedShipType, (newVal) => {
+  fetchShipNumbers(newVal)
+})
+
+// 监听复制规则弹窗中的船型变化 -> 各自加载对应船号
+watch(sourceShipType, (newVal) => {
+  fetchCopyShipNumbers(newVal, 'source')
+})
+
+watch(targetShipType, (newVal) => {
+  fetchCopyShipNumbers(newVal, 'target')
+})
+
+// 监听规则下拉变化 -> 加载对应表格数据
+watch(selectedMainMaterialRule, (newVal) => {
+  fetchMainMaterialData(newVal)
+})
+
+watch(selectedFlangeRule, (newVal) => {
+  fetchFlangeData(newVal)
+})
+
+watch(selectedPipeLimitRule, (newVal) => {
+  fetchPipeLimitData(newVal)
+})
+
+
+// Bottom Table Data
+// const resultData = ref([
+//   { id: 1, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '6bar', d: 'SCH40', pmc: '1C1B1AD' },
+//   { id: 2, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '6bar', d: 'SCH80', pmc: '1C1B1AE' },
+//   { id: 3, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '6bar', d: 'SCH160', pmc: '1C1B1AJ' },
+//   { id: 4, a: 'I', b1: '碳钢管', b2: 'GB/T 8163', b3: '20#', c1: 'GB2506', c2: '10bar', d: 'SCH40', pmc: '1C1B1BD' },
+// ])
+const resultData = ref([])
+
+const selectedRows = ref([])
+
+// Edit/Add Dialog State
+const editDialogVisible = ref(false)
+const dialogTitle = ref('')
+const currentEditingId = ref(null) // null means adding new, otherwise editing existing ID
+const formData = ref({
+  a: '',
+  b1: '',
+  b2: '',
+  b3: '',
+  c1: '',
+  c2: '',
+  d: ''
+})
+
+// Mock Dropdown Options (to be replaced by API)
+const optionsA = ref([])
+const optionsB1 = ref([])
+const optionsB2 = ref([])
+const optionsB3 = ref([])
+const optionsC1 = ref([])
+const optionsC2 = ref([])
+const optionsD = ref([])
+
+// 动态获取下拉选项
+const fetchAddOptions = async (type, parentDesc = null) => {
+  try {
+    const res = await axios.get('/api/pmc/pmccode/add', {
+      params: { type, parentDesc }
+    })
+    if (res.data?.code === 200) {
+      return res.data.data || []
+    }
+  } catch (error) {
+    console.error(`Fetch options for ${type} failed:`, error)
+  }
+  return []
+}
+
+// 监听 B1 变化 -> 加载 B2
+watch(() => formData.value.b1, async (newVal) => {
+  formData.value.b2 = '' // Reset B2
+  if (newVal) {
+    optionsB2.value = await fetchAddOptions('b2', newVal)
+  } else {
+    optionsB2.value = []
+  }
+})
+
+// Add Button Click -> Open Dialog
+const handleAdd = async () => {
+  dialogTitle.value = '新增 PMC 数据'
+  currentEditingId.value = null
+  formData.value = { a: '', b1: '', b2: '', b3: '', c1: '', c2: '', d: '' }
+  
+  // Load initial options
+  optionsA.value = await fetchAddOptions('a')
+  optionsB1.value = await fetchAddOptions('b1')
+  optionsB3.value = await fetchAddOptions('b3')
+  optionsC1.value = await fetchAddOptions('c1')
+  optionsC2.value = await fetchAddOptions('c2')
+  optionsD.value = await fetchAddOptions('d')
+  
+  editDialogVisible.value = true
+}
+
+// Save Dialog Data
+const saveDialogData = () => {
+  // 查找各个字段对应的 Code
+  const getCode = (val, options) => {
+    const found = options.find(o => o.label === val)
+    return found ? found.value : '' // value is Code
+  }
+
+  const { a, b1, b2, b3, c1, c2, d } = formData.value
+
+  const codeA = getCode(a, optionsA.value)
+  const codeB1 = getCode(b1, optionsB1.value)
+  const codeB2 = getCode(b2, optionsB2.value)
+  const codeB3 = getCode(b3, optionsB3.value)
+  const codeC1 = getCode(c1, optionsC1.value)
+  const codeC2 = getCode(c2, optionsC2.value)
+  const codeD = getCode(d, optionsD.value)
+
+  // 校验所有选项是否都有对应的 Code
+  if (!codeA || !codeB1 || !codeB2 || !codeB3 || !codeC1 || !codeC2 || !codeD) {
+    ElMessage.error('请完整选择所有必填项，并确保选项有效')
+    return
+  }
+
+  // Generate PMC Code
+  const pmcCode = `${codeA}${codeB1}${codeB2}${codeB3}${codeC1}${codeC2}${codeD}`
+
+  // Check Duplicate
+  const isDuplicate = resultData.value.some(item => {
+    // 如果是编辑模式，跳过当前行
+    if (currentEditingId.value !== null && item.id === currentEditingId.value) {
+      return false
+    }
+    return item.pmc === pmcCode
+  })
+
+  if (isDuplicate) {
+    ElMessage.error(`当前生成的 PMC 编码 ${pmcCode} 已存在！`)
+    return
+  }
+
+  if (currentEditingId.value === null) {
+    // Add New
+    const newId = resultData.value.length > 0 ? Math.max(...resultData.value.map(item => item.id)) + 1 : 1
+    const newRow = {
+      id: newId,
+      uniqueKey: `${selectedShipType.value}_${selectedShipNumber.value}_new_${newId}`,
+      ...formData.value, // Stores descriptions
+      pmc: pmcCode,
+      isByRule: true
+    }
+    resultData.value.push(newRow)
+
+    // Scroll to new row and select it
+    nextTick(() => {
+      // Find row by specific ID class
+      const rowEl = resultTableRef.value?.$el.querySelector(`.el-table__body .row-id-${newId}`)
+      if (rowEl) {
+        rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        resultTableRef.value.toggleRowSelection(newRow, true)
+      } else {
+        // Fallback: just toggle selection if DOM element not found immediately
+        resultTableRef.value.toggleRowSelection(newRow, true)
+      }
+    })
+  } else {
+    // Edit Existing
+    const index = resultData.value.findIndex(item => item.id === currentEditingId.value)
+    if (index !== -1) {
+      resultData.value[index] = {
+        ...resultData.value[index],
+        ...formData.value,
+        pmc: pmcCode
+      }
+    }
+  }
+  
+  editDialogVisible.value = false
+}
+
+// 核心保存逻辑
+const performSave = async (shipType, shipNo) => {
+  const payload = {
+    shipType: shipType,
+    shipNo: shipNo,
+    items: selectedRows.value.map(row => ({
+      pmcCode: row.pmc,
+      pipingClassName: row.a,
+      materialsCategoryName: row.b1,
+      pipingStandardName: row.b2,
+      materialsGradeName: row.b3,
+      flangeStandardName: row.c1,
+      pressureRatingName: row.c2,
+      scheduleThicknessName: row.d,
+      isByRule: !!row.isByRule
+    }))
+  }
+
+  try {
+    const res = await axios.post('/api/pmc/pmccode/save', payload)
+    if (res?.data?.code === 200) {
+      ElMessage.success(res.data.message || '保存成功')
+      // 如果保存的是当前选中的船型船号，则刷新数据
+      // if (shipType === selectedShipType.value && shipNo === selectedShipNumber.value) {
+      //   refreshData()
+      // }
+    } else {
+      ElMessage.error(res?.data?.message || '保存失败')
+    }
+  } catch (error) {
+    console.error('保存PMC编码失败', error)
+    ElMessage.error('保存PMC编码失败')
+  }
+}
+
+// 保存PMC编码到后端（入口）
+const saveToApi = async () => {
+  // 如果已经选择了船型船号，直接保存
+  if (selectedShipType.value && selectedShipNumber.value) {
+    if (selectedRows.value.length === 0) {
+    ElMessage.warning('请勾选需要保存的新增数据')
+    return
+  }
+  await performSave(selectedShipType.value, selectedShipNumber.value)
+  // 清除勾选
+  if (resultTableRef.value) {
+    resultTableRef.value.clearSelection()
+  }
+} else {
+    // 否则弹出窗口选择
+    targetSaveShipType.value = ''
+    targetSaveShipNumber.value = ''
+    saveDialogVisible.value = true
+  }
+}
+
+// 弹窗确认保存
+const confirmSaveFromDialog = async () => {
+  if (!targetSaveShipType.value || !targetSaveShipNumber.value) {
+    ElMessage.error('请选择船型船号')
+    return
+  }
+  
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请勾选需要保存的新增数据')
+    return
+  }
+  
+  await performSave(targetSaveShipType.value, targetSaveShipNumber.value)
+  // 清除勾选
+  if (resultTableRef.value) {
+    resultTableRef.value.clearSelection()
+  }
+  saveDialogVisible.value = false
+}
+
+// Refresh Data
+const refreshData = async () => {
+  if (!selectedShipType.value || !selectedShipNumber.value) {
+    ElMessage.error('请填写船型船号')
+    return
+  }
+
+  try {
+    const res = await axios.get('/api/pmc/pmccode/query', {
+      params: {
+        shipType: selectedShipType.value,
+        shipNo: selectedShipNumber.value
+      }
+    })
+
+    if (res.data?.code === 200) {
+      const list = res.data.data || []
+      resultData.value = list.map((item, index) => ({
+        id: index + 1,
+        uniqueKey: `${selectedShipType.value}_${selectedShipNumber.value}_${index + 1}`,
+        pmc: item.pmcCode,
+        a: item.pipingClassName,
+        b1: item.materialsCategoryName,
+        b2: item.pipingStandardName,
+        b3: item.materialsGradeName,
+        c1: item.flangeStandardName,
+        c2: item.pressureRatingName,
+        d: item.scheduleThicknessName,
+        isByRule: item.isByRule
+      }))
+      // 清除勾选
+      if (resultTableRef.value) {
+        resultTableRef.value.clearSelection()
+      }
+      ElMessage.success(`查询成功，共 ${list.length} 条数据`)
+    } else {
+      ElMessage.error(res.data?.message || '刷新失败')
+    }
+  } catch (error) {
+    console.error('Refresh failed:', error)
+    ElMessage.error('查询失败')
+  }
+}
+const cancelDialog = () => {
+  editDialogVisible.value = false
+}
+
+// Delete API Placeholder
+  const deleteFromApi = async (pmcCodes) => {
+    console.log('Deleting PMCs from API:', pmcCodes)
+    if (!selectedShipType.value || !selectedShipNumber.value) {
+      ElMessage.error('请选择船型船号')
+      return
+    }
+
+    try {
+      const res = await axios.post('/api/pmc/pmccode/delete', {
+        shipType: selectedShipType.value,
+        shipNo: selectedShipNumber.value,
+        pmcCodes: pmcCodes
+      })
+
+      if (res.data?.code === 200) {
+        ElMessage.success(res.data.message || '删除成功')
+        // 刷新数据以同步状态
+        // refreshData()
+        
+        // 前端移除已删除的行
+        resultData.value = resultData.value.filter(item => !pmcCodes.includes(item.pmc))
+        selectedRows.value = []
+      } else {
+        ElMessage.error(res.data?.message || '删除失败')
+      }
+    } catch (error) {
+      console.error('Delete failed:', error)
+      ElMessage.error('删除失败')
+    }
+  }
+
+  // Delete Button Click
+  const handleDelete = () => {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请先选择要删除的数据')
+    return
+  }
+  // Show confirmation dialog
+  ElMessageBox.confirm(
+    `确定要删除选中的 ${selectedRows.value.length} 行数据吗？此操作将直接删除数据库中的记录。`,
+    '删除警告',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(() => {
+    const selectedPmcCodes = selectedRows.value.map(row => row.pmc)
+    // Call API
+    deleteFromApi(selectedPmcCodes)
+  }).catch(() => {
+    // Cancelled
+  })
+}
+
+// 筛选方法
+const filterHandler = (value, row, column) => {
+  const property = column['property']
+  return row[property] === value
+}
+
+// 跟踪当前过滤后的数据
+const filteredData = ref([])
+
+// 初始化/重置时，filteredData 默认为所有数据
+watch(resultData, (newVal) => {
+  filteredData.value = newVal
+}, { immediate: true })
+
+// 监听表格筛选变化
+const handleFilterChange = (filters) => {
+  // filters 是一个对象，key 是 columnKey (如果未设置则为 prop?), value 是选中的值数组
+  // Element Plus 的 filter-change 事件返回的是 { prop: [values] }
+
+  // 最佳实践：使用 store 或 ref 存储各列的筛选值，然后 computed 计算 filteredData
+  // 但为了适配 Element Plus 内置筛选，我们需要一点 hack 或者改用自定义表头筛选。
+  // 鉴于不想重写表头，我们尝试监听 filter-change 并结合 tableRef 获取筛选后的数据。
+  
+  // 实际上，el-table 并没有直接暴露 "filteredData"。
+  // 我们可以维护一个 activeFilters 对象
+  Object.entries(filters).forEach(([key, values]) => {
+    // 这里的 key 是 column-key， values 是选中的筛选值数组
+    // 如果 values 长度为 0，说明清除了该列筛选
+    if (values && values.length > 0) {
+      activeFilters.value[key] = values
+    } else {
+      delete activeFilters.value[key]
+    }
+  })
+  
+  // 每次筛选变化，我们需要强制触发 activeFilters 的更新，以便 computed 重新计算
+  activeFilters.value = { ...activeFilters.value }
+  
+  updateFilteredData()
+}
+
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
+import { ElConfigProvider } from 'element-plus'
+
+// 将整个内容包裹在 ConfigProvider 中？或者在 main.js 中配置。
+// 既然只能改这个文件，我们在 template 最外层包裹 ElConfigProvider。
+
+
+const activeFilters = ref({})
+
+const updateFilteredData = () => {
+  if (Object.keys(activeFilters.value).length === 0) {
+    filteredData.value = resultData.value
+    return
+  }
+  
+  filteredData.value = resultData.value.filter(row => {
+    return Object.entries(activeFilters.value).every(([prop, values]) => {
+      // 只要行数据的该属性值在筛选选中值列表中即可
+      return values.includes(row[prop])
+    })
+  })
+}
+
+// 获取某一列的所有唯一值作为筛选选项（Computed）
+// 修改逻辑：基于 filteredData 生成选项，但要排除“当前列”的筛选影响？
+// Excel 逻辑：
+// 1. 如果当前列没有筛选，显示所有（基于其他列筛选后的结果）。
+// 2. 如果当前列有筛选，显示的选项应该是“基于其他列筛选后的结果”中的该列所有可能值，
+//    这样用户可以勾选更多或者取消勾选。
+//    但如果直接用 filteredData，那么当前列的选项就只剩下已选的了，用户没法加选其他的。
+//    所以：
+//    对于列 A 的筛选菜单，数据来源应该是：resultData 经过“除了 A 以外的所有列筛选条件”过滤后的数据。
+const filterOptions = computed(() => {
+  const getOptions = (targetProp) => {
+    if (!resultData.value || resultData.value.length === 0) return []
+    
+    // 构造临时过滤器：排除当前列的筛选条件
+    const otherFilters = { ...activeFilters.value }
+    delete otherFilters[targetProp]
+    
+    let sourceData = resultData.value
+    
+    // 如果有其他列的筛选，先过滤
+    if (Object.keys(otherFilters).length > 0) {
+      sourceData = sourceData.filter(row => {
+        return Object.entries(otherFilters).every(([prop, values]) => {
+          return values.includes(row[prop])
+        })
+      })
+    }
+    
+    const values = sourceData.map(item => item[targetProp]).filter(val => val)
+    return [...new Set(values)].sort().map(val => ({ text: val, value: val }))
+  }
+
+  return {
+    a: getOptions('a'),
+    b1: getOptions('b1'),
+    b2: getOptions('b2'),
+    b3: getOptions('b3'),
+    c1: getOptions('c1'),
+    c2: getOptions('c2'),
+    d: getOptions('d')
+  }
+})
+
+const resultTableRef = ref(null)
+const mainMaterialTableRef = ref(null)
+const flangeTableRef = ref(null)
+const pipeLimitTableRef = ref(null)
+const searchPmcCodeInput = ref('')
+const confirmedSearchKeyword = ref('') // Store the keyword when search is triggered
+
+// 基于 filteredData 和 搜索关键字 生成最终显示的数据
+const displayData = computed(() => {
+  if (!confirmedSearchKeyword.value) {
+    return filteredData.value
+  }
+  const keyword = confirmedSearchKeyword.value.toLowerCase()
+  return filteredData.value.filter(item => {
+    // 搜索范围：PMC编码以及各列的值
+    const searchableFields = [
+      item.pmc,
+      item.a,
+      item.b1,
+      item.b2,
+      item.b3,
+      item.c1,
+      item.c2,
+      item.d
+    ]
+    return searchableFields.some(val => val && String(val).toLowerCase().includes(keyword))
+  })
+})
+
+const tableRowClassName = ({ row }) => {
+  const classes = [`row-id-${row.id}`]
+  if (row.isByRule) {
+    classes.push('new-added-row')
+  }
+  return classes.join(' ')
+}
+
+// Search Logic (Triggered by button or enter key)
+const searchPmcCode = () => {
+  confirmedSearchKeyword.value = searchPmcCodeInput.value.trim()
+  if (confirmedSearchKeyword.value) {
+    ElMessage.success('已应用搜索过滤')
+  } else {
+    ElMessage.info('已清除搜索过滤')
+  }
+}
+
+// Handle Row Click
+const handleRowClick = (row, tableInstance) => {
+  if (tableInstance) {
+    tableInstance.toggleRowSelection(row)
+  }
+}
+
+// Table Selection Change
+const handleSelectionChange = (val) => {
+  selectedRows.value = val
+}
+
+// Table Selections for Rule Tables
+const selectedMainMaterialRows = ref([])
+const selectedFlangeRows = ref([])
+const selectedPipeLimitRows = ref([])
+
+// Handle Selection Change for Rule Tables
+const handleMainMaterialSelectionChange = (val) => {
+  selectedMainMaterialRows.value = val
+}
+
+const handleFlangeSelectionChange = (val) => {
+  selectedFlangeRows.value = val
+}
+
+const handlePipeLimitSelectionChange = (val) => {
+  selectedPipeLimitRows.value = val
+}
+
+// Generate 7-digit PMC Code
+const generatePmcCode = async () => {
+  // Check if main material and flange rows are selected
+  if (selectedMainMaterialRows.value.length === 0 || selectedFlangeRows.value.length === 0) {
+    ElMessage.error('请在“B1B2B3D组合数据”和“C1C2组合数据”表格中选择至少一行数据')
+    return
+  }
+
+  // Generate all combinations
+  const combinations = []
+  let id = resultData.value.length > 0 ? Math.max(...resultData.value.map(item => item.id)) + 1 : 1
+
+  // Determine A values and validation rules
+  const usePipeLimit = selectedPipeLimitRows.value.length > 0
+  let aValues = []
+  let validCombinations = new Set()
+
+  if (usePipeLimit) {
+    aValues = selectedPipeLimitRows.value.map(row => row.pipingClassCode)
+
+    selectedPipeLimitRows.value.forEach(row => {
+      const key = `${row.pipingClassCode}|${row.pipingStandardCode}|${row.materialsGradeCode}|${row.pressureRatingCode}`
+      validCombinations.add(key)
+    })
+  } else {
+    // If not selected, A is '3', no validation
+    aValues = ['3']
+  }
+
+  // Iterate through Cartesian product
+  for (const a of aValues) {
+    for (const mainMaterial of selectedMainMaterialRows.value) {
+      for (const flange of selectedFlangeRows.value) {
+        // Construct the candidate parts
+        const b1 = mainMaterial.code
+        const b2 = mainMaterial.std
+        const b3 = mainMaterial.grade
+        const c1 = flange.std
+        const c2 = flange.press
+        const d = mainMaterial.thickness
+
+        // Validation Logic
+        if (usePipeLimit && a !== '3') {
+          const key = `${a}|${b2}|${b3}|${c2}`
+          if (!validCombinations.has(key)) {
+            continue
+          }
+        }
+
+        // Generate PMC code (7 digits)
+        const pmcCode = `${a}${b1}${b2}${b3}${c1}${c2}${d}`
+
+        const currentId = id++
+        combinations.push({
+          id: currentId,
+          uniqueKey: `${selectedShipType.value}_${selectedShipNumber.value}_new_${currentId}`,
+          a,
+          b1,
+          b2,
+          b3,
+          c1,
+          c2,
+          d,
+          pmc: pmcCode
+        })
+      }
+    }
+  }
+
+  if (combinations.length === 0) {
+    ElMessage.warning('没有符合校验要求的组合数据')
+    return
+  }
+
+  // 去重：以PMC为唯一键
+  const existingCodes = new Set(resultData.value.map(item => item.pmc))
+  const pmcList = []
+  const baseRows = []
+
+  combinations.forEach(item => {
+    if (!existingCodes.has(item.pmc)) {
+      existingCodes.add(item.pmc)
+      pmcList.push(item.pmc)
+      baseRows.push(item)
+    }
+  })
+
+  if (pmcList.length === 0) {
+    ElMessage.warning('所有生成的PMC编码均已存在，未新增数据')
+    return
+  }
+
+  try {
+    const res = await axios.post('/api/pmc/pmccode/generate', {
+      pmcCodes: pmcList
+    })
+
+    const data = Array.isArray(res.data?.data) ? res.data.data : []
+    const descMap = new Map()
+    data.forEach(d => {
+      if (d.pmc) {
+        descMap.set(d.pmc, d)
+      }
+    })
+
+    const newRows = baseRows.map(row => {
+      const desc = descMap.get(row.pmc) || {}
+      return {
+        ...row,
+        a: desc.aDesc || row.a,
+        b1: desc.b1Desc || row.b1,
+        b2: desc.b2Desc || row.b2,
+        b3: desc.b3Desc || row.b3,
+        c1: desc.c1Desc || row.c1,
+        c2: desc.c2Desc || row.c2,
+        d: desc.dDesc || row.d
+      }
+    })
+
+    resultData.value = [...resultData.value, ...newRows]
+
+    // 默认勾选新增的行
+    nextTick(() => {
+      newRows.forEach(row => {
+        const targetRow = resultData.value.find(r => r.id === row.id)
+        if (targetRow) {
+          resultTableRef.value.toggleRowSelection(targetRow, true)
+        }
+      })
+    })
+
+    ElMessage.success(`成功生成 ${newRows.length} 条PMC编码`)
+  } catch (error) {
+    console.error('生成PMC编码失败', error)
+    ElMessage.error('生成PMC编码失败')
+  }
+}
+
+// Copy Rule Dialog
+const copyRuleDialogVisible = ref(false)
+
+// Open Copy Rule Dialog
+const openCopyRuleDialog = () => {
+  sourceShipType.value = ''
+  targetShipType.value = ''
+  sourceShipNumber.value = ''
+  targetShipNumber.value = ''
+  sourceShipNumbers.value = []
+  targetShipNumbers.value = []
+  copyRuleDialogVisible.value = true
+}
+
+// Confirm Copy Rule
+const confirmCopyRule = async () => {
+  if (!sourceShipType.value || !sourceShipNumber.value || !targetShipType.value || !targetShipNumber.value) {
+    ElMessage.error('请完整选择源船型船号和目标船型船号')
+    return
+  }
+  
+  // 检查是否相同
+  if (sourceShipType.value === targetShipType.value && sourceShipNumber.value === targetShipNumber.value) {
+    ElMessage.error('源船号和目标船号不能相同')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `此操作将清空目标船型船号 (${targetShipType.value}/${targetShipNumber.value}) 下的所有现有数据，并用源数据覆盖。是否继续？`,
+      '覆盖确认',
+      {
+        confirmButtonText: '确定覆盖',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    const payload = {
+      sourceShipType: sourceShipType.value,
+      sourceShipNo: sourceShipNumber.value,
+      targetShipType: targetShipType.value,
+      targetShipNo: targetShipNumber.value
+    }
+
+    const res = await axios.post('/api/pmc/pmccode/copy', payload)
+    
+    if (res.data.code === 200) {
+      ElMessage.success(res.data.message || '复制成功')
+      copyRuleDialogVisible.value = false
+      // 如果当前主界面选中的是目标船号，可以刷新一下
+      if (selectedShipType.value === targetShipType.value && selectedShipNumber.value === targetShipNumber.value) {
+        refreshData()
+      }
+    } else {
+      ElMessage.error(res.data.message || '复制失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Copy rule failed:', error)
+      ElMessage.error('复制规则失败: ' + (error.response?.data?.message || error.message))
+    }
+  }
+}
+
+// Cancel Copy Rule
+const cancelCopyRule = () => {
+  copyRuleDialogVisible.value = false
+}
+
+</script>
+
+<template>
+  <el-config-provider :locale="zhCn">
+    <div class="pmc-container">
+    <!-- Top Section -->
+    <transition name="el-zoom-in-top">
+      <div class="section-block" v-show="showRulePanel">
+        <!-- Top Toolbar -->
+        <div class="table-header" style="justify-content: flex-end; display: none;">
+          <!-- <div class="title-area">
+            <el-select v-model="selectedShipType" placeholder="船型" style="width: 120px;">
+              <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+            <el-select v-model="selectedShipNumber" placeholder="船号" style="width: 120px;">
+              <el-option v-for="item in shipNumbers" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+          </div> -->
+          <div class="actions">
+            <el-button type="primary" @click="generatePmcCode">生成7位编码</el-button>
+          </div>
+        </div>
+
+        <!-- Rule Tables Row -->
+        <el-row :gutter="20" class="rule-row">
+          <!-- Col 1 -->
+          <el-col :span="8">
+            <div class="rule-card">
+              <div class="rule-header">
+                <span>主材料规则：</span>
+                <el-select v-model="selectedMainMaterialRule" style="width: 130px;">
+                  <el-option v-for="item in mainMaterialRules" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+              </div>
+              <div class="rule-table-wrap">
+                <div class="table-title">B1B2B3D组合数据</div>
+                <el-table 
+                  ref="mainMaterialTableRef"
+                  :data="mainMaterialData" 
+                  border 
+                  stripe 
+                  size="small" 
+                  height="260" 
+                  @selection-change="handleMainMaterialSelectionChange"
+                  @row-click="(row) => handleRowClick(row, mainMaterialTableRef)"
+                >
+                  <el-table-column type="selection" width="40" />
+                  <el-table-column prop="id" label="ID" width="40" />
+                  <el-table-column prop="code" label="主材料" />
+                  <el-table-column prop="std" label="管材标准" />
+                  <el-table-column prop="grade" label="牌号" />
+                  <el-table-column prop="thickness" label="壁厚等级" />
+                </el-table>
+              </div>
+            </div>
+          </el-col>
+
+          <!-- Col 2 -->
+          <el-col :span="8">
+            <div class="rule-card">
+              <div class="rule-header">
+                <span>法兰规则：</span>
+                <el-select v-model="selectedFlangeRule" style="width: 130px;">
+                  <el-option v-for="item in flangeRules" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+              </div>
+              <div class="rule-table-wrap">
+                <div class="table-title">C1C2组合数据</div>
+                <el-table 
+                  ref="flangeTableRef"
+                  :data="flangeData" 
+                  border 
+                  stripe 
+                  size="small" 
+                  height="260" 
+                  @selection-change="handleFlangeSelectionChange"
+                  @row-click="(row) => handleRowClick(row, flangeTableRef)"
+                >
+                  <el-table-column type="selection" width="40" />
+                  <el-table-column prop="id" label="ID" width="40" />
+                  <el-table-column prop="std" label="法兰标准" />
+                  <el-table-column prop="press" label="法兰压力等级" />
+                </el-table>
+              </div>
+            </div>
+          </el-col>
+
+          <!-- Col 3 -->
+          <el-col :span="8">
+            <div class="rule-card">
+              <div class="rule-header">
+                <span>管材一二级限定规则：</span>
+                <el-select v-model="selectedPipeLimitRule" style="width: 130px;">
+                  <el-option v-for="item in pipeLimitRules" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+                <el-button type="primary" @click="generatePmcCode" style="margin-left: auto;">生成7位编码</el-button>
+              </div>
+              <div class="rule-table-wrap">
+                <div class="table-title">AB2B3C2组合数据</div>
+                <el-table 
+                  ref="pipeLimitTableRef"
+                  :data="pipeLimitData" 
+                  border 
+                  stripe 
+                  size="small" 
+                  height="260" 
+                  @selection-change="handlePipeLimitSelectionChange"
+                  @row-click="(row) => handleRowClick(row, pipeLimitTableRef)"
+                >
+                  <el-table-column type="selection" width="40" />
+                  <el-table-column prop="id" label="ID" width="40" />
+                  <el-table-column prop="pipingClassCode" label="管材等级" />
+                  <el-table-column prop="pipingStandardCode" label="管材标准" />
+                  <el-table-column prop="materialsGradeCode" label="牌号" />
+                  <el-table-column prop="pressureRatingCode" label="法兰压力等级" align="center"/>
+                </el-table>
+              </div>
+            </div>
+          </el-col>
+        </el-row>
+      </div>
+    </transition>
+
+    <!-- Bottom Section -->
+    <div class="section-block bottom-block">
+      <!-- Centered Toggle Icon -->
+      <div 
+        style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 10; cursor: pointer; padding: 2px 12px; background-color: #fff; border: 1px solid #dcdfe6; border-top: none; border-radius: 0 0 6px 6px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);"
+        @click="showRulePanel = !showRulePanel"
+        :title="showRulePanel ? '折叠规则面板' : '展开规则面板'"
+      >
+        <el-icon style="font-size: 16px; color: #409eff; display: block;">
+          <component :is="showRulePanel ? 'CaretTop' : 'CaretBottom'" />
+        </el-icon>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="table-header">
+        <div class="title-area">
+          <el-select v-model="selectedShipType" placeholder="船型" style="width: 120px;">
+            <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+          <el-select v-model="selectedShipNumber" placeholder="船号" style="width: 120px;">
+            <el-option v-for="item in shipNumbers" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+          <el-button type="primary" icon="Search" @click="refreshData">查询</el-button>
+        </div>
+
+        <div class="actions">
+          <el-input 
+            v-model="searchPmcCodeInput" 
+            placeholder="请输入查找内容" 
+            style="width: 200px; margin-right: 12px;" 
+            @keyup.enter="searchPmcCode"
+            clearable
+          >
+            <template #append>
+              <el-button icon="Search" @click="searchPmcCode" />
+            </template>
+          </el-input>
+          <el-button icon="CopyDocument" @click="openCopyRuleDialog">从其他船号复制规则</el-button>
+          <el-button type="primary" icon="Plus" @click="handleAdd">增加</el-button>
+          <el-button type="danger" plain icon="Delete" :disabled="selectedRows.length === 0" @click="handleDelete">删除</el-button>
+          <el-button type="primary" icon="Check" @click="saveToApi">保存</el-button>
+        </div>
+      </div>
+
+      <!-- Main Data Table -->
+      <div class="main-table-wrap">
+        <el-table 
+          ref="resultTableRef"
+          :data="displayData" 
+          :row-key="(row) => row.uniqueKey || row.id"
+          :row-class-name="tableRowClassName"
+          border 
+          stripe 
+          style="width: 100%" 
+          height="100%" 
+          @selection-change="handleSelectionChange"
+          @row-click="(row) => handleRowClick(row, resultTableRef)"
+          @filter-change="handleFilterChange"
+        >
+          <el-table-column type="selection" width="50" align="center" reserve-selection />
+          <el-table-column label="序号" width="60" align="center">
+            <template #default="scope">
+              {{ scope.$index + 1 }}
+            </template>
+          </el-table-column>
+          <el-table-column 
+            prop="a" 
+            label="管材等级 A" 
+            align="center" 
+            column-key="a"
+            :filters="filterOptions.a"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="b1" 
+            label="主材料 B1" 
+            align="center" 
+            column-key="b1"
+            :filters="filterOptions.b1"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="b2" 
+            label="管材标准 B2" 
+            align="center" 
+            column-key="b2"
+            :filters="filterOptions.b2"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="b3" 
+            label="牌号 B3" 
+            align="center" 
+            column-key="b3"
+            :filters="filterOptions.b3"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="c1" 
+            label="法兰标准 C1" 
+            align="center" 
+            column-key="c1"
+            :filters="filterOptions.c1"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="c2" 
+            label="法兰压力等级 C2" 
+            align="center" 
+            column-key="c2"
+            :filters="filterOptions.c2"
+            :filter-method="filterHandler"
+          />
+          <el-table-column 
+            prop="d" 
+            label="壁厚等级 D" 
+            align="center" 
+            column-key="d"
+            :filters="filterOptions.d"
+            :filter-method="filterHandler"
+          />
+          <el-table-column prop="pmc" label="PMC" align="center" />
+        </el-table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit/Add Dialog -->
+  <el-dialog :title="dialogTitle" v-model="editDialogVisible" width="500px">
+    <el-form :model="formData" label-width="140px">
+      <el-form-item label="管材等级 A">
+        <el-select v-model="formData.a" placeholder="请选择">
+          <el-option v-for="opt in optionsA" :key="opt.value" :label="opt.label" :value="opt.label" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="主材料 B1">
+        <el-select v-model="formData.b1" placeholder="请选择">
+          <el-option v-for="opt in optionsB1" :key="opt.value" :label="opt.label" :value="opt.label" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="管材标准 B2">
+        <el-select v-model="formData.b2" placeholder="请选择" :disabled="!formData.b1">
+          <el-option v-for="opt in optionsB2" :key="opt.value" :label="opt.label" :value="opt.label" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="牌号 B3">
+        <el-select v-model="formData.b3" placeholder="请选择">
+          <el-option v-for="opt in optionsB3" :key="opt.value" :label="opt.label" :value="opt.label" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="法兰标准 C1">
+        <el-select v-model="formData.c1" placeholder="请选择">
+          <el-option v-for="opt in optionsC1" :key="opt.value" :label="opt.label" :value="opt.label" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="法兰压力等级 C2">
+        <el-select v-model="formData.c2" placeholder="请选择">
+          <el-option v-for="opt in optionsC2" :key="opt.value" :label="opt.label" :value="opt.label" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="壁厚等级 D">
+        <el-select v-model="formData.d" placeholder="请选择">
+          <el-option v-for="opt in optionsD" :key="opt.value" :label="opt.label" :value="opt.label" />
+        </el-select>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="cancelDialog">取消</el-button>
+        <el-button type="primary" @click="saveDialogData">保存</el-button>
+      </span>
+    </template>
+  </el-dialog>
+
+  <!-- Copy Rule Dialog -->
+  <el-dialog title="从其他船号复制规则" v-model="copyRuleDialogVisible" width="40%" :before-close="cancelCopyRule">
+    <el-form label-width="120px" style="max-width: 500px; margin: 0 auto;">
+      <el-form-item label="数据源船号">
+        <div style="display: flex; gap: 12px;">
+          <el-select v-model="sourceShipType" placeholder="数据源船型" style="width: 120px;">
+            <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+          <el-select v-model="sourceShipNumber" placeholder="数据源船号" style="width: 140px;">
+            <el-option v-for="item in sourceShipNumbers" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </div>
+      </el-form-item>
+      <el-form-item label="目标船号">
+        <div style="display: flex; gap: 12px;">
+          <el-select v-model="targetShipType" placeholder="目标船型" style="width: 120px;">
+            <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+          <el-select v-model="targetShipNumber" placeholder="目标船号" style="width: 140px;">
+            <el-option v-for="item in targetShipNumbers" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </div>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="cancelCopyRule">取消</el-button>
+        <el-button type="primary" @click="confirmCopyRule">确认</el-button>
+      </span>
+    </template>
+  </el-dialog>
+
+  <!-- Save Selection Dialog -->
+  <el-dialog title="选择保存目标" v-model="saveDialogVisible" width="30%">
+    <el-form label-width="100px">
+      <el-form-item label="目标船号">
+        <div style="display: flex; gap: 12px;">
+          <el-select v-model="targetSaveShipType" placeholder="船型" style="width: 120px;">
+            <el-option v-for="item in shipTypes" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+          <el-select v-model="targetSaveShipNumber" placeholder="船号" style="width: 140px;">
+            <el-option v-for="item in targetSaveShipNumbers" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </div>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="saveDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmSaveFromDialog">保存</el-button>
+      </span>
+    </template>
+  </el-dialog>
+  </el-config-provider>
+</template>
+<style scoped>
+.pmc-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Reduced gap to accommodate toggle bar */
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0px;
+  background-color: #f5f7fa;
+  box-sizing: border-box;
+}
+
+.section-block {
+  background-color: #fff;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  padding: 15px;
+}
+
+.bottom-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative; /* Ensure absolute positioning works for toggle icon */
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.title-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rule-row {
+  margin-bottom: 2px;
+  overflow-x: auto;
+}
+
+.rule-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rule-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  height: 40px; /* 固定高度确保对齐 */
+}
+
+.rule-header span {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.rule-table-wrap {
+  border: 1px solid #ebeef5;
+}
+
+.table-title {
+  background-color: #f5f7fa;
+  padding: 5px 10px;
+  font-weight: bold;
+  border-bottom: 1px solid #ebeef5;
+  font-size: 13px;
+}
+
+.main-table-wrap {
+  flex: 1;
+  overflow: hidden; /* Changed from auto to hidden to let el-table handle scrolling */
+  min-height: 0; /* Ensure flex child can shrink */
+}
+
+.main-table-wrap :deep(.el-table) {
+  min-width: 900px;
+}
+
+:deep(.el-table__header) th {
+  background-color: #eef1f6 !important;
+  color: #606266;
+  font-weight: bold;
+  text-align: center !important;
+}
+
+:deep(.el-table__body) td {
+  text-align: center !important;
+}
+
+:deep(.el-input__inner) {
+  text-align: center;
+}
+
+:deep(.el-table .new-added-row) {
+  --el-table-tr-bg-color: var(--el-color-success-light-9);
+}
+
+:deep(.el-table .new-added-row td.el-table__cell) {
+  background-color: var(--el-color-success-light-9) !important;
+}
+</style>
