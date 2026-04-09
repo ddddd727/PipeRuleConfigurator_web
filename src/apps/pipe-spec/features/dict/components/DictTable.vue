@@ -22,7 +22,7 @@ const {
   dataSnapshot, optionsMap, loadingOptions,
   addColVisible, addColForm, addingCol,
   mapUiType, toCamelCase, findKey, getNextAvailableId,
-  getVisibleOptions, fetchSharedOptions, resetToSnapshot
+  getVisibleOptions, getAddRowBlockedByFilteredSelectMessage, fetchSharedOptions, resetToSnapshot
 } = useDictCommon()
 toCamelCase
 // ...existing code...
@@ -301,6 +301,8 @@ const handleSelectionChange = (val) => { selectedRows.value = val }
 // ─────────────────────────────────────────────
 const handleAddRow = () => {
   if (!isEdit.value) return ElMessage.warning('请先进入编辑模式')
+  const blockedMsg = getAddRowBlockedByFilteredSelectMessage()
+  if (blockedMsg) return ElMessage.warning(blockedMsg)
   const newRow = { _isNew: true }
 
   const nextId = getNextAvailableId(tableConfig.value.list, tableConfig.value.columns)
@@ -357,6 +359,9 @@ const handleBatchDelete = () => {
 // ─────────────────────────────────────────────
 const validateRow = async (row, rowIndex) => {
   const columns = tableConfig.value.columns
+  const pkCol = (columns || []).find(c => c.isPrimaryKey)
+  const pkVal = pkCol?.prop ? row?.[pkCol.prop] : (row?.id ?? row?.Id ?? row?.ID)
+  const idText = (pkVal === undefined || pkVal === null || pkVal === '') ? '—' : pkVal
 
   for (const col of columns) {
     if (col.isPrimaryKey || col.isReadOnly) continue
@@ -366,8 +371,7 @@ const validateRow = async (row, rowIndex) => {
 
     // IsRequired
     if (col.required && isEmpty) {
-      ElMessage.warning(`第 ${rowIndex + 1} 行 [${col.label}] 不能为空`)
-      return false
+      return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）不能为空`)
     }
 
     if (isEmpty) continue
@@ -379,15 +383,15 @@ const validateRow = async (row, rowIndex) => {
     if (v) {
       const msg = v.customMessage
       if (v.minLength && strVal.length < v.minLength)
-        return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${msg ?? `最少 ${v.minLength} 个字符`}`)
+        return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${msg ?? `最少 ${v.minLength} 个字符`}`)
       if (v.maxLength && strVal.length > v.maxLength)
-        return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${msg ?? `最多 ${v.maxLength} 个字符`}`)
+        return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${msg ?? `最多 ${v.maxLength} 个字符`}`)
       if (v.min != null && Number(val) < v.min)
-        return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${msg ?? `不能小于 ${v.min}`}`)
+        return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${msg ?? `不能小于 ${v.min}`}`)
       if (v.max != null && Number(val) > v.max)
-        return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${msg ?? `不能大于 ${v.max}`}`)
+        return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${msg ?? `不能大于 ${v.max}`}`)
       if (v.pattern && !new RegExp(v.pattern).test(strVal))
-        return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${msg ?? '格式不正确'}`)
+        return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${msg ?? '格式不正确'}`)
     }
 
     // ✅ CustomRules（onSubmit 触发）
@@ -399,7 +403,7 @@ const validateRow = async (row, rowIndex) => {
           // eslint-disable-next-line no-new-func
           const fn = new Function('value', 'row', `return (${rule.expression})`)
           const passed = fn(val, row)
-          if (!passed) return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${rule.message}`)
+          if (!passed) return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${rule.message}`)
         } catch (e) {
           console.warn('Expression 执行失败:', e)
         }
@@ -413,7 +417,7 @@ const validateRow = async (row, rowIndex) => {
             row: { ...row }
           })
           const result = res.data?.data || res.data
-          if (!result.valid) return fail(`第 ${rowIndex + 1} 行 [${col.label}]：${result.message || rule.message}`)
+          if (!result.valid) return fail(`第 ${rowIndex + 1} 行 [${col.label}]（ID: ${idText}）：${result.message || rule.message}`)
         } catch (e) {
           console.error('远程校验失败:', e)
         }
@@ -489,7 +493,6 @@ const openAddColumnDialog = () => {
 
 const submitAddColumn = async () => {
   if (!addColForm.title) return ElMessage.warning('请输入列名称')
-  if (addColForm.uiType === 'Select' && !addColForm.options) return ElMessage.warning('下拉框必须填写选项')
 
   addingCol.value = true
   try {
@@ -758,18 +761,14 @@ const canDelete = computed(() => tableMeta.value.permissions?.allowDelete !== fa
     <!-- 新增列对话框 -->
     <el-dialog v-model="addColVisible" title="添加自定义列" width="400px" append-to-body>
       <el-form label-position="top">
-        <el-form-item label="列名称 (中文标题)">
-          <el-input v-model="addColForm.title" placeholder="例如：紧急程度" />
+        <el-form-item label="列名称">
+          <el-input v-model="addColForm.title" placeholder="例如：牌号" />
         </el-form-item>
         <el-form-item label="数据类型">
           <el-select v-model="addColForm.uiType" style="width: 100%;">
-            <el-option label="文本框 (Input)"  value="Input" />
-            <el-option label="下拉框 (Select)" value="Select" />
-            <el-option label="开关 (Switch)"   value="Switch" />
+            <el-option label="文本框 (Input)" value="Input" />
+            <el-option label="开关 (Switch)" value="Switch" />
           </el-select>
-        </el-form-item>
-        <el-form-item v-if="addColForm.uiType === 'Select'" label="选项列表 (用逗号分隔)">
-          <el-input v-model="addColForm.options" placeholder="例如：高,中,低" />
         </el-form-item>
         <el-form-item>
           <el-checkbox v-model="addColForm.isRequired">是否必填</el-checkbox>

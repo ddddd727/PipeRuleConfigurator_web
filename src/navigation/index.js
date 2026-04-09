@@ -44,7 +44,7 @@ export const appNavigationRegistry = [
   },
   {
     id: 'engineering',
-    name: '工程基础管理',
+    name: 'S3D工程基础管理',
     entry: '/engineering/s3d-env-config',
     enabled: true,
     order: 4,
@@ -57,12 +57,12 @@ export const appNavigationRegistry = [
   },
   {
     id: 'component-ci',
-    name: '组件持续集成系统',
+    name: 'S3D组件持续集成管理',
     entry: '/component-ci/rapid-deploy',
     enabled: true,
     order: 5,
     desc: '二次开发快速部署、操作速查手册与使用频次统计看板。',
-    logo: Connection,
+    logo: Connection,   
     links: [
       { label: '快速部署', path: '/component-ci/rapid-deploy' },
       { label: '操作速查', path: '/component-ci/operation-guide' }
@@ -70,7 +70,7 @@ export const appNavigationRegistry = [
   },
   {
     id: 'code-management',
-    name: '编码管理平台',
+    name: 'S3D-编码平台集成管理',
     entry: '/code-management/code-config',
     enabled: true,
     order: 6,

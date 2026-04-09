@@ -5,7 +5,7 @@ const Stub = () => import('@/shared/components/StubPage.vue')
 export default {
   path: '/component-ci',
   component: AppLayout,
-  meta: { title: '组件持续集成系统', icon: 'Connection' },
+  meta: { title: 'S3D组件持续集成管理', icon: 'Connection' },
   redirect: '/component-ci/rapid-deploy',
   children: [
     {
