@@ -93,42 +93,15 @@
           </el-card>
 
           <div class="tables-panel">
-            <section class="data-section">
-              <div class="data-section-header">
-                <div class="data-section-title">公用端面数据</div>
-                <div class="data-section-actions">
-                  <el-button type="primary" :icon="Plus" @click="handleAddRow('common')">新增</el-button>
-                  <el-button type="warning" :icon="Edit">修改</el-button>
-                </div>
-              </div>
-              <div class="table-wrapper" v-loading="commonLoading" element-loading-text="加载中...">
-                <el-table
-                  ref="commonTableRef"
-                  :data="commonData"
-                  border
-                  height="100%"
-                  :row-class-name="tableRowClassName"
-                  @selection-change="handleCommonSelectionChange"
-                >
-                  <el-table-column type="selection" width="55" :selectable="checkSelectable" />
-                  <el-table-column
-                    v-for="col in visibleCommonColumns"
-                    :key="col.prop"
-                    :prop="col.prop"
-                    :label="col.label"
-                    :min-width="col.minWidth || 140"
-                    show-overflow-tooltip
-                  />
-                </el-table>
-              </div>
-            </section>
-            <section v-if="showAppearanceGroup" class="data-section">
+            <section v-if="showAppearanceGroup" class="data-section data-section-full">
               <div class="data-section-header">
                 <div class="data-section-title">外形重量重心描述</div>
                 <div class="data-section-actions">
                   <el-button type="primary" :icon="Plus" @click="handleAddRow('appearance')">新增</el-button>
-                  <el-button type="warning" :icon="Edit">修改</el-button>
-                  <el-button type="danger" :icon="CircleClose" @click="handleDisableRows('appearance')">禁用</el-button>
+                  <el-button type="warning" :icon="Edit" @click="handleEditAppearanceRow">修改</el-button>
+                  <el-button :type="appearanceStatusActionType" :icon="appearanceStatusActionIcon" @click="handleAppearanceStatusAction">
+                    {{ appearanceStatusActionText }}
+                  </el-button>
                 </div>
               </div>
               <div class="table-wrapper" v-loading="appearanceLoading" element-loading-text="加载中...">
@@ -138,6 +111,7 @@
                   border
                   height="100%"
                   :row-class-name="tableRowClassName"
+                  @row-click="handleAppearanceRowClick"
                   @selection-change="handleAppearanceSelectionChange"
                 >
                   <el-table-column type="selection" width="55" :selectable="checkSelectable" />
@@ -151,6 +125,9 @@
                   />
                 </el-table>
               </div>
+            </section>
+            <section v-else class="data-section data-section-full">
+              <el-empty description="当前节点暂无外形重量重心描述数据" />
             </section>
           </div>
         </div>
@@ -203,6 +180,81 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="appearanceAddDialogVisible" :title="appearanceDialogTitle" width="920px">
+      <el-form :model="appearanceAddForm" label-width="180px" class="appearance-add-form">
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="IndustryCommodityCode">
+              <el-select v-model="appearanceAddForm.IndustryCommodityCode" style="width: 100%" :filterable="false" :allow-create="false">
+                <el-option
+                  v-for="opt in appearanceFieldOptions.IndustryCommodityCode"
+                  :key="opt"
+                  :label="opt"
+                  :value="opt"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row v-for="(row, rowIndex) in appearancePairRows" :key="`pair-${rowIndex}`" :gutter="20">
+          <el-col v-for="field in row" :key="field.key" :span="12">
+            <el-form-item :label="field.label">
+              <el-input
+                v-if="field.control === 'input'"
+                :model-value="appearanceAddForm[field.key]"
+                type="text"
+                :inputmode="field.inputmode"
+                @update:model-value="handleAppearancePairFieldChange(field.key, $event)"
+              />
+              <el-select
+                v-else
+                :model-value="appearanceAddForm[field.key]"
+                style="width: 100%"
+                :filterable="false"
+                :allow-create="false"
+                @update:model-value="handleAppearancePairFieldChange(field.key, $event)"
+              >
+                <el-option
+                  v-for="opt in appearanceFieldOptions[field.key] || []"
+                  :key="opt"
+                  :label="opt"
+                  :value="opt"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row v-for="(row, rowIndex) in appearanceDialogRows" :key="`normal-${rowIndex}`" :gutter="20">
+          <el-col v-for="field in row" :key="field.key" :span="12">
+            <el-form-item :label="field.label">
+              <el-input
+                v-if="field.control === 'input'"
+                v-model="appearanceAddForm[field.key]"
+                type="text"
+                :inputmode="field.inputmode"
+              />
+              <el-select v-else v-model="appearanceAddForm[field.key]" style="width: 100%" :filterable="false" :allow-create="false">
+                <el-option
+                  v-for="opt in appearanceFieldOptions[field.key] || []"
+                  :key="opt"
+                  :label="opt"
+                  :value="opt"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="handleSubmitAppearanceDialog">保存</el-button>
+          <el-button @click="appearanceAddDialogVisible = false">取消</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -221,6 +273,7 @@ import {
   Folder,
   Menu,
   Plus,
+  RefreshRight,
   Search,
   Upload
 } from '@element-plus/icons-vue'
@@ -229,7 +282,6 @@ import {
   getPipingBaseOptions,
   getPipingComponentAppearanceData,
   getPipingComponentBaseData,
-  getPipingComponentCommonData,
   getPipingSpecTree,
   savePipingComponentBase
 } from '@/apps/product-standard/features/piping-spec-management/api/pipingSpecAPI'
@@ -238,21 +290,17 @@ const route = useRoute()
 const currentTitle = computed(() => route.meta.title || 'S3D部件数据管理')
 
 const treeRef = ref(null)
-const commonTableRef = ref(null)
 const appearanceTableRef = ref(null)
 
 const filterText = ref('')
 const treeLoading = ref(false)
-const commonLoading = ref(false)
 const appearanceLoading = ref(false)
 
 const treeData = ref([])
 const selectedNode = ref(null)
 const selectedCategory = ref('')
 const baseRows = ref([])
-const commonData = ref([])
 const appearanceData = ref([])
-const commonSelection = ref([])
 const appearanceSelection = ref([])
 const isTreeCollapsed = ref(false)
 
@@ -276,6 +324,11 @@ const saveAsForm = ref({
   scheduleThickness: '',
   material: ''
 })
+const appearanceAddDialogVisible = ref(false)
+const appearanceDialogMode = ref('add')
+const appearanceAddForm = ref({})
+const appearanceLocalRows = ref({})
+const appearanceEditTarget = ref(null)
 
 const defaultProps = {
   children: 'children',
@@ -285,6 +338,104 @@ const defaultProps = {
 const toggleTreePanel = () => {
   isTreeCollapsed.value = !isTreeCollapsed.value
 }
+
+const appearanceFieldOrderMap = {
+  pipe: [
+    'IndustryCommodityCode',
+    'NPD[1]',
+    'NpdUnitType[1]',
+    'NPD[2]',
+    'NpdUnitType[2]',
+    'EndPreparation[1]',
+    'ScheduleThickness[1]',
+    'EndPreparation[2]',
+    'ScheduleThickness[2]',
+    'Density',
+    'PurchaseLength',
+    'MinimumPipeLength',
+    'MaximumPipeLength',
+    'WeightPerUnitLength',
+    'PartDescription',
+    'MaterialsMgmtIdent'
+  ],
+  pipeComponent: [
+    'IndustryCommodityCode',
+    'NPD[1]',
+    'NpdUnitType[1]',
+    'NPD[2]',
+    'NpdUnitType[2]',
+    'EndPreparation[1]',
+    'ScheduleThickness[1]',
+    'EndPreparation[2]',
+    'ScheduleThickness[2]',
+    'DryWeight',
+    'DryCogX',
+    'DryCogY',
+    'DryCogZ',
+    'PartDescription',
+    'MaterialsMgmtIdent',
+    'BendRadius'
+  ]
+}
+
+const numericAppearanceFields = new Set([
+  'NPD[1]',
+  'NPD[2]',
+  'Density',
+  'PurchaseLength',
+  'MinimumPipeLength',
+  'MaximumPipeLength',
+  'WeightPerUnitLength',
+  'DryWeight',
+  'DryCogX',
+  'DryCogY',
+  'DryCogZ',
+  'BendRadius'
+])
+
+const appearanceTextInputFields = new Set(['PartDescription'])
+
+const appearanceFieldOptionPresets = {
+  IndustryCommodityCode: ['PIPE001', 'PIPE002', 'PIPE003', 'PCELB45-001', 'PCELB45-002', 'PCSLEEV-001', 'PCSLEEV-002'],
+  'NpdUnitType[1]': ['mm', 'inch'],
+  'NpdUnitType[2]': ['mm', 'inch'],
+  'EndPreparation[1]': ['BW', 'SW', 'THD'],
+  'EndPreparation[2]': ['BW', 'SW', 'THD'],
+  'ScheduleThickness[1]': ['Sch.40', 'Sch.80', 'STD', 'XS'],
+  'ScheduleThickness[2]': ['Sch.40', 'Sch.80', 'STD', 'XS'],
+  MaterialsMgmtIdent: ['MAT-PIPE-001', 'MAT-PIPE-002', 'MAT-ELB-001', 'MAT-SLEEV-001']
+}
+
+const appearanceFieldLabelMap = {
+  IndustryCommodityCode: 'IndustryCommodityCode',
+  'NPD[1]': 'NPD[1]',
+  'NpdUnitType[1]': 'NpdUnitType[1]',
+  'NPD[2]': 'NPD[2]',
+  'NpdUnitType[2]': 'NpdUnitType[2]',
+  'EndPreparation[1]': 'EndPreparation[1]',
+  'EndPreparation[2]': 'EndPreparation[2]',
+  'ScheduleThickness[1]': 'ScheduleThickness[1]',
+  'ScheduleThickness[2]': 'ScheduleThickness[2]',
+  Density: 'Density',
+  PurchaseLength: 'PurchaseLength',
+  MinimumPipeLength: 'MinimumPipeLength',
+  MaximumPipeLength: 'MaximumPipeLength',
+  WeightPerUnitLength: 'WeightPerUnitLength',
+  PartDescription: 'PartDescription',
+  MaterialsMgmtIdent: 'MaterialsMgmtIdent',
+  DryWeight: 'DryWeight',
+  DryCogX: 'DryCogX',
+  DryCogY: 'DryCogY',
+  DryCogZ: 'DryCogZ',
+  BendRadius: 'BendRadius'
+}
+
+const buildAppearanceFieldMeta = (key) => ({
+  key,
+  label: appearanceFieldLabelMap[key] || key,
+  control: numericAppearanceFields.has(key) || appearanceTextInputFields.has(key) ? 'input' : 'select',
+  inputmode: numericAppearanceFields.has(key) ? 'decimal' : undefined
+})
 
 const detailFields = computed(() => {
   const hidden = new Set(['status'])
@@ -360,18 +511,93 @@ const hasScheduleThicknessFilter = computed(() => scheduleThicknessOptions.value
 
 const showAppearanceGroup = computed(() => ['pipe', 'pipeComponent'].includes(selectedCategory.value))
 
-const visibleCommonColumns = computed(() => {
-  if (!commonData.value.length) return []
-  return Object.keys(commonData.value[0])
-    .filter((key) => key !== 'status')
-    .map((key) => ({ prop: key, label: key }))
-})
+const isAppearanceRestoreMode = computed(
+  () => appearanceSelection.value.length > 0 && appearanceSelection.value.every((row) => row.status === 0)
+)
+
+const appearanceStatusActionText = computed(() => (isAppearanceRestoreMode.value ? '恢复' : '禁用'))
+const appearanceStatusActionType = computed(() => (isAppearanceRestoreMode.value ? 'success' : 'danger'))
+const appearanceStatusActionIcon = computed(() => (isAppearanceRestoreMode.value ? RefreshRight : CircleClose))
+const appearanceDialogTitle = computed(() => (appearanceDialogMode.value === 'edit' ? '修改外形重量重心描述' : '新增外形重量重心描述'))
 
 const visibleAppearanceColumns = computed(() => {
   if (!appearanceData.value.length) return []
   return Object.keys(appearanceData.value[0])
-    .filter((key) => key !== 'status')
+    .filter((key) => !['status', 'GeometricIndustryStandard'].includes(key))
     .map((key) => ({ prop: key, label: key }))
+})
+
+const appearanceRowSeed = computed(() => appearanceSelection.value[0] || appearanceData.value[0] || {})
+
+const appearanceFieldOptions = computed(() => {
+  const optionMap = {}
+  const rows = [...appearanceData.value, ...(appearanceLocalRows.value[getAppearanceStorageKey()] || [])]
+  Object.keys(appearanceFieldOptionPresets).forEach((key) => {
+    optionMap[key] = [...appearanceFieldOptionPresets[key]]
+  })
+
+  rows.forEach((row) => {
+    Object.entries(row).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '' || key === 'status') return
+      if (!optionMap[key]) optionMap[key] = []
+      if (!optionMap[key].includes(String(value))) optionMap[key].push(String(value))
+    })
+  })
+
+  if (currentBaseRow.value?.IndustryCommodityCode) {
+    optionMap.IndustryCommodityCode = optionMap.IndustryCommodityCode || []
+    if (!optionMap.IndustryCommodityCode.includes(currentBaseRow.value.IndustryCommodityCode)) {
+      optionMap.IndustryCommodityCode.unshift(currentBaseRow.value.IndustryCommodityCode)
+    }
+  }
+
+  return optionMap
+})
+
+const appearanceDialogRows = computed(() => {
+  const seedKeys = Object.keys(appearanceRowSeed.value || {})
+  const pairedKeys = new Set()
+  ;(appearanceFieldOrderMap[selectedCategory.value] || []).forEach((key) => {
+    if (/\[(1|2)\]$/.test(key)) pairedKeys.add(key)
+  })
+
+  const order = (appearanceFieldOrderMap[selectedCategory.value] || []).filter(
+    (key) => seedKeys.length === 0 || key === 'IndustryCommodityCode' || seedKeys.includes(key)
+  ).filter(
+    (key) => !['IndustryCommodityCode', 'status'].includes(key) && !pairedKeys.has(key)
+  )
+
+  const fields = order.map(buildAppearanceFieldMeta)
+
+  const rows = []
+  for (let i = 0; i < fields.length; i += 2) {
+    rows.push(fields.slice(i, i + 2))
+  }
+  return rows
+})
+
+const appearancePairRows = computed(() => {
+  const seedKeys = Object.keys(appearanceRowSeed.value || {})
+  const order = appearanceFieldOrderMap[selectedCategory.value] || []
+  const pairBases = []
+  const seenBases = new Set()
+
+  order.forEach((key) => {
+    const match = key.match(/^(.*)\[(1|2)\]$/)
+    if (!match) return
+    const base = match[1]
+    if (seenBases.has(base)) return
+    const key1 = `${base}[1]`
+    const key2 = `${base}[2]`
+    const hasKey1 = seedKeys.length === 0 || seedKeys.includes(key1)
+    const hasKey2 = seedKeys.length === 0 || seedKeys.includes(key2)
+    if (hasKey1 || hasKey2) {
+      pairBases.push([key1, key2])
+      seenBases.add(base)
+    }
+  })
+
+  return pairBases.map((pair) => pair.map(buildAppearanceFieldMeta))
 })
 
 const transformPathsToTree = (paths) => {
@@ -402,6 +628,64 @@ const transformPathsToTree = (paths) => {
 const filterNode = (value, data) => {
   if (!value) return true
   return String(data.label || '').toLowerCase().includes(value.toLowerCase())
+}
+
+const getAppearanceStorageKey = () => `${selectedNode.value?.fullPath || ''}::${selectedCategory.value || ''}`
+
+const filterAppearanceRows = (rows) => {
+  const filters = buildQueryFilters()
+  return (rows || []).filter((row) => {
+    if (filters.IndustryCommodityCode && row.IndustryCommodityCode !== filters.IndustryCommodityCode) return false
+    if (filters.scheduleThickness) {
+      const value1 = row['ScheduleThickness[1]']
+      const value2 = row['ScheduleThickness[2]']
+      if ((value1 || value2) && value1 !== filters.scheduleThickness && value2 !== filters.scheduleThickness) return false
+    }
+    return true
+  })
+}
+
+const buildAppearanceFormDefaults = (seed = {}) => {
+  const form = {}
+  const order = appearanceFieldOrderMap[selectedCategory.value] || []
+
+  order.forEach((key) => {
+    form[key] = seed[key] ?? ''
+  })
+
+  return form
+}
+
+const normalizeAppearanceRow = (form) => {
+  const normalized = {}
+  Object.entries(form).forEach(([key, value]) => {
+    if (value === '' || value === null || value === undefined) {
+      normalized[key] = ''
+      return
+    }
+    normalized[key] = numericAppearanceFields.has(key) ? Number(value) : value
+  })
+  normalized.status = 1
+  return normalized
+}
+
+const handleAppearancePairFieldChange = (key, value) => {
+  const normalizedValue = value ?? ''
+  if (!/\[1\]$/.test(key)) {
+    appearanceAddForm.value[key] = normalizedValue
+    return
+  }
+
+  const pairedKey = key.replace(/\[1\]$/, '[2]')
+  const previousValue = appearanceAddForm.value[key] ?? ''
+  const pairedValue = appearanceAddForm.value[pairedKey] ?? ''
+  const shouldSyncPair = pairedValue === '' || pairedValue === previousValue
+
+  appearanceAddForm.value[key] = normalizedValue
+
+  if (shouldSyncPair) {
+    appearanceAddForm.value[pairedKey] = normalizedValue
+  }
 }
 
 const loadTreeData = async () => {
@@ -459,20 +743,6 @@ const loadBaseData = async () => {
   }
 }
 
-const loadCommonData = async () => {
-  if (!selectedNode.value) return
-  commonLoading.value = true
-  try {
-    const res = await getPipingComponentCommonData(selectedNode.value.label, selectedCategory.value, buildQueryFilters())
-    commonData.value = res || []
-  } catch (error) {
-    console.error('加载公用端面数据失败:', error)
-    commonData.value = []
-  } finally {
-    commonLoading.value = false
-  }
-}
-
 const loadAppearanceData = async () => {
   if (!selectedNode.value || !showAppearanceGroup.value) {
     appearanceData.value = []
@@ -481,7 +751,8 @@ const loadAppearanceData = async () => {
   appearanceLoading.value = true
   try {
     const res = await getPipingComponentAppearanceData(selectedNode.value.label, selectedCategory.value, buildQueryFilters())
-    appearanceData.value = res || []
+    const localRows = filterAppearanceRows(appearanceLocalRows.value[getAppearanceStorageKey()] || [])
+    appearanceData.value = [...(res || []), ...localRows]
   } catch (error) {
     console.error('加载外形重量重心数据失败:', error)
     appearanceData.value = []
@@ -495,7 +766,6 @@ const handleNodeClick = async (data) => {
   selectedNode.value = { label: data.label, fullPath: data.fullPath }
   selectedCategory.value = String(data.raw?.category || '')
   await loadBaseData()
-  await loadCommonData()
   await loadAppearanceData()
 }
 
@@ -532,29 +802,109 @@ const handleSaveAs = async () => {
   }
 }
 const handleAddRow = (section) => {
-  const sectionName = section === 'appearance' ? '外形重量重心描述' : '公用端面数据'
-  ElMessage.info(`${sectionName} 的新增功能先保留为展示入口，后续可继续补充表单`)
+  if (section !== 'appearance') {
+    ElMessage.info('当前数据的新增功能先保留为展示入口，后续可继续补充表单')
+    return
+  }
+  appearanceDialogMode.value = 'add'
+  appearanceEditTarget.value = null
+  appearanceAddForm.value = buildAppearanceFormDefaults(appearanceSelection.value[0] || {})
+  appearanceAddDialogVisible.value = true
 }
 
-const handleDisableRows = async (section = 'appearance') => {
-  const rows = section === 'appearance' ? appearanceSelection.value : commonSelection.value
+const handleEditAppearanceRow = () => {
+  if (appearanceSelection.value.length !== 1) {
+    ElMessage.warning('请选中一行数据进行修改')
+    return
+  }
+  appearanceDialogMode.value = 'edit'
+  appearanceEditTarget.value = appearanceSelection.value[0]
+  appearanceAddForm.value = buildAppearanceFormDefaults(appearanceSelection.value[0])
+  appearanceAddDialogVisible.value = true
+}
+
+const handleSaveAppearanceAdd = () => {
+  const newRow = normalizeAppearanceRow(appearanceAddForm.value)
+  const storageKey = getAppearanceStorageKey()
+  const currentRows = appearanceLocalRows.value[storageKey] || []
+  appearanceLocalRows.value = {
+    ...appearanceLocalRows.value,
+    [storageKey]: [...currentRows, newRow]
+  }
+
+  if (filterAppearanceRows([newRow]).length) {
+    appearanceData.value = [...appearanceData.value, newRow]
+  }
+
+  appearanceAddDialogVisible.value = false
+  appearanceEditTarget.value = null
+  ElMessage.success('新增成功')
+}
+
+const handleSaveAppearanceEdit = () => {
+  if (!appearanceEditTarget.value) {
+    ElMessage.warning('请先选择一行要修改的数据')
+    return
+  }
+  const status = appearanceEditTarget.value.status
+  const updatedRow = {
+    ...normalizeAppearanceRow(appearanceAddForm.value),
+    status
+  }
+  Object.assign(appearanceEditTarget.value, updatedRow)
+  appearanceAddDialogVisible.value = false
+  appearanceTableRef.value?.clearSelection()
+  appearanceSelection.value = []
+  appearanceEditTarget.value = null
+  ElMessage.success('修改成功')
+}
+
+const handleSubmitAppearanceDialog = () => {
+  if (appearanceDialogMode.value === 'edit') {
+    handleSaveAppearanceEdit()
+    return
+  }
+  handleSaveAppearanceAdd()
+}
+
+const handleAppearanceStatusAction = async () => {
+  const rows = appearanceSelection.value
   if (!rows.length) {
     ElMessage.warning('请至少选择一行数据')
     return
   }
-  await disablePipingRows(rows)
-  rows.forEach((row) => {
+
+  if (isAppearanceRestoreMode.value) {
+    rows.forEach((row) => {
+      row.status = 1
+    })
+    appearanceTableRef.value?.clearSelection()
+    appearanceSelection.value = []
+    ElMessage.success('恢复成功')
+    return
+  }
+
+  const activeRows = rows.filter((row) => row.status !== 0)
+  if (!activeRows.length) {
+    ElMessage.warning('请至少选择一行可禁用的数据')
+    return
+  }
+
+  await disablePipingRows(activeRows)
+  activeRows.forEach((row) => {
     row.status = 0
   })
+  appearanceTableRef.value?.clearSelection()
+  appearanceSelection.value = []
   ElMessage.success('禁用成功')
-}
-
-const handleCommonSelectionChange = (rows) => {
-  commonSelection.value = rows
 }
 
 const handleAppearanceSelectionChange = (rows) => {
   appearanceSelection.value = rows
+}
+
+const handleAppearanceRowClick = (row) => {
+  appearanceTableRef.value?.toggleRowSelection(row)
 }
 
 const checkSelectable = (row) => Boolean(row)
@@ -574,7 +924,6 @@ watch(
   () => [filterForm.value.IndustryCommodityCode, filterForm.value.scheduleThickness],
   () => {
     if (!selectedNode.value) return
-    loadCommonData()
     loadAppearanceData()
   }
 )
@@ -720,6 +1069,10 @@ watch(
   background: #fff;
 }
 
+.data-section-full {
+  height: 100%;
+}
+
 .data-section-header {
   display: flex;
   align-items: center;
@@ -743,6 +1096,19 @@ watch(
 .table-wrapper {
   flex: 1;
   min-height: 0;
+}
+
+.table-wrapper :deep(.el-table th.el-table__cell) {
+  background: #f2f6fc;
+  text-align: center;
+}
+
+.table-wrapper :deep(.el-table td.el-table__cell) {
+  text-align: center;
+}
+
+.table-wrapper :deep(.el-table .cell) {
+  text-align: center;
 }
 
 .card-header {
