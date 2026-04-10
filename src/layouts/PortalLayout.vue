@@ -37,7 +37,7 @@ const handleSearch = () => {
         </div>
         <div class="brand-text">
           <span class="brand-name">S3D设计规则驱动管理系统</span>
-          <span class="brand-sub">PMC Rule Engine · 外高桥造船</span>
+          <span class="brand-sub">S3D Design Rule Engine· 外高桥造船</span>
         </div>
       </div>
 
