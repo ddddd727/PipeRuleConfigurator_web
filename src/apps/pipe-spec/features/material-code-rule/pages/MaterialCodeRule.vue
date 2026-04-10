@@ -508,16 +508,18 @@ const handleConfirmSave = async () => {
     return // checkDuplicateRule 内部已经弹窗提示
   }
 
+  // 执行保存
+  await executeSave(pendingSaveType.value, ruleName, selectedData)
+  
+  // 保存后清空当前规则选择
   if (pendingSaveType.value === 'b1b2b3d') {
-    selectedRuleB1B2B3D.value = ruleName
-    await executeSave('b1b2b3d', ruleName, selectedData)
+    selectedRuleB1B2B3D.value = ''
   } else if (pendingSaveType.value === 'c1c2') {
-    selectedRuleC1C2.value = ruleName
-    await executeSave('c1c2', ruleName, selectedData)
+    selectedRuleC1C2.value = ''
   } else if (pendingSaveType.value === 'limit') {
-    selectedRuleLimit.value = ruleName
-    await executeSave('limit', ruleName, selectedData)
+    selectedRuleLimit.value = ''
   }
+  
   saveConfirmVisible.value = false
 }
 
@@ -619,16 +621,14 @@ const limitC2TableRef = ref(null)
 const fetchB1Data = async () => {
   try {
     const res = await axios.get('/api/S3dCodeMaterialsCategoryPipingStandard/materials-categories')
-    // 尝试适配不同的响应结构
     const list = res.data.result || res.data.data || res.data
     if (Array.isArray(list)) {
       console.log('B1 Raw List:', list)
       b1Data.value = list.map(item => ({
-        // 兼容 PascalCase 和 camelCase
         code: item.MaterialsCategoryCode || item.materialsCategoryCode || item.code,
         name: item.MaterialsCategoryDesc || item.materialsCategoryDesc || item.name,
         cl: item.MaterialsCategory_CL || item.materialsCategory_CL || item.materialsCategoryCl || item.cl
-      }))
+      })).sort((a, b) => String(a.code).localeCompare(String(b.code)))
 
       const defaultB1 = b1Data.value.find(x => typeof x.name === 'string' && x.name.includes('碳钢管')) || b1Data.value[0]
       if (defaultB1) {
@@ -678,7 +678,7 @@ const fetchB2Data = async (materialsCategoryCl) => {
           item.PipingStandardCl ??
           item.pipingStandardCl ??
           item.cl
-      }))
+      })).sort((a, b) => String(a.code).localeCompare(String(b.code)))
     }
   } catch (error) {
     console.error('Failed to fetch B2 data:', error)
@@ -705,7 +705,7 @@ const fetchLimitB2Data = async () => {
           item.PipingStandardCl ??
           item.pipingStandardCl ??
           item.cl
-      }))
+      })).sort((a, b) => String(a.code).localeCompare(String(b.code)))
     }
   } catch (error) {
     console.error('Failed to fetch Limit B2 data:', error)
@@ -726,7 +726,7 @@ const fetchLimitC2Data = async (geometricIndustryStandardCl) => {
         code: item.PressureRatingCode || item.pressureRatingCode || item.code,
         name: item.PressureRatingDesc || item.pressureRatingDesc || item.name,
         cl: item.PressureRatingCl || item.pressureRatingCl || item.cl
-      }))
+      })).sort((a, b) => String(a.code).localeCompare(String(b.code)))
     }
   } catch (error) {
     console.error('Failed to fetch Limit C2 data:', error)
@@ -752,7 +752,7 @@ const fetchB3Data = async (geometricIndustryStandardCl) => {
         code: item.MaterialsGradeCode || item.materialsGradeCode || item.code,
         name: item.MaterialsGradeDesc || item.materialsGradeDesc || item.name,
         cl: item.MaterialsGradeCl || item.materialsGradeCl || item.cl
-      }))
+      })).sort((a, b) => String(a.code).localeCompare(String(b.code)))
     }
   } catch (error) {
     console.error('Failed to fetch B3 data:', error)
@@ -779,7 +779,7 @@ const fetchDData = async (MaterialsCategoryCl) => {
         code: item.ScheduleThicknessCode || item.scheduleThicknessCode || item.code,
         name: item.ScheduleThicknessDesc || item.scheduleThicknessDesc || item.name,
         cl: item.ScheduleThicknessCl || item.scheduleThicknessCl || item.cl
-      }))
+      })).sort((a, b) => String(a.code).localeCompare(String(b.code)))
     }
   } catch (error) {
     console.error('Failed to fetch D data:', error)
@@ -805,21 +805,44 @@ const generateData = () => {
   const b2Item = b2Data.value.find(i => i.cl === b2Selection.value)
   const b3Item = b3Data.value.find(i => i.cl === b3Selection.value)
 
-  let newId = resultData.value.length > 0 ? Math.max(...resultData.value.map(r => r.id)) + 1 : 1
-  let count = 0
+  const duplicates = []
+  const existingCombos = []
   
   dSelection.value.forEach(d => {
-    // Check if exists
-    const exists = resultData.value.some(r => 
+    const comboKey = `${b1Item?.code}-${b2Item?.code}-${b3Item?.code}-${d.code}`
+    
+    const existsInResult = resultData.value.some(r => 
       r.b1Code === b1Item?.code &&
       r.b2Code === b2Item?.code &&
       r.b3Code === b3Item?.code &&
       r.dCode === d.code
     )
     
-    if (!exists) {
+    const existsInNew = existingCombos.some(key => key === comboKey)
+    
+    if (existsInResult || existsInNew) {
+      duplicates.push(comboKey)
+    } else {
+      existingCombos.push(comboKey)
+    }
+  })
+  
+  if (duplicates.length > 0) {
+    ElMessage.warning(`发现 ${duplicates.length} 条重复的编码组合，请检查数据！`)
+    return
+  }
+
+  let newId = resultData.value.length > 0 ? Math.max(...resultData.value.map(r => r.id)) + 1 : 1
+  let count = 0
+  const newIds = []
+  
+  dSelection.value.forEach(d => {
+    const comboKey = `${b1Item?.code}-${b2Item?.code}-${b3Item?.code}-${d.code}`
+    if (!duplicates.includes(comboKey)) {
+      const id = newId++
+      newIds.push(id)
       resultData.value.push({
-        id: newId++,
+        id: id,
         b1Code: b1Item?.code,
         b1Cl: b1Item?.cl,
         b2Code: b2Item?.code,
@@ -833,16 +856,13 @@ const generateData = () => {
     }
   })
   
-  if (count > 0) {
-    ElMessage.success(`生成成功，新增 ${count} 条数据`)
-  } else {
-    ElMessage.info('所选组合已存在')
-  }
+  ElMessage.success(`生成成功，新增 ${count} 条数据`)
+  
   if (resultTableRef.value) {
     nextTick(() => {
       resultTableRef.value.clearSelection()
       resultData.value.forEach(row => {
-        if (prevIds.includes(row.id)) {
+        if (newIds.includes(row.id)) {
           resultTableRef.value.toggleRowSelection(row, true)
         }
       })
@@ -1056,7 +1076,7 @@ const handleDRowClick = (row, column) => {
 const handleResultRowClick = async (row, column) => {
   if (!row) return
 
-  const b1 = b1Data.value.find(i => i.code === row.b1Code)
+  const b1 = b1Data.value.find(i => i.cl === row.b1Cl)
   if (b1) {
     b1Selection.value = b1.cl
     await Promise.all([
@@ -1065,26 +1085,24 @@ const handleResultRowClick = async (row, column) => {
     ])
   }
 
-  const b2 = b2Data.value.find(i => i.code === row.b2Code)
+  const b2 = b2Data.value.find(i => i.cl === row.b2Cl)
   if (b2) {
     b2Selection.value = b2.cl
     await fetchB3Data(b2.cl)
   }
 
-  const b3 = b3Data.value.find(i => i.code === row.b3Code)
+  const b3 = b3Data.value.find(i => i.cl === row.b3Cl)
   if (b3) b3Selection.value = b3.cl
   
   if (dTableRef.value) {
     dTableRef.value.clearSelection()
-    const targetD = dData.value.find(item => item.code === row.dCode)
+    const targetD = dData.value.find(item => item.cl === row.dCl)
     if (targetD) {
       dTableRef.value.toggleRowSelection(targetD, true)
     }
   }
 
   if (column && column.type === 'selection') return
-  if (!resultTableRef.value) return
-  resultTableRef.value.toggleRowSelection(row)
 }
 
 // Result Data Selection
@@ -1134,7 +1152,7 @@ const fetchC1Data = async () => {
         code: item.FlangeStandardCode || item.flangeStandardCode || item.code,
         name: item.FlangeStandDesc || item.flangeStandDesc || item.name,
         cl: item.GeometricIndustryStandardCl || item.geometricIndustryStandardCl || item.cl
-      }))
+      })).sort((a, b) => String(a.code).localeCompare(String(b.code)))
     }
   } catch (error) {
     console.error('Failed to fetch C1 data:', error)
@@ -1161,7 +1179,7 @@ const fetchC2Data = async (geometricIndustryStandardCl) => {
         code: item.PressureRatingCode || item.pressureRatingCode || item.code,
         name: item.PressureRatingDesc || item.pressureRatingDesc || item.name,
         cl: item.PressureRatingCl || item.pressureRatingCl || item.cl
-      }))
+      })).sort((a, b) => String(a.code).localeCompare(String(b.code)))
     }
   } catch (error) {
     console.error('Failed to fetch C2 data:', error)
@@ -1185,19 +1203,42 @@ const generateC1C2Data = () => {
 
   const c1Item = c1Data.value.find(i => i.cl === c1Selection.value)
 
-  let newId = resultC1C2Data.value.length > 0 ? Math.max(...resultC1C2Data.value.map(r => r.id)) + 1 : 1
-  let count = 0
+  const duplicates = []
+  const existingCombos = []
   
   c2Selection.value.forEach(c2 => {
-    // Check if exists
-    const exists = resultC1C2Data.value.some(r => 
+    const comboKey = `${c1Item?.code}-${c2.code}`
+    
+    const existsInResult = resultC1C2Data.value.some(r => 
       r.c1Code === c1Item?.code &&
       r.c2Code === c2.code
     )
     
-    if (!exists) {
+    const existsInNew = existingCombos.some(key => key === comboKey)
+    
+    if (existsInResult || existsInNew) {
+      duplicates.push(comboKey)
+    } else {
+      existingCombos.push(comboKey)
+    }
+  })
+  
+  if (duplicates.length > 0) {
+    ElMessage.warning(`发现 ${duplicates.length} 条重复的编码组合，请检查数据！`)
+    return
+  }
+
+  let newId = resultC1C2Data.value.length > 0 ? Math.max(...resultC1C2Data.value.map(r => r.id)) + 1 : 1
+  let count = 0
+  const newIds = []
+  
+  c2Selection.value.forEach(c2 => {
+    const comboKey = `${c1Item?.code}-${c2.code}`
+    if (!duplicates.includes(comboKey)) {
+      const id = newId++
+      newIds.push(id)
       resultC1C2Data.value.push({
-        id: newId++,
+        id: id,
         c1Code: c1Item?.code,
         c1Cl: c1Item?.cl,
         c2Code: c2.code,
@@ -1207,16 +1248,12 @@ const generateC1C2Data = () => {
     }
   })
   
-  if (count > 0) {
-    ElMessage.success(`生成成功，新增 ${count} 条数据`)
-  } else {
-    ElMessage.info('所选组合已存在')
-  }
+  ElMessage.success(`生成成功，新增 ${count} 条数据`)
   if (resultC1C2TableRef.value) {
     nextTick(() => {
       resultC1C2TableRef.value.clearSelection()
       resultC1C2Data.value.forEach(row => {
-        if (prevIds.includes(row.id)) {
+        if (newIds.includes(row.id)) {
           resultC1C2TableRef.value.toggleRowSelection(row, true)
         }
       })
@@ -1254,7 +1291,7 @@ const handleC2RowClick = (row, column) => {
 const handleResultC1C2RowClick = async (row, column) => {
   if (!row) return
 
-  const c1 = c1Data.value.find(i => i.code === row.c1Code)
+  const c1 = c1Data.value.find(i => i.cl === row.c1Cl)
   if (c1) {
     c1Selection.value = c1.cl
     await fetchC2Data(c1.cl)
@@ -1262,15 +1299,13 @@ const handleResultC1C2RowClick = async (row, column) => {
   
   if (c2TableRef.value) {
     c2TableRef.value.clearSelection()
-    const targetC2 = c2Data.value.find(item => item.code === row.c2Code)
+    const targetC2 = c2Data.value.find(item => item.cl === row.c2Cl)
     if (targetC2) {
       c2TableRef.value.toggleRowSelection(targetC2, true)
     }
   }
 
   if (column && column.type === 'selection') return
-  if (!resultC1C2TableRef.value) return
-  resultC1C2TableRef.value.toggleRowSelection(row)
 }
 
 // Result C1C2 Data Selection
@@ -1339,7 +1374,7 @@ const fetchLimitAData = async () => {
           name: rawName != null ? String(rawName).trim() : '',
           cl: rawCl != null ? rawCl : ''
         }
-      })
+      }).sort((a, b) => String(a.code).localeCompare(String(b.code)))
     }
   } catch (error) {
     console.error('Failed to fetch Limit A data:', error)
@@ -1414,42 +1449,65 @@ const generateLimitData = () => {
 
   const b2Item = b2Data.value.find(i => i.cl === limitB2Selection.value)
 
+  const duplicates = []
+  const existingCombos = []
+
   limitB3Selection.value.forEach(b3 => {
     limitC2Selection.value.forEach(c2 => {
-       const exists = resultLimitData.value.some(r => 
-         r.aCode === limitASelection.value &&
-         r.b2Code === b2Item?.code &&
-         r.b3Code === b3.code &&
-         r.c2Code === c2.code
-       )
-       
-       if (!exists) {
-         resultLimitData.value.push({
-           id: newId++,
-           aCode: aItem?.code || limitASelection.value,
-           aCl: aItem?.cl,
-           b2Code: b2Item?.code,
-           b2Cl: b2Item?.cl,
-           b3Code: b3.code,
-           b3Cl: b3.cl,
-           c2Code: c2.code,
-           c2Cl: c2.cl
-         })
-         count++
-       }
+      const comboKey = `${limitASelection.value}-${b2Item?.code}-${b3.code}-${c2.code}`
+      
+      const existsInResult = resultLimitData.value.some(r => 
+        r.aCode === limitASelection.value &&
+        r.b2Code === b2Item?.code &&
+        r.b3Code === b3.code &&
+        r.c2Code === c2.code
+      )
+      
+      const existsInNew = existingCombos.some(key => key === comboKey)
+      
+      if (existsInResult || existsInNew) {
+        duplicates.push(comboKey)
+      } else {
+        existingCombos.push(comboKey)
+      }
+    })
+  })
+  
+  if (duplicates.length > 0) {
+    ElMessage.warning(`发现 ${duplicates.length} 条重复的编码组合，请检查数据！`)
+    return
+  }
+
+  const newIds = []
+
+  limitB3Selection.value.forEach(b3 => {
+    limitC2Selection.value.forEach(c2 => {
+      const comboKey = `${limitASelection.value}-${b2Item?.code}-${b3.code}-${c2.code}`
+      if (!duplicates.includes(comboKey)) {
+        const id = newId++
+        newIds.push(id)
+        resultLimitData.value.push({
+          id: id,
+          aCode: aItem?.code || limitASelection.value,
+          aCl: aItem?.cl,
+          b2Code: b2Item?.code,
+          b2Cl: b2Item?.cl,
+          b3Code: b3.code,
+          b3Cl: b3.cl,
+          c2Code: c2.code,
+          c2Cl: c2.cl
+        })
+        count++
+      }
     })
   })
 
-  if (count > 0) {
-    ElMessage.success(`生成成功，新增 ${count} 条数据`)
-  } else {
-    ElMessage.info('所选组合已存在')
-  }
+  ElMessage.success(`生成成功，新增 ${count} 条数据`)
   if (resultLimitTableRef.value) {
     nextTick(() => {
       resultLimitTableRef.value.clearSelection()
       resultLimitData.value.forEach(row => {
-        if (prevIds.includes(row.id)) {
+        if (newIds.includes(row.id)) {
           resultLimitTableRef.value.toggleRowSelection(row, true)
         }
       })
@@ -1512,7 +1570,7 @@ const handleResultLimitRowClick = async (row, column) => {
 
   limitASelection.value = row.aCode
   
-  const b2 = b2Data.value.find(i => i.code === row.b2Code)
+  const b2 = b2Data.value.find(i => i.cl === row.b2Cl)
   if (b2) {
     limitB2Selection.value = b2.cl
     await Promise.all([
@@ -1523,7 +1581,7 @@ const handleResultLimitRowClick = async (row, column) => {
   
   if (limitB3TableRef.value) {
     limitB3TableRef.value.clearSelection()
-    const targetB3 = b3Data.value.find(item => item.code === row.b3Code)
+    const targetB3 = b3Data.value.find(item => item.cl === row.b3Cl)
     if (targetB3) {
       limitB3TableRef.value.toggleRowSelection(targetB3, true)
     }
@@ -1531,15 +1589,13 @@ const handleResultLimitRowClick = async (row, column) => {
 
   if (limitC2TableRef.value) {
     limitC2TableRef.value.clearSelection()
-    const targetC2 = c2Data.value.find(item => item.code === row.c2Code)
+    const targetC2 = c2Data.value.find(item => item.cl === row.c2Cl)
     if (targetC2) {
       limitC2TableRef.value.toggleRowSelection(targetC2, true)
     }
   }
 
   if (column && column.type === 'selection') return
-  if (!resultLimitTableRef.value) return
-  resultLimitTableRef.value.toggleRowSelection(row)
 }
 
 // Result Limit Data Selection

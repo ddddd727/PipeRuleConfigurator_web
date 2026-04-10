@@ -15,6 +15,10 @@
               clearable
               :prefix-icon="Search"
             />
+
+            <div class="tree-actions">
+              <el-button text class="tree-add-button">+</el-button>
+            </div>
           </div>
 
           <div class="tree-wrapper">
@@ -827,6 +831,26 @@ watch(filterText, (value) => {
 .tree-header {
   padding: 12px 16px;
   border-bottom: 1px solid #f0f2f5;
+}
+
+.tree-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+  margin-bottom: -10px;
+}
+
+.tree-add-button {
+  padding: 0;
+  min-height: auto;
+  min-width: auto;
+  font-size: 22px;
+  line-height: 1;
+  color: #606266;
+}
+
+.tree-add-button:hover {
+  color: #409eff;
 }
 
 .tree-wrapper {
