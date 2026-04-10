@@ -36,8 +36,8 @@ const handleSearch = () => {
           </svg>
         </div>
         <div class="brand-text">
-          <span class="brand-name">S3D设计规则驱动管理系统</span>
-          <span class="brand-sub">S3D Design Rule Engine· 外高桥造船</span>
+          <span class="brand-name">设计规则驱动管理系统</span>
+          <span class="brand-sub">Design Rule Driven Management (DRDM.Chinasws.Com )</span>
         </div>
       </div>
 
@@ -90,7 +90,7 @@ const handleSearch = () => {
       <!-- 欢迎区 -->
       <section class="welcome">
         <div class="welcome-left">
-          <h1 class="welcome-title">欢迎进入S3D设计规则驱动管理系统</h1>
+          <h1 class="welcome-title">欢迎进入设计规则驱动管理系统</h1>
           <p class="welcome-desc">请选择您需要进入的功能模块。登录系统接入后将展示个性化信息。</p>
         </div>
 
@@ -174,7 +174,7 @@ const handleSearch = () => {
   align-items: center;
   gap: 11px;
   flex-shrink: 0;
-  width: 280px;
+  width: 360px;
 }
 .logo svg { width: 36px; height: 36px; display: block; }
 
@@ -194,6 +194,7 @@ const handleSearch = () => {
   font-size: 11px;
   color: rgba(255,255,255,.45);
   letter-spacing: .2px;
+  white-space: nowrap;
 }
 
 .navbar-search {
