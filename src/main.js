@@ -1,15 +1,17 @@
-import { createApp } from 'vue'
+﻿import { createApp } from 'vue'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
 import './apps/design-rule/mock/index.js'
+import './apps/product-standard/features/codelist-management/mock/codelistMock.js'
+import './apps/product-standard/features/piping-spec-management/mock/pipingSpecMock.js'
 import { createPinia } from 'pinia'
 import './assets/dirty-status.css'
-// 开发环境下启用本地 mock 数据
+// 寮€鍙戠幆澧冧笅鍚敤鏈湴 mock 鏁版嵁
 if (import.meta.env.DEV) {
-  // 动态导入以避免在生产环境中打包 mock
+  // 鍔ㄦ€佸鍏ヤ互閬垮厤鍦ㄧ敓浜х幆澧冧腑鎵撳寘 mock
   import('./apps/design-rule/mock')
 }
 
@@ -24,3 +26,4 @@ app.use(pinia)
 app.use(router)
 app.use(ElementPlus)
 app.mount('#app')
+
